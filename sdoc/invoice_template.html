@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Счёт</title>
+<style>
+  @page { size: A4; margin: 15mm 14mm; }
+  @media print {
+    .no-print { display: none !important; }
+  }
+  .print-controls {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+  }
+  .print-btn {
+    background: #4caf50;
+    color: #fff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .print-btn:hover { background: #45a049; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10pt;
+    color: #000;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 15mm 14mm;
+    background: #fff;
+  }
+
+  /* === Header === */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .header-title {
+    font-size: 16pt;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+
+  /* === Info blocks === */
+  .info-block {
+    margin-bottom: 12px;
+    line-height: 1.15;
+  }
+  .info-block .label {
+    font-weight: bold;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+  }
+  .info-left { flex: 1; }
+  .info-right {
+    text-align: right;
+    white-space: nowrap;
+    margin-left: 20px;
+  }
+  .info-line {
+    display: flex;
+    gap: 8px;
+    line-height: 1.23;
+  }
+  .info-line .key {
+    font-weight: bold;
+    white-space: nowrap;
+  }
+  .info-line .val {
+    flex: 1;
+  }
+  .phone-line {
+    text-align: right;
+    margin-bottom: 2px;
+  }
+
+  /* === Table === */
+  table.items {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+  table.items th,
+  table.items td {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    vertical-align: top;
+  }
+  table.items th {
+    background: #f0f0f0;
+    font-weight: bold;
+    text-align: center;
+  }
+  table.items td.num {
+    text-align: right;
+    white-space: nowrap;
+  }
+  table.items td.item-name {
+    width: 38%;
+  }
+  table.items td.col-kol {
+    width: 8%;
+    text-align: center;
+  }
+  table.items td.col-price {
+    width: 12%;
+    text-align: right;
+  }
+  table.items td.col-sum {
+    width: 14%;
+    text-align: right;
+  }
+
+  /* === Totals === */
+  table.totals-row {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+  table.totals-row th,
+  table.totals-row td {
+    padding: 3px 6px;
+    vertical-align: middle;
+    border: none;
+  }
+  table.totals-row td.totals-label {
+    text-align: right;
+    padding-right: 8px;
+    font-weight: normal;
+  }
+  table.totals-row td.totals-cell {
+    border: 1px solid #000;
+    text-align: right;
+    padding: 3px 8px;
+  }
+  table.totals-row td.totals-cell.bold {
+    font-weight: bold;
+  }
+
+  /* === NDS & SumProp === */
+  .nds-line {
+    margin-bottom: 6px;
+    font-size: 10pt;
+  }
+  .total-words {
+    font-size: 10pt;
+    margin-bottom: 24px;
+  }
+  .total-words .label {
+    font-weight: normal;
+  }
+  .total-words .value {
+    font-weight: bold;
+  }
+
+  /* === Signatures === */
+  .signatures {
+    margin-top: 30px;
+    font-size: 10pt;
+    line-height: 1.69;
+  }
+  .sig-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .sig-role {
+    white-space: nowrap;
+    font-weight: normal;
+  }
+  .sig-dots {
+    flex: 1;
+    border-bottom: 1px dotted #000;
+    min-width: 200px;
+  }
+  .sig-name {
+    white-space: nowrap;
+  }
+
+  .stamp {
+    margin-top: 20px;
+    font-size: 10pt;
+    font-weight: bold;
+  }
+
+  /* === Print === */
+  @media print {
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="print-controls no-print">
+  <button class="print-btn" onclick="window.print()">Печать</button>
+</div>
+
+  <!-- Header: Logo + Title -->
+  <div class="header">
+    <div class="header-left">
+      <img src="sdoc/logo.png" alt="" width="110" height="48" />
+      <div class="header-title">&nbsp; &nbsp; &nbsp; СЧЁТ №&nbsp;#Number#&nbsp;от&nbsp;#Date#</div>
+    </div>
+  </div>
+
+  <!-- Поставщик -->
+  <div class="info-block">
+    <div class="info-line">
+      <span class="key">Поставщик:</span>
+      <span class="val" style="font-weight:bold">#FirmName#</span>
+      <span class="info-right">#FirmPhoneLine#</span>
+    </div>
+    <div class="info-line">
+      <span class="key" style="min-width:62px">Адрес:</span>
+      <span class="val">#FirmAddress#</span>
+    </div>
+    <div class="info-line">
+      <span class="key" style="min-width:62px">Расч. счет:</span>
+      <span class="val">#FirmSchet#&nbsp;&nbsp;#FirmBank#</span>
+    </div>
+    <div class="info-line">
+      <span class="key" style="min-width:62px">Код ИНН:</span>
+      <span class="val">#FirmINN#&nbsp;&nbsp;#FirmKPPLine#</span>
+    </div>
+    <div class="info-line">
+      <span class="key" style="min-width:62px">БИК:</span>
+      <span class="val">#FirmBIK#&nbsp;&nbsp;Корсчет: #FirmKSchet#</span>
+    </div>
+  </div>
+
+  <!-- Плательщик -->
+  <div class="info-block">
+    <div class="info-line">
+      <span class="key">Плательщик:</span>
+      <span class="val" style="font-weight:bold">#ClientName#</span>
+      <span class="info-right">#ClientPhoneLine#</span>
+    </div>
+    <div class="info-line">
+      <span class="key" style="min-width:62px">Адрес:</span>
+      <span class="val">#ClientAddress#</span>
+    </div>
+  </div>
+
+  <!-- Таблица товаров -->
+  <table class="items">
+    <thead>
+      <tr>
+        <th class="item-name">Предмет счета</th>
+        <th class="col-kol">Кол-во</th>
+        <th class="col-price">Цена, Руб</th>
+        <th class="col-sum">Сумма без<br>НДС, Руб</th>
+        <th class="col-sum">Сумма<br>НДС, Руб</th>
+        <th class="col-sum">Сумма с<br>НДС, Руб</th>
+      </tr>
+    </thead>
+    <tbody>
+      #D1
+      <tr>
+        <td class="item-name">#ItemName#</td>
+        <td class="col-kol">#ItemQuant#</td>
+        <td class="col-price">#ItemPrice#</td>
+        <td class="col-sum">#ItemSum#</td>
+        <td class="col-sum">#ItemSumN#</td>
+        <td class="col-sum">#ItemSSum#</td>
+      </tr>
+      #1D
+    </tbody>
+  </table>
+
+  <!-- Итого -->
+  <table class="totals-row">
+    <colgroup>
+      <col style="width:38%">
+      <col style="width:8%">
+      <col style="width:12%">
+      <col style="width:14%">
+      <col style="width:14%">
+      <col style="width:14%">
+    </colgroup>
+    <tr>
+      <td class="totals-label" colspan="3">Итого:</td>
+      <td class="totals-cell">#TotSum#</td>
+      <td class="totals-cell">#TotSumN#</td>
+      <td class="totals-cell bold">#TotSSum#</td>
+    </tr>
+  </table>
+
+  <!-- НДС -->
+  <div class="nds-line">#NDS_Str#</div>
+
+  <!-- Всего к оплате -->
+  <div class="total-words">
+    <span class="label">Всего к оплате: </span><span class="value">#SumProp#</span>
+  </div>
+
+  <!-- Подписи + подпись/печать -->
+  <div class="signatures" style="position: relative;">
+    <div class="sig-line">
+      <span class="sig-role">Руководитель предприятия:</span>
+      <span class="sig-dots"></span>
+      <span class="sig-name">/ #FirmDirector# /</span>
+    </div>
+    <div class="sig-line">
+      <span class="sig-role">Главный бухгалтер:</span>
+      <span class="sig-dots"></span>
+      <span class="sig-name">/ #FirmGlavbuh# /</span>
+    </div>
+    <img src="sdoc/podpispechat.png" alt="" style="position: absolute; top: calc(-5px - 6mm); left: 35%; height: 195px;" />
+  </div>
+
+  <div class="stamp">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; М.П.</div>
+
+  <!-- Платежные реквизиты -->
+  <div class="payment-info" style="margin-top: 40px; font-size: 10pt; line-height: 1.23;">
+    <p>&nbsp;  </p>
+    <p style="margin-bottom: 10px;">
+      Просим при оплате указывать назначение платежа: «Оплата по счёту № #Number# от #Date#, НДС не облагается».
+    </p>
+    <p style="margin-bottom: 10px;">
+      Счёт является действительным для оплаты в течении десяти банковских дней, включая дату выписки счёта.<br>
+      Датой оплаты по данному счёту считается дата зачисления денежных средств на расчетный счет Поставщика.
+    </p>
+    <p style="margin-bottom: 16px;">
+      Просим Вас сообщить об оплате по email: #FirmEmail# или по телефону #FirmPhone#.
+    </p>
+
+    <p style="margin-bottom: 6px; font-weight: bold;">Образец заполнения платежного поручения:</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 10pt; border: 1px solid #000;">
+      <!-- строка 1 -->
+      <tr>
+        <td rowspan="2" style="border: 1px solid #000; border-right: none; padding: 4px 6px; width: 29%; vertical-align: top; text-align: left;">
+          #FirmBank#<br>
+          г. Москва<br>
+          Банк получателя
+        </td>
+        <td style="border: none; padding: 4px 6px; width: 29%;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 4px 6px; width: 17%; text-align: left;">БИК</td>
+        <td rowspan="2" style="border: 1px solid #000; padding: 4px 6px; width: 25%; vertical-align: top; text-align: left;">
+          #FirmBIK#<br><br>
+          #FirmKSchet#
+        </td>
+      </tr>
+      <!-- строка 2 -->
+      <tr>
+        <td style="border: none; padding: 4px 6px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 4px 6px; text-align: left;">Сч. №</td>
+      </tr>
+      <!-- строка 3 -->
+      <tr>
+        <td style="border: 1px solid #000; padding: 4px 6px; text-align: left;">ИНН &nbsp;#FirmINN#</td>
+        <td style="border: 1px solid #000; padding: 4px 6px; text-align: left;">КПП &nbsp;#FirmKPP#</td>
+        <td style="border: 1px solid #000; border-bottom: none; padding: 4px 6px; text-align: left;">Сч. №</td>
+        <td rowspan="2" style="border: 1px solid #000; padding: 4px 6px; vertical-align: top; text-align: left;">
+          #FirmSchet#
+        </td>
+      </tr>
+      <!-- строка 4 -->
+      <tr>
+        <td colspan="2" style="border: 1px solid #000; padding: 4px 6px; text-align: left; vertical-align: top;">
+          #FirmName#<br>
+          #FirmBank#<br>
+          Получатель
+        </td>
+        <td style="border: 1px solid #000; padding: 4px 6px; text-align: left;">&nbsp;</td>
+      </tr>
+    </table>
+  </div>
+
+</body>
+</html>

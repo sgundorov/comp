@@ -1,0 +1,277 @@
+Давай проанализируем...
+Была поставлен задача: создать в форме "Продажа" таблицу "Товары документа" на основе уже имеющегося работающего образца: формы "Счет".  Казалось бы что это просто: нужно  скопировать код из Счета и заменить названия таблиц и полей в этом коде.  Но на деле мы опять получили ДЕСЯТКИ ошибок и недоделок, исправление которых заняло много часов отладки.
+Проанализируй почему это произошло? Что нужно сделать чтобы новые таблицы и формы создавались по готовому шаблону сразу без ошибок?
+Для решения этой задачи мы уже написали скилл создания таблицы. Но он не помог.  Может быть нужно доработать этот скил, включитьв него все возможные ошибки при создании таблицы?
+Может сделать еще один скил по созданию таблице в родительской форме?
+Или может еще раз реструктуризировать код приложения таким образом чтобы таблица легко и безошибочно "собиралась" из готовых "шаблонов кода"?
+
+
+Если шаблон "Таблица в форме" готов, то давай его используем. Для этого нужно создать еще одну страницу "Счет" со списком товаров на ней. Я не хочу править имеющуюся страницу invoice.php - она уже отлажена и работает нак нужно.
+Путь новая страница называется invo.php. Нужно сделать новую страницу "Счета" не так как раньше, а используя шаблонные файлы "Таблица в форме".
+
+
+Думаю как сделать файл-шаблон (html) с встроенными таблицами. У меня есть готовая система (под Windows) которая использует специальную разметку файл шаблона для выделения в нем секций (строк) таблицы, которые должны повторяться для каждой строки встроенной в документ дочерней таблицы. Там в файле шаблон начало и конец строки отмечаются специаольной разметкой (#D1 - начало строки, #1D - конец строки). Можем применить эту систему разметки файла-шаблона. Сами "переменные" в этих файлах шаблонах обозначаются тае: #Number#, #Data#...
+ 
+Думаю что если использовать эту систему разметки шаблона, то я могу предбразовать имеющиеся у меня файлы шаблоны в формате rtf в формат html.
+
+По ресайзу колонок.  Похоже что именно сейчас сохраняется ширина только той колонки, которая была изменена. А ширина всех остальных колонок по-прежнему изменяется. В "Счетах" это работат правильно. Посмотри как сделано там.    Нужжно это исправить. Причем так, чтобы работало одинаково во всех таблицахю (То есть это код должен быть общим для всех таблиц).
+
+При переключении docum.accept_flag нужно пересчитать (в таблице residue) остаток товара на участке для каждого из товаров документа. С учетом того что residue.wh_id==docum.store_id.  Остаток считается путем суммирования docum2.quant по всем документам, в которых есть данный товар и у которых docum2.accept_flag != 0.  Суммировать нужно с учетом того приходный это документ или расходный. Это определяется по таблице typeop (поле prihod_flag), связанной с таблицей docum через typeop_id.
+
+Не работает все что связано с отметками записей в sale.php.  При открытии формы sale_form ошибка: Ошибка подключения к БД
+
+
+В форме "Операция с деньгами" при вводе sum_in или sum_oup должна вычислятся и сразу же обновляться plat.sum.  Там же при выборе вида операции должен сразу же обновляться "Тип" (out_flag).
+
+Для документов "Приход" и "Возврат от покупателя" (у которых в таблице typeop включен prihod_flag) в "Оплатах" сумма plat.sum отрицательная. (Потому что для нас это расходная операция: мы кому то платим).  В этих случаях выделение красным цветом docum.sum_plat в таблице и форме должно быть по условию: docum.sum > (-docum.sum_plat)
+
+invoice_form.php. В форме "Товар счета" нужно добавить новую кнопку "Товар" справа от кнопки "+" товара. Иконка "карандаш" (как у инлайн редакторов таблиц).  При нажатии на эту кнопку должна открываться форма tmc_form в режиме edit в модальном окне.  При закрывании этой формы управление возвращается в форму "Товар счета".
+
+-----
+C:\xa\htdocs\comp
+Инструменты работают?
+Да.
+
+В форме sotr_form.php перестал работать лукап. Нужно исправить...  Возможно что и в других формах такая же проблема: проверить и исправитью
+Теперь вижу проблему. Давайте проверю другие формы и историю изменений.
+
+Нашёл проблему. В sotr_form.php:389 inline-скрипт читает data-roles, а render_lookup() записывает данные в атрибут data-countries. Это единственный баг — остальные формы используют правильный data-countries.
+
+Отчёт:
+
+Файл: sotr_form.php:389
+
+Проблема: В inline-скрипте ручного биндинга лукапа атрибут указан как data-roles, но render_lookup() (controls.php:151) сохраняет данные в data-countries. Из-за этого парсился пустой массив — список ролей не отображался.
+
+Исправление: data-roles → data-countries
+
+Проверка других форм: Все остальные *_form.php (city, client, izgot, firm, contact, tmc, docum2, invoice2, plat) используют корректный data-countries — проблема только в sotr_form.php.
+
+Не открывается страница "Контрагенты": 
+Ошибка синтаксического анализа : синтаксическая ошибка, неожиданный идентификатор "cRoot", ожидается "]" в файле C:\xa\htdocs\comp\client.php на строке 589
+Вижу проблему. В строке extra_open (line 589) JS использует одинарные кавычки внутри PHP-строки в одинарных кавычках — PHP обрывается на '[CITY].
+
+Другие формы с аналогичными длинными extra_open/extra_restore строками:
+
+Отчёт:
+
+Файл: client.php:589
+
+Проблема: В PHP-строке 'extra_open' => '...' внутри JS кода были одинарные кавычки: console.log('[CITY] cRoot:', ...). PHP воспринял '[CITY] как конец строки, а cRoot: — как неожиданный идентификатор, что вызвало синтаксическую ошибку.
+
+Исправление: Заменил одинарные кавычки на двойные в console.log — теперь PHP-строка не разрывается:
+
+// было: console.log('[CITY] cRoot:',...
+// стало: console.log("[CITY] cRoot:",...
+Проверка других файлов: Больше нигде в extra_open/extra_restore нет неэкранированных одинарных кавычек внутри PHP-строк — проблема была только в client.php.
+
+Форма "Контрагент", поле "Город". После выбора города должно автоматически заполняться поле "Страна" (из city.country_id)
+Логика автозаполнения города→страны уже реализована в трёх местах:
+
+client_form.php:683-694 — onCitySelect для standalone-режима
+client.php:718-738 — initFormLookups() для модального режима (через data-country-input)
+client.php:589 — extra_open setTimeout (модальный, дублирующий)
+Единственное, что мешало — синтаксическая ошибка в client.php:589 (неэкранированные одинарные кавычки в console.log), из-за которой PHP не выполнялся. После исправления всё должно работать.
+
+Проверьте — открывается ли теперь страница и заполняется ли страна при выборе города.
+
+Страна при выборе города не заполняется. В консоли: [CITY] cRoot: true coRoot: true cApi: true coApi: true
+Проблема в том, что setTimeout переопределяет __lookupApi.choose, но UI-клик вызывает внутреннюю choose из замыкания bindLookup, а не через API. initFormLookups() использует правильный механизм (onSelect), но в нём есть баг: при проверке countryRoot.__lookupApi внутри handler — он уже должен быть установлен к моменту вызова, но давайте проверим с логами.
+
+Теперь давайте почистим extra_open — удалим бесполезный setTimeout (он переопределяет __lookupApi.choose, который UI не вызывает) и заодно проверим данные:
+
+Удаляю бесполезный setTimeout (override __lookupApi.choose не вызывается при клике через UI — popup item использует внутреннюю choose из замыкания). Заменяю на правильный механизм.
+
+Готово. Теперь при выборе города в консоли появятся отладочные сообщения [city->country]. Проверьте, пожалуйста, что покажет консоль после выбора города в форме Контрагента.
+
+Не работает. [city->country] city: {id: 28, name: 'Tallinn', country_id: 4} id: 28 country_id: 4
+client.php?focus=22394:1542 [city->country] country: {id: 4, name: 'Эстония'} hasApi: true
+Хм, handler срабатывает, данные находит, hasApi: true, а страна не заполняется. Давайте проверим, отрабатывает ли choose — добавим лог прямо перед и после вызова:
+
+Проверьте консоль после выбора города — теперь должно показать тип chooseFn и значения полей после вызова.
+
+[city->country] city: {id: 21, name: 'New York', country_id: 17} id: 21 country_id: 17
+client.php?focus=22394:1542 [city->country] country: {id: 17, name: 'США'} hasApi: true chooseFn: function
+client.php?focus=22394:1545 [city->country] after choose, countryName value: США countryId value: 17
+Странно — данные успешно устанавливаются (countryName value: США, countryId value: 17), но визуально не отображаются. Давайте посмотрим на разметку формы — возможно два блока адресов.
+
+Согласно логам, значения УСТАНАВЛИВАЮТСЯ (countryName value: США, countryId value: 17).
+
+Подскажите: вы смотрите на первую вкладку "Основные реквизиты" (таб 0) или на вторую "Юридический адрес" (таб 1)? В форме два блока Город/Страна, а initFormLookups находит [data-lookup="country"] через querySelector — только первый (таб 0). Страна во втором табе не заполняется.
+
+Какой из двух блоков должен авто-заполняться, или оба?
+
+Я смотрю на вкладке "Адрес". По-моему страны больше нигде нет и не должно быть.
+Понял. Tab 0 "Общие" тоже имеет Город/Страна (скрыт), и querySelector находит его там. Нужно искать Страну в том же табе, где и выбранный Город.
+
+Теперь поправлю и standalone-режим в client_form.php:
+
+Готово. Теперь initFormLookups ищет Страну в том же .tab-pane, что и Город:
+
+var tabPane = root.closest('.tab-pane');
+var countryRoot = tabPane
+  ? tabPane.querySelector('[data-lookup="country"]')
+  : modalBody.querySelector('[data-lookup="country"]');
+Все изменения:
+
+Файл	Изменение
+sotr_form.php:389	data-roles → data-countries
+client.php:589	Экранированы одинарные кавычки в console.log (PHP syntax error)
+client.php:589	Удалён бесполезный setTimeout (override __lookupApi.choose не вызывался UI)
+client.php:720-723	Поиск страны в том же табе (через root.closest('.tab-pane'))
+Проверьте — теперь при выборе города на вкладке "Адрес" страна должна заполняться.
+
+Да. Нужно убрать поля "Город", "Страна" и "Почтовый индекс" с первой вкладки. Они дублирубтся!
+Удалено. Теперь Город/Страна/Индекс только на вкладке "Адрес". $currentCityCountryId остаётся — используется в data-city-country-id на единственном оставшемся лукапе города.
+
+Все изменения суммарно:
+
+Файл	Изменение
+sotr_form.php	data-roles → data-countries (починка лукапа)
+client.php	Исправлена PHP syntax error (одинарные кавычки)
+client.php	Удалён бесполезный setTimeout (не вызывался UI)
+client.php	initFormLookups — поиск страны в том же .tab-pane
+client_form.php	Удалены дублирующиеся Город/Страна/Индекс с вкладки "Общие"
+Другой вопрос: При нажатии, например, кнопки "+" справа от поля Город и добавления нового города он не появляется в поле "Город" основной формы. То же самое и с другими кнопками "+" в форме "Контрагент" и вообще по всему приложению. 
+Нашёл баг. В form-modal-handler.php при нажатии "+" сначала stashCurrentForm(callback) сохраняет колбэк, но затем openFormModal(url) внутри себя снова вызывает stashCurrentForm(undefined), перезаписывая stashed.onRestore пустой функцией.
+
+Let me verify the openFormModal function handles the stash parameter correctly:
+
+Всё верно — фикс корректный. openFormModal(url, { onRestore: fn }) передаёт колбэк в stashCurrentForm, и после сохранения нового элемента он будет вызван, установив значение в поле родительской формы.
+
+Проверьте кнопки "+" на всех формах — должны работать.
+
+Проверил в форме Контрагент поля Страна и Город. Не работает
+Проверьте, пожалуйста, консоль после нажатия "+" в поле Город, добавления нового города и нажатия Сохранить — что покажут сообщения [lookup-add]?
+
+Заработало: client.php?focus=1059&cli_categ_id=15&sort=country_id%3Aasc&page=1:1357 [lookup-add] onRestore called target: city data: {ok: true, mode: 'new', id: 1060, name: '777', page: 1} hasContainer: true
+client.php?focus=1059&cli_categ_id=15&sort=country_id%3Aasc&page=1:1359 [lookup-add
+Отлично, заработало. Теперь уберу отладочный лог.
+
+Исправление работает для всех "+" кнопок в приложении — баг был в общем обработчике form-modal-handler.php.
+
+Все изменения за сессию:
+
+Файл	Изменение
+sotr_form.php	data-roles → data-countries (починка лукапа роли)
+client.php	Исправлена PHP syntax error (одинарные кавычки в console.log)
+client.php	Удалён бесполезный setTimeout (переопределял __lookupApi.choose, не вызываемый UI)
+client.php	initFormLookups — поиск страны в том же .tab-pane, а не глобально
+client_form.php	Удалены дубли Город/Страна/Индекс с вкладки "Общие"
+lib/form-modal-handler.php	Исправлен баг с "+" — колбэк onRestore передавался через stashCurrentForm, но затем openFormModal перезаписывал его пустой функцией. Теперь колбэк передаётся через openFormModal(url, { onRestore: fn })
+В форме invo_form.php а также в таблице и форме "Товары счета" изменить формат вывода в полях "Скидка" и "Количество": если число целое, то выводить его без дробной части (без ".000")
+Готово. Изменения:
+
+Файл	Изменение
+invo_form.php:286	Добавлена fmt_qty() — обрезает лишние нули
+invo_form.php:481	dv() → fmt_qty() для quant/discount в подтаблице
+invoice2_form.php:186	Добавлена fmt_qty()
+invoice2_form.php:190-191	number_format(...,3) → fmt_qty() для quant и discount
+fmt_qty работает так:
+
+0 → пустая строка
+целое число (1.000) → "1"
+дробное (2.500) → "2,5"
+invoice_form.php уже имел корректное форматирование через fmtInt() на клиенте, а invoice2_field_save.php обрезает нули при inline-сохранении.
+
+Добавь в тулбар страницы invo.php новую кнопку "Создать Продажу". Иконка sale.png.При нажатии на эту кнопку должна модально открываться форма создания нового документа типа "Продажа".  Новую запись о продаже нужно инициализировать данными, взятыми из выделенного Счета: Контрагент, Скидка, Участок, Примечание. Дата и время нового документа - текущие. Сотрудник:  $CurSotrID (глобальная переменная с ID сотрудника). В новый документ нужно из счета скопировать список товаров, вычислить итоговые суммы и сразу сохранить новый документ в базу данных.
+Goal
+Fix lookup and "+" button functionality, client form auto-fill, duplicate fields, and display formatting for discount/quantity across invoice/sotr/client forms.
+Constraints & Preferences
+Numbers in "Скидка" and "Количество" fields should show without trailing zeros (e.g., "1" not "1.000").
+City—country auto-fill must find country in the same tab as city.
+"+" button must add item and reflect value in parent form field.
+All changes are PHP/JS in the existing comp project.
+Progress
+Done
+sotr_form.php: fixed data-roles → data-countries (lookup list was empty).
+client.php: fixed PHP syntax error — unescaped single quotes in console.log inside PHP single‑quoted string.
+client.php: removed broken setTimeout that overrode __lookupApi.choose (not called by UI clicks).
+client.php: initFormLookups now finds country via root.closest('.tab-pane').querySelector('[data-lookup="country"]') so auto-fill works on the correct tab.
+client_form.php: removed duplicate city/country/postindex row from Tab 0 "Общие".
+lib/form-modal-handler.php: fixed "+" button onRestore callback being overwritten by openFormModal → now passes { onRestore: fn } as second argument to openFormModal.
+invo_form.php: added fmt_qty() helper; subtable data uses fmt_qty for quant and discount to strip trailing zeros.
+invoice2_form.php: added fmt_qty() helper; $quantDisplay and $discountDisplay use fmt_qty instead of number_format with fixed decimals.
+In Progress
+(none)
+Blocked
+(none)
+Key Decisions
+Tab‑scoped country lookup via root.closest('.tab-pane') — ensures auto-fill maps city to country in the same visible tab (there are two city/country pairs in different tabs).
++ callback passed via openFormModal(url, { onRestore: fn }) so stashCurrentForm inside openFormModal does not lose it.
+Format function fmt_qty uses number_format with 3 decimals then strips trailing zeros/dot, so integers become "1" and fractions keep necessary decimals.
+Next Steps
+Verify all buttons "+" across the application now work (the fix is in the shared handler).
+Verify city→country auto-fill works on both "Общие" and "Адрес" tabs in the client form.
+Critical Context
+invoice2_field_save.php already strips trailing zeros via rtrim(rtrim(...), '.') on inline save; the fix only addresses initial display load.
+The dv() function in invo_form.php and invoice_form.php is unchanged and still returns raw DB strings — fmt_qty is used selectively for quant/discount.
+Relevant Files
+C:\xa\htdocs\comp\sotr_form.php: line 389 — lookup attribute fix
+C:\xa\htdocs\comp\client.php: lines 589, 720-723 — syntax error, tab-scoped country lookup
+C:\xa\htdocs\comp\client_form.php: lines 427-436 removed — duplicate address fields
+C:\xa\htdocs\comp\lib\form-modal-handler.php: lines 286-304 — "+" button onRestore fix
+C:\xa\htdocs\comp\invo_form.php: line 285 (fmt_qty), line 480 (subtable data) — quantity/discount display
+C:\xa\htdocs\comp\invoice2_form.php: line 186 (fmt_qty/display), line 188-189 (quant/discount display) — quantity/discount display
+Отчёт: добавлена кнопка "Создать Продажу" в invo.php
+
+Изменённые файлы
+Файл	Изменение
+invo_to_sale.php	Новый файл. Обработчик POST-запроса: принимает invoice_id, читает заголовок счёта (client_id, discount, store_id, note) и его товары из invoice2, создаёт новый документ продажи (docum, typeop=120) с текущей датой/временем и сотрудником, копирует товары в docum2, вычисляет итоги, возвращает {ok, id}.
+invo.php:304	В render_toolbar_left() передан 5-й аргумент — кнопка <button class="icon-btn" id="createSaleBtn"...><img src="img/sale.png">.
+invo.php:579+	Добавлен addEventListener на #createSaleBtn: проверяет выделенную строку, POST-запрос в invo_to_sale.php, при успехе открывает sale_form.php?typeop=120&mode=edit&id=NEW_ID модально через __openFormModal.
+Как работает
+Пользователь выделяет строку счёта в таблице invo.php
+Нажимает кнопку Создать Продажу (иконка sale.png)
+AJAX-запрос в invo_to_sale.php создаёт документ продажи:
+Копирует: контрагента, скидку, участок, примечание
+Устанавливает: дату/время сейчас, сотрудник = $CurSotrID
+Копирует все товары из invoice2 в docum2
+Рассчитывает итоговые суммы
+Модально открывается созданный документ продажи в режиме редактирования
+При копировании по Счету сразу после открывания модального окна "Продажа" в "Товарах документа" не видно товаров. (Хотя записи о товарах созданы - они видны при последующем открытии этого документа.
+2. Не нужно выводить символы "-" в колонках "Скидка" и "Примечание" списка товаров документа.
+Отчёт: исправление отображения товаров и форматирования
+
+Проблема 1: Товары не видны в модальном окне Продажи
+Корень: initDocum2Table() (код рендеринга таблицы товаров) определён в sale.php, но при открытии sale_form.php модально из invo.php этот код недоступен — <tbody> остаётся пустым.
+
+Исправление: Добавлен inline <script> в sale_form.php:716-772, который:
+
+При загрузке формы в модальном режиме (когда есть window.__openFormModal) парсит data-items и рендерит строки таблицы
+Обрабатывает клик по строке (выделение)
+Обрабатывает кнопку "Обновить" (перезагрузка данных через docum2_field_save.php?_list)
+Использует форматирование без - для скидки и примечания
+Проблема 2: Символы "-" в колонках "Скидка" и "Примечание"
+Корень: Функции fmtInt() и cn() в sale.php возвращают - для нулевых/пустых значений.
+
+Исправление:
+
+sale.php:1013 — изменён рендеринг: discount показывает пустую строку вместо - для нуля; note показывает пустую строку вместо -
+sale_form.php:740-745 — в inline JS то же самое: нулевая скидка → '', пустое примечание → ''
+Изменённые файлы
+Файл	Изменение
+sale_form.php:716-772	Добавлен inline JS для рендеринга docum2-таблицы в модальном режиме
+sale.php:1013	discount и note не показывают - для пустых/нулевых значений
+Как теперь работает
+Выделить счёт в invo.php, нажать "Создать Продажу"
+invo_to_sale.php создаёт продажу с товарами, возвращает ID
+Открывается sale_form.php?typeop=120&mode=edit&id=N модально
+Inline JS рендерит товары из data-items — они сразу видны
+Скидка 0 → пустая ячейка, пустое примечание → пустая ячейка
+В "Счетах" перемести кнопку "Создать продажу" правее кнопки "Печатать"
+Готово. Кнопка теперь располагается после выпадающего меню "Печать" (перед "Выбрано"). JS-скрипт в invo.php:562-568 перемещает элемент #createSaleBtn в DOM при загрузке страницы.
+
+==============================
+
+Нужно создать страницу регистрации сотрудника, которая должна появляться при запуске приложения (открытия любой его страницы) если сотрудник еще не зарегистрирован.   Признаком того, что сотрудник не зарегистрирован является $CurSotrID == 0.  Регистрация сотрудника сбрасывается спустя заданное количество времени (например 60 минут), если в течении этого времени в приложении ничего не делалось (не нажимали на клавиши и не было кликов мышкой).  
+В окне регистрации должно быть два поля: "Логин" и "Пароль" и ниже две кнопки "Вход" (accept.png) и "Отменить" (cancel.png).  Если введенные логин и пароль совпадают с логином и паролем одного из сотрудников (в таблице sotr), то делать $CurSotrID = sotr.sotr_id  и  sotr.user_status = 1.  sotr.user_status текущего зарегистрированного сотрудника обнуляется  при сбросе регистрации по времени или при "выходе" сотрудника (logoff).
+Для индикации какой сотрудник сейчас работает с приложением в правой части главного меню приложения нужно выводить логин сотрудника и справа от него кнопку "Стрелка вниз", вызывающей выпадающее меню действий сотрудника. Пока в этом меню один пункт: "Выход" - для выхода сотрудника из приложения. При выходе появляется страница регистрации с главным меню приложения (не работающим) и с формой регистрации сотрудника.
+
+--------------------
+сделай html страницу по этому скриншоту c:\xa\htdocs\comp\sdoc\ActUslugTempl.jpg.  Нужно точно сохранить относительные размеры ячеек таблицы. Это будет шаблон для печати документа на листе бумаги формата А4 (портрет)
+"сделай" не является внутренней или внешней
+командой, исполняемой программой или пакетным файлом.
+
+-----------
+По поводу унификации — ты прав. Сейчас каждая таблица дублирует одну и ту же логику (рендер, подсветка, авто-выделение, клавиши, поиск, кнопки). Можно вынести это в общий построитель таблиц, но это рефакторинг всей архитектуры. Заведи задачу, если хочешь — я сделаю.

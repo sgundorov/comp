@@ -1,0 +1,150 @@
+$files = @(
+  @{f='categ';t=[char]0x041A+[char]0x0430+[char]0x0442+[char]0x0435+[char]0x0433+[char]0x043E+[char]0x0440+[char]0x0438+[char]0x0438+[char]0x0020+[char]0x0442+[char]0x043E+[char]0x0432+[char]0x0430+[char]0x0440+[char]0x043E+[char]0x0432;form=[char]0x041A+[char]0x0430+[char]0x0442+[char]0x0435+[char]0x0433+[char]0x043E+[char]0x0440+[char]0x0438+[char]0x044F+[char]0x0020+[char]0x0442+[char]0x043E+[char]0x0432+[char]0x0430+[char]0x0440+[char]0x043E+[char]0x0432;img='categ'},
+  @{f='categ_form';t=[char]0x041A+[char]0x0430+[char]0x0442+[char]0x0435+[char]0x0433+[char]0x043E+[char]0x0440+[char]0x0438+[char]0x044F+[char]0x0020+[char]0x0442+[char]0x043E+[char]0x0432+[char]0x0430+[char]0x0440+[char]0x043E+[char]0x0432;form=$null;img='categ'},
+  @{f='city';t=[char]0x0413+[char]0x043E+[char]0x0440+[char]0x043E+[char]0x0434+[char]0x0430;form=[char]0x0413+[char]0x043E+[char]0x0440+[char]0x043E+[char]0x0434;img='city'},
+  @{f='city_form';t=[char]0x0413+[char]0x043E+[char]0x0440+[char]0x043E+[char]0x0434;form=$null;img='city'},
+  @{f='cli_categ';t=[char]0x041A+[char]0x0430+[char]0x0442+[char]0x0435+[char]0x0433+[char]0x043E+[char]0x0440+[char]0x0438+[char]0x0438+[char]0x0020+[char]0x043A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x0433+[char]0x0435+[char]0x043D+[char]0x0442+[char]0x043E+[char]0x0432;form=[char]0x041A+[char]0x0430+[char]0x0442+[char]0x0435+[char]0x0433+[char]0x043E+[char]0x0440+[char]0x0438+[char]0x044F+[char]0x0020+[char]0x043A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x0433+[char]0x0435+[char]0x043D+[char]0x0442+[char]0x043E+[char]0x0432;img='cli_categ'},
+  @{f='cli_categ_form';t=[char]0x041A+[char]0x0430+[char]0x0442+[char]0x0435+[char]0x0433+[char]0x043E+[char]0x0440+[char]0x0438+[char]0x044F+[char]0x0020+[char]0x043A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x0433+[char]0x0435+[char]0x043D+[char]0x0442+[char]0x043E+[char]0x0432;form=$null;img='cli_categ'},
+  @{f='cli_tag';t=[char]0x0412+[char]0x0438+[char]0x0434+[char]0x044B+[char]0x0020+[char]0x0434+[char]0x0435+[char]0x044F+[char]0x0442+[char]0x0435+[char]0x043B+[char]0x044C+[char]0x043D+[char]0x043E+[char]0x0441+[char]0x0442+[char]0x0438;form=[char]0x0412+[char]0x0438+[char]0x0434+[char]0x0020+[char]0x0434+[char]0x0435+[char]0x044F+[char]0x0442+[char]0x0435+[char]0x043B+[char]0x044C+[char]0x043D+[char]0x043E+[char]0x0441+[char]0x0442+[char]0x0438;img='cli_tag'},
+  @{f='cli_tag_form';t=[char]0x0412+[char]0x0438+[char]0x0434+[char]0x0020+[char]0x0434+[char]0x0435+[char]0x044F+[char]0x0442+[char]0x0435+[char]0x043B+[char]0x044C+[char]0x043D+[char]0x043E+[char]0x0441+[char]0x0442+[char]0x0438;form=$null;img='cli_tag'},
+  @{f='client';t=[char]0x041A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x0433+[char]0x0435+[char]0x043D+[char]0x0442+[char]0x044B;form=[char]0x041A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x0433+[char]0x0435+[char]0x043D+[char]0x0442;img='client'},
+  @{f='client_form';t=[char]0x041A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x0433+[char]0x0435+[char]0x043D+[char]0x0442;form=$null;img='client'},
+  @{f='client_print';t=[char]0x041A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x0433+[char]0x0435+[char]0x043D+[char]0x0442+[char]0x044B;form=$null;img='client'},
+  @{f='contact';t=[char]0x041A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0430+[char]0x043A+[char]0x0442+[char]0x044B;form=[char]0x041A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0430+[char]0x043A+[char]0x0442;img='contact'},
+  @{f='contact_form';t=[char]0x041A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0430+[char]0x043A+[char]0x0442;form=$null;img='contact'},
+  @{f='contact_print';t=[char]0x041A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0430+[char]0x043A+[char]0x0442+[char]0x044B;form=$null;img='contact'},
+  @{f='contype';t=[char]0x0412+[char]0x0438+[char]0x0434+[char]0x044B+[char]0x0020+[char]0x043A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0430+[char]0x043A+[char]0x0442+[char]0x043E+[char]0x0432;form=[char]0x0412+[char]0x0438+[char]0x0434+[char]0x0020+[char]0x043A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0430+[char]0x043A+[char]0x0442+[char]0x0430;img='contype'},
+  @{f='contype_form';t=[char]0x0412+[char]0x0438+[char]0x0434+[char]0x0020+[char]0x043A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0430+[char]0x043A+[char]0x0442+[char]0x0430;form=$null;img='contype'},
+  @{f='country';t=[char]0x0421+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x043D+[char]0x044B;form=[char]0x0421+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x043D+[char]0x0430;img='country'},
+  @{f='country_form';t=[char]0x0421+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x043D+[char]0x0430;form=$null;img='country'},
+  @{f='firm';t=[char]0x0424+[char]0x0438+[char]0x0440+[char]0x043C+[char]0x044B;form=[char]0x0424+[char]0x0438+[char]0x0440+[char]0x043C+[char]0x0430;img='firm'},
+  @{f='firm_form';t=[char]0x0424+[char]0x0438+[char]0x0440+[char]0x043C+[char]0x0430;form=$null;img='firm'},
+  @{f='group';t=[char]0x0413+[char]0x0440+[char]0x0443+[char]0x043F+[char]0x043F+[char]0x044B+[char]0x0020+[char]0x0442+[char]0x043E+[char]0x0432+[char]0x0430+[char]0x0440+[char]0x043E+[char]0x0432;form=$null;img='group'},
+  @{f='groupserv';t=[char]0x0413+[char]0x0440+[char]0x0443+[char]0x043F+[char]0x043F+[char]0x044B+[char]0x0020+[char]0x0443+[char]0x0441+[char]0x043B+[char]0x0443+[char]0x0433;form=$null;img='groupserv'},
+  @{f='izgot';t=[char]0x041F+[char]0x0440+[char]0x043E+[char]0x0438+[char]0x0437+[char]0x0432+[char]0x043E+[char]0x0434+[char]0x0438+[char]0x0442+[char]0x0435+[char]0x043B+[char]0x0438;form=[char]0x041F+[char]0x0440+[char]0x043E+[char]0x0438+[char]0x0437+[char]0x0432+[char]0x043E+[char]0x0434+[char]0x0438+[char]0x0442+[char]0x0435+[char]0x043B+[char]0x044C;img='izgot'},
+  @{f='izgot_form';t=[char]0x041F+[char]0x0440+[char]0x043E+[char]0x0438+[char]0x0437+[char]0x0432+[char]0x043E+[char]0x0434+[char]0x0438+[char]0x0442+[char]0x0435+[char]0x043B+[char]0x044C;form=$null;img='izgot'},
+  @{f='object';t=[char]0x041E+[char]0x0431+[char]0x044A+[char]0x0435+[char]0x043A+[char]0x0442+[char]0x044B+[char]0x0020+[char]0x0434+[char]0x043E+[char]0x0441+[char]0x0442+[char]0x0443+[char]0x043F+[char]0x0430;form=[char]0x041E+[char]0x0431+[char]0x044A+[char]0x0435+[char]0x043A+[char]0x0442+[char]0x0020+[char]0x0434+[char]0x043E+[char]0x0441+[char]0x0442+[char]0x0443+[char]0x043F+[char]0x0430;img='object'},
+  @{f='object_form';t=[char]0x041E+[char]0x0431+[char]0x044A+[char]0x0435+[char]0x043A+[char]0x0442+[char]0x0020+[char]0x0434+[char]0x043E+[char]0x0441+[char]0x0442+[char]0x0443+[char]0x043F+[char]0x0430;form=$null;img='object'},
+  @{f='promo';t=[char]0x0418+[char]0x0441+[char]0x0442+[char]0x043E+[char]0x0447+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x0438+[char]0x0020+[char]0x0440+[char]0x0435+[char]0x043A+[char]0x043B+[char]0x0430+[char]0x043C+[char]0x044B;form=[char]0x0418+[char]0x0441+[char]0x0442+[char]0x043E+[char]0x0447+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x0020+[char]0x0440+[char]0x0435+[char]0x043A+[char]0x043B+[char]0x0430+[char]0x043C+[char]0x044B;img='promo'},
+  @{f='promo_form';t=[char]0x0418+[char]0x0441+[char]0x0442+[char]0x043E+[char]0x0447+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x0020+[char]0x0440+[char]0x0435+[char]0x043A+[char]0x043B+[char]0x0430+[char]0x043C+[char]0x044B;form=$null;img='promo'},
+  @{f='role';t=[char]0x0420+[char]0x043E+[char]0x043B+[char]0x0438+[char]0x0020+[char]0x0441+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x043E+[char]0x0432;form=[char]0x0420+[char]0x043E+[char]0x043B+[char]0x044C+[char]0x0020+[char]0x0441+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x0430;img='role'},
+  @{f='role_form';t=[char]0x0420+[char]0x043E+[char]0x043B+[char]0x044C+[char]0x0020+[char]0x0441+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x0430;form=$null;img='role'},
+  @{f='sgroup';t=[char]0x0413+[char]0x0440+[char]0x0443+[char]0x043F+[char]0x043F+[char]0x044B+[char]0x0020+[char]0x0441+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x043E+[char]0x0432;form=[char]0x0413+[char]0x0440+[char]0x0443+[char]0x043F+[char]0x043F+[char]0x0430+[char]0x0020+[char]0x0441+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x043E+[char]0x0432;img='sgroup'},
+  @{f='sgroup_form';t=[char]0x0413+[char]0x0440+[char]0x0443+[char]0x043F+[char]0x043F+[char]0x0430+[char]0x0020+[char]0x0441+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x043E+[char]0x0432;form=$null;img='sgroup'},
+  @{f='sotr';t=[char]0x0421+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x0438;form=[char]0x0421+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A;img='sotr'},
+  @{f='sotr_form';t=[char]0x0421+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A;form=$null;img='sotr'},
+  @{f='store';t=[char]0x0423+[char]0x0447+[char]0x0430+[char]0x0441+[char]0x0442+[char]0x043A+[char]0x0438;form=[char]0x0423+[char]0x0447+[char]0x0430+[char]0x0441+[char]0x0442+[char]0x043E+[char]0x043A;img='store'},
+  @{f='store_form';t=[char]0x0423+[char]0x0447+[char]0x0430+[char]0x0441+[char]0x0442+[char]0x043E+[char]0x043A;form=$null;img='store'},
+  @{f='tmc';t=[char]0x0422+[char]0x043E+[char]0x0432+[char]0x0430+[char]0x0440+[char]0x044B;form=[char]0x0422+[char]0x043E+[char]0x0432+[char]0x0430+[char]0x0440;img='tmc'},
+  @{f='tmc_form';t=[char]0x0422+[char]0x043E+[char]0x0432+[char]0x0430+[char]0x0440;form=$null;img='tmc'},
+  @{f='unit';t=[char]0x0415+[char]0x0434+[char]0x0438+[char]0x043D+[char]0x0438+[char]0x0446+[char]0x044B+[char]0x0020+[char]0x0438+[char]0x0437+[char]0x043C+[char]0x0435+[char]0x0440+[char]0x0435+[char]0x043D+[char]0x0438+[char]0x044F;form=[char]0x0415+[char]0x0434+[char]0x0438+[char]0x043D+[char]0x0438+[char]0x0446+[char]0x0430+[char]0x0020+[char]0x0438+[char]0x0437+[char]0x043C+[char]0x0435+[char]0x0440+[char]0x0435+[char]0x043D+[char]0x0438+[char]0x044F;img='unit'},
+  @{f='unit_form';t=[char]0x0415+[char]0x0434+[char]0x0438+[char]0x043D+[char]0x0438+[char]0x0446+[char]0x0430+[char]0x0020+[char]0x0438+[char]0x0437+[char]0x043C+[char]0x0435+[char]0x0440+[char]0x0435+[char]0x043D+[char]0x0438+[char]0x044F;form=$null;img='unit'},
+  @{f='zat';t=[char]0x041E+[char]0x043F+[char]0x0435+[char]0x0440+[char]0x0430+[char]0x0446+[char]0x0438+[char]0x0438+[char]0x0020+[char]0x0441+[char]0x0020+[char]0x0434+[char]0x0435+[char]0x043D+[char]0x044C+[char]0x0433+[char]0x0430+[char]0x043C+[char]0x0438;form=[char]0x041E+[char]0x043F+[char]0x0435+[char]0x0440+[char]0x0430+[char]0x0446+[char]0x0438+[char]0x044F+[char]0x0020+[char]0x0441+[char]0x0020+[char]0x0434+[char]0x0435+[char]0x043D+[char]0x044C+[char]0x0433+[char]0x0430+[char]0x043C+[char]0x0438;img='zat'},
+  @{f='zat_form';t=[char]0x041E+[char]0x043F+[char]0x0435+[char]0x0440+[char]0x0430+[char]0x0446+[char]0x0438+[char]0x044F+[char]0x0020+[char]0x0441+[char]0x0020+[char]0x0434+[char]0x0435+[char]0x043D+[char]0x044C+[char]0x0433+[char]0x0430+[char]0x043C+[char]0x0438;form=$null;img='zat'}
+)
+$filterOpts = @{
+  contains=[char]0x0421+[char]0x043E+[char]0x0434+[char]0x0435+[char]0x0440+[char]0x0436+[char]0x0438+[char]0x0442
+  ends_with=[char]0x0417+[char]0x0430+[char]0x043A+[char]0x0430+[char]0x043D+[char]0x0447+[char]0x0438+[char]0x0432+[char]0x0430+[char]0x0435+[char]0x0442+[char]0x0441+[char]0x044F+[char]0x0020+[char]0x043D+[char]0x0430
+  not_contains=[char]0x041D+[char]0x0435+[char]0x0020+[char]0x0441+[char]0x043E+[char]0x0434+[char]0x0435+[char]0x0440+[char]0x0436+[char]0x0438+[char]0x0442
+  not_equals=[char]0x041D+[char]0x0435+[char]0x0020+[char]0x0440+[char]0x0430+[char]0x0432+[char]0x043D+[char]0x043E
+  equals=[char]0x0420+[char]0x0430+[char]0x0432+[char]0x043D+[char]0x043E
+  starts_with=[char]0x041D+[char]0x0430+[char]0x0447+[char]0x0438+[char]0x043D+[char]0x0430+[char]0x0435+[char]0x0442+[char]0x0441+[char]0x044F+[char]0x0020+[char]0x0441
+}
+$filterTexts = @{
+  sotr=[char]0x0421+[char]0x043E+[char]0x0442+[char]0x0440+[char]0x0443+[char]0x0434+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x0020+[char]0x003D+[char]0x0020
+  group=[char]0x0413+[char]0x0440+[char]0x0443+[char]0x043F+[char]0x043F+[char]0x0430+[char]0x0020+[char]0x003D+[char]0x0020
+  promo=[char]0x0418+[char]0x0441+[char]0x0442+[char]0x043E+[char]0x0447+[char]0x043D+[char]0x0438+[char]0x043A+[char]0x0020+[char]0x0440+[char]0x0435+[char]0x043A+[char]0x043B+[char]0x0430+[char]0x043C+[char]0x044B+[char]0x0020+[char]0x003D+[char]0x0020
+  tag=[char]0x0412+[char]0x0438+[char]0x0434+[char]0x0020+[char]0x0434+[char]0x0435+[char]0x044F+[char]0x0442+[char]0x0435+[char]0x043B+[char]0x044C+[char]0x043D+[char]0x043E+[char]0x0441+[char]0x0442+[char]0x0438+[char]0x0020+[char]0x003D+[char]0x0020
+  firm=[char]0x0424+[char]0x0438+[char]0x0440+[char]0x043C+[char]0x0430+[char]0x0020+[char]0x003D+[char]0x0020
+  store=[char]0x0423+[char]0x0447+[char]0x0430+[char]0x0441+[char]0x0442+[char]0x043E+[char]0x043A+[char]0x0020+[char]0x003D+[char]0x0020
+  categ=[char]0x041A+[char]0x0430+[char]0x0442+[char]0x0435+[char]0x0433+[char]0x043E+[char]0x0440+[char]0x0438+[char]0x044F+[char]0x0020+[char]0x003D+[char]0x0020
+  contype=[char]0x0412+[char]0x0438+[char]0x0434+[char]0x0020+[char]0x043A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0430+[char]0x043A+[char]0x0442+[char]0x0430+[char]0x0020+[char]0x003D+[char]0x0020
+  unit=[char]0x0415+[char]0x0434+[char]0x0438+[char]0x043D+[char]0x0438+[char]0x0446+[char]0x0430+[char]0x0020+[char]0x003D+[char]0x0020
+  client=[char]0x041A+[char]0x043E+[char]0x043D+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x0433+[char]0x0435+[char]0x043D+[char]0x0442+[char]0x0020+[char]0x003D+[char]0x0020
+  cli_categ=[char]0x041A+[char]0x0430+[char]0x0442+[char]0x0435+[char]0x0433+[char]0x043E+[char]0x0440+[char]0x0438+[char]0x044F+[char]0x0020+[char]0x003D+[char]0x0020
+  country=[char]0x0421+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x043D+[char]0x0430+[char]0x0020+[char]0x003D+[char]0x0020
+  city=[char]0x0413+[char]0x043E+[char]0x0440+[char]0x043E+[char]0x0434+[char]0x0020+[char]0x003D+[char]0x0020
+  izgot=[char]0x041F+[char]0x0440+[char]0x043E+[char]0x0438+[char]0x0437+[char]0x0432+[char]0x043E+[char]0x0434+[char]0x0438+[char]0x0442+[char]0x0435+[char]0x043B+[char]0x044C+[char]0x0020+[char]0x003D+[char]0x0020
+}
+$errMsg = [char]0x041E+[char]0x0448+[char]0x0438+[char]0x0431+[char]0x043A+[char]0x0430+[char]0x0020+[char]0x043F+[char]0x043E+[char]0x0434+[char]0x043A+[char]0x043B+[char]0x044E+[char]0x0447+[char]0x0435+[char]0x043D+[char]0x0438+[char]0x044F+[char]0x0020+[char]0x043A+[char]0x0020+[char]0x0411+[char]0x0414+[char]0x003A+[char]0x0020
+$selMsg = [char]0x0412+[char]0x044B+[char]0x0431+[char]0x0440+[char]0x0430+[char]0x043D+[char]0x043E+[char]0x003A+[char]0x0020
+$printPage = [char]0x041F+[char]0x0435+[char]0x0447+[char]0x0430+[char]0x0442+[char]0x044C+[char]0x0020+[char]0x0441+[char]0x0442+[char]0x0440+[char]0x0430+[char]0x043D+[char]0x0438+[char]0x0446+[char]0x044B
+$printAll = [char]0x041F+[char]0x0435+[char]0x0447+[char]0x0430+[char]0x0442+[char]0x044C+[char]0x0020+[char]0x0432+[char]0x0441+[char]0x0435+[char]0x0433+[char]0x043E
+$printCurrent = [char]0x041F+[char]0x0435+[char]0x0447+[char]0x0430+[char]0x0442+[char]0x044C+[char]0x0020+[char]0x0442+[char]0x0435+[char]0x043A+[char]0x0443+[char]0x0449+[char]0x0435+[char]0x0439
+$exportCsv = [char]0x042D+[char]0x043A+[char]0x0441+[char]0x043F+[char]0x043E+[char]0x0440+[char]0x0442+[char]0x0020+[char]0x0432+[char]0x0020+[char]0x0043+[char]0x0053+[char]0x0056
+$exportExcel = [char]0x042D+[char]0x043A+[char]0x0441+[char]0x043F+[char]0x043E+[char]0x0440+[char]0x0442+[char]0x0020+[char]0x0432+[char]0x0020+[char]0x0045+[char]0x0078+[char]0x0063+[char]0x0065+[char]0x006C
+function Fix-File($info) {
+    $path = "C:\xa\htdocs\comp\" + $info.f + ".php"
+    if (-not (Test-Path $path)) { return 0 }
+    $bytes = [System.IO.File]::ReadAllBytes($path)
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+    $count = 0
+    if ($text.Length -ge 3 -and [int][char]$text[0] -eq 0x43F) { $text = $text.Substring(3); $count++ }
+    $title = $info.t
+    $hTitle = $info.form; if (-not $hTitle) { $hTitle = $title }
+
+    # 1. render_head_start
+    $p = "render_head_start('"; $i = $text.IndexOf($p)
+    if ($i -ge 0) { $s = $i + $p.Length; $e = $text.IndexOf("')", $s)
+        if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]' -and $o -ne $title) { $text = $text.Substring(0,$s) + $title + $text.Substring($e); $count++ } } }
+    # 2. H1 title
+    $img = $info.img; $h1 = '<h1 class="page-title"><img src="img/' + $img + '.png" alt="" /> '
+    $i = $text.IndexOf($h1)
+    if ($i -ge 0) { $s = $i + $h1.Length; $e = $text.IndexOf('</h1>', $s)
+        if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]' -and $o -ne $hTitle) { $text = $text.Substring(0,$s) + $hTitle + $text.Substring($e); $count++ } } }
+    # 3. H2 title
+    $h2 = '<h2 class="page-title">'; $i = $text.IndexOf($h2)
+    if ($i -ge 0) { $s = $i + $h2.Length; $e = $text.IndexOf('</h2>', $s)
+        if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]' -and $o -ne $hTitle) { $text = $text.Substring(0,$s) + $hTitle + $text.Substring($e); $count++ } } }
+    # 4. die()
+    $i = 0; while (($i = $text.IndexOf("die('", $i)) -ge 0) {
+        $s = $i + 5; $e = $text.IndexOf("'", $s)
+        if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]' -and $o.Length -gt 10) { $text = $text.Substring(0,$s) + $errMsg + $text.Substring($e); $count++ } }
+        $i = $e + 1; if ($i -le 0) { break } }
+    # 5. selCount
+    $i = $text.IndexOf("selCount.textContent = '")
+    if ($i -ge 0) { $s = $i + 24; $e = $text.IndexOf("'", $s)
+        if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]') { $text = $text.Substring(0,$s) + $selMsg + $text.Substring($e); $count++ } } }
+    # 6. Filter options
+    foreach ($kv in $filterOpts.GetEnumerator()) {
+        $kp = "'$($kv.Key)' => '"; $kv = $kv.Value; $fi = 0
+        while (($fi = $text.IndexOf($kp, $fi)) -ge 0) {
+            $s = $fi + $kp.Length; $e = $text.IndexOf("'", $s)
+            if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]' -and $o -ne $kv) { $text = $text.Substring(0,$s) + $kv + $text.Substring($e); $count++ } }
+            $fi = $e + 1; if ($fi -le 0) { break } } }
+    # 7. Filter text labels
+    foreach ($kv in $filterTexts.GetEnumerator()) {
+        $kp = "'kind' => '$($kv.Key)'"; $lb = $kv.Value; $fi = 0
+        while (($fi = $text.IndexOf($kp, $fi)) -ge 0) {
+            $ni = $text.IndexOf("'text' => '", $fi)
+            if ($ni -ge 0) { $s = $ni + 11; $e = $text.IndexOf("'", $s)
+                if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]' -and $o -ne $lb) { $text = $text.Substring(0,$s) + $lb + $text.Substring($e); $count++ } } }
+            $fi = $fi + 1; if ($fi -le 0) { break } } }
+    # 8. Export filenames
+    $i = 0; while (($i = $text.IndexOf("'filename' => '", $i)) -ge 0) {
+        $s = $i + 15; $e = $text.IndexOf("'", $s)
+        if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]') { $ext = if ($o -match '\.xlsx?') { $Matches[0] } else { '.csv' }; $nn = $title + $ext; if ($o -ne $nn) { $text = $text.Substring(0,$s) + $nn + $text.Substring($e); $count++ } } }
+        $i = $e + 1; if ($i -le 0) { break } }
+    # 9. Export label ternaries
+    $i = 0; while (($i = $text.IndexOf("? '", $i)) -ge 0) {
+        $s = $i + 3; $e = $text.IndexOf("'", $s)
+        if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]' -and $o.Length -lt 50) { $nl = if ($o -match 'CSV') { $exportCsv } else { $exportExcel }; if ($o -ne $nl) { $text = $text.Substring(0,$s) + $nl + $text.Substring($e); $count++ } } }
+        $i = $e + 1; if ($i -le 0) { break } }
+    # 10. Print labels
+    $i = 0; while (($i = $text.IndexOf('target="_blank">', $i)) -ge 0) {
+        $ca = $text.IndexOf('</a>', $i)
+        if ($ca -ge 0) { $lt = $text.Substring($i + 16, $ca - $i - 16); if ($lt -match '[^\x00-\x7F]' -and $lt.Length -gt 3) { $snip = $text.Substring([Math]::Max(0,$i-100), $ca - $i + 100)
+                $pl = if ($snip -match '\?all=1') { $printAll } elseif ($snip -match '\?page=') { $printCurrent } else { $printPage }
+                if ($lt -ne $pl) { $text = $text.Substring(0,$i+16) + $pl + $text.Substring($ca); $count++ } } }
+        $i = $ca + 1; if ($i -le 0) { break } }
+    # 11. Flash errors
+    $i = 0; while (($i = $text.IndexOf("flash.textContent = '", $i)) -ge 0) {
+        $s = $i + 21; $e = $text.IndexOf("'", $s)
+        if ($e -ge 0) { $o = $text.Substring($s, $e-$s); if ($o -match '[^\x00-\x7F]' -and $o.Length -gt 5) { $text = $text.Substring(0,$s) + $errMsg + $text.Substring($e); $count++ } }
+        $i = $e + 1; if ($i -le 0) { break } }
+    if ($count -gt 0) { $utf8 = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText($path, $text, $utf8) }
+    return $count
+}
+$total = 0
+foreach ($inf in $files) { $n = Fix-File $inf; Write-Host ("$($inf.f): $n fix(es)"); $total += $n }
+Write-Host "=== Total: $total fixes ==="

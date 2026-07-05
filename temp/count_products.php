@@ -1,0 +1,1 @@
+<?php chdir(__DIR__ . '/..'); require 'config.php'; echo $conn->query('SELECT COUNT(*) FROM product WHERE hide_flag=0')->fetch_row()[0];

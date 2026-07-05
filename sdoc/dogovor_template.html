@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Договор</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 20mm 15mm 20mm 15mm;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10pt;
+    width: 190mm;
+    margin: 0 auto;
+    padding: 20mm 15mm;
+    line-height: 1.4;
+  }
+
+  @media print {
+    body {
+      padding: 0;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+    .no-print {
+      display: none !important;
+    }
+  }
+
+  .print-controls {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+  }
+  .print-btn {
+    background: #4caf50;
+    color: #fff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .print-btn:hover {
+    background: #45a049;
+  }
+
+  /* ===================== СТРАНИЦА 1 ===================== */
+
+  .contract-title {
+    font-size: 16pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .date-line {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .date-line span {
+    font-size: 12pt;
+  }
+
+  .preamble {
+    text-indent: 40px;
+    margin-bottom: 20px;
+    text-align: justify;
+  }
+
+  .section-title {
+    font-size: 13pt;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 12px;
+  }
+
+  .article {
+    margin-bottom: 8px;
+    text-align: justify;
+    text-indent: 40px;
+  }
+
+  .article.no-indent {
+    text-indent: 0;
+  }
+
+  .bold {
+    font-weight: bold;
+  }
+
+  /* ===================== РЕКВИЗИТЫ (стр. 2) ===================== */
+
+  .requisites-block {
+    margin-bottom: 30px;
+  }
+
+  .requisites-block .party-label {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+
+  .requisites-block p {
+    margin-bottom: 2px;
+    line-height: 1.3;
+  }
+
+  /* ===================== ПОДПИСИ ===================== */
+
+  .signatures {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 30px;
+  }
+
+  .sig-col {
+    width: 48%;
+  }
+
+  .sig-col .sig-role {
+    font-size: 10pt;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+
+  .sig-col .sig-firm {
+    font-size: 10pt;
+    margin-bottom: 30px;
+  }
+
+  .sig-col .sig-line {
+    margin-top: 50px;
+    margin-bottom: 2px;
+  }
+
+  .sig-col .sig-name {
+    font-size: 10pt;
+  }
+
+  .sig-col .sig-title {
+    font-size: 10pt;
+  }
+
+  /* ===================== ПРИЛОЖЕНИЕ (стр. 3) ===================== */
+
+  .appendix-title {
+    font-size: 13pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  .appendix-date-line {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .appendix-intro {
+    margin-bottom: 12px;
+    text-align: justify;
+  }
+
+  .appendix-section {
+    font-weight: bold;
+    margin-bottom: 12px;
+    margin-top: 16px;
+  }
+
+  .appendix-article {
+    margin-bottom: 8px;
+    text-align: justify;
+    text-indent: 40px;
+  }
+
+  /* Таблица приложения */
+  table.app-items {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-bottom: 16px;
+    margin-top: 12px;
+  }
+
+  table.app-items th,
+  table.app-items td {
+    border: 1px solid black;
+    padding: 4px 6px;
+    font-size: 10pt;
+    vertical-align: top;
+    word-wrap: break-word;
+  }
+
+  table.app-items th {
+    font-weight: bold;
+    text-align: center;
+  }
+
+  /* Столбцы: Наименование=34%, Кол-во=10%, Цена=12%, Сумма без НДС=16%, Сумма НДС=14%, Сумма с НДС=14% */
+  table.app-items col.col-name   { width: 34%; }
+  table.app-items col.col-qty    { width: 10%; }
+  table.app-items col.col-price  { width: 12%; }
+  table.app-items col.col-nonds  { width: 16%; }
+  table.app-items col.col-nds    { width: 14%; }
+  table.app-items col.col-total  { width: 14%; }
+
+  table.app-items td.cell-center { text-align: center; }
+  table.app-items td.cell-left   { text-align: left; }
+
+  table.app-items tfoot td {
+    font-weight: bold;
+    text-align: center;
+  }
+
+  table.app-items tfoot td.total-label {
+    text-align: right;
+    font-weight: normal;
+    padding-right: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="print-controls no-print">
+  <button class="print-btn" onclick="window.print()">Печать</button>
+</div>
+
+<!-- ==================== СТРАНИЦА 1: ДОГОВОР ==================== -->
+
+<div class="contract-title">Договор № #Number#/#Year#</div>
+
+<div class="date-line">
+  <span>г. #FirmCity#</span>
+  <span>«#Day#» #Month# #Year#</span>
+</div>
+
+<div class="preamble">
+  <strong>#FirmName#</strong>, г. Красногорск Московской обл., именуемый в дальнейшем <strong>Поставщик</strong>, в лице #FirmDirector#, действующего на основании ОГРН #FirmOGRN#, с одной стороны и <strong>#ClientName#</strong>, именуемое в дальнейшем &laquo;Покупатель&raquo;, в лице Генерального директора #ClientDirector#, действующего на основании Устава, с другой стороны, заключили настоящий договор о нижеследующем:
+</div>
+
+<!-- 1. ПРЕДМЕТ ДОГОВОРА -->
+<div class="section-title">1. ПРЕДМЕТ ДОГОВОРА</div>
+
+<div class="article">
+  1.1. По настоящему договору <strong>Покупатель</strong> обязуется оплатить и принять, а <strong>Поставщик</strong> обязуется в обусловленный срок передать товар согласно номенклатуре, количеству, цене, указанной в <strong>Приложении №1</strong>, являющемся неотъемлемой частью настоящего договора.
+  Сумма договора неизменна и составляет #TotSum# Рублей (#SumProp#), без НДС.
+  НДС не облагается в связи с применением упрощенной системы налогообложения.
+</div>
+
+<!-- 2. ПОРЯДОК И СРОКИ ПОСТАВКИ -->
+<div class="section-title">2. ПОРЯДОК И СРОКИ ПОСТАВКИ</div>
+
+<div class="article">
+  2.1. Срок поставки продукции определяется в соответствии с условиями оформленных приложений.
+</div>
+<div class="article">
+  2.2. Датой поставки считается дата подписания Покупателем товарно-транспортной накладной.
+  <strong>Поставщик</strong> обязуется обеспечить получение <strong>Покупателем</strong> в течение 5-ти календарных дней с
+  даты перехода права собственности на товар, но не позднее 3-го числа месяца, следующего за
+  отчетным, оригиналов подписанных <strong>Поставщиком</strong> счетов-фактур, товарных накладных.
+</div>
+<div class="article">
+  2.3. <strong>Поставщик</strong> вправе поставлять продукцию частично.
+</div>
+<div class="article">
+  2.4. <strong>Поставщик</strong> обязан известить <strong>Покупателя</strong> по факсу или по электронной почте о готовности
+  продукции к отгрузке.
+</div>
+
+<!-- 3. ПОРЯДОК РАСЧЕТОВ -->
+<div class="section-title">3. ПОРЯДОК РАСЧЕТОВ</div>
+
+<div class="article">
+  3.1. Расчеты за поставляемую продукцию производятся в соответствии с условиями
+  оформленных приложений.
+</div>
+<div class="article">
+  3.2. Моментом оплаты считается дата списания денежных средств с корреспондентского счета
+  банка <strong>Покупателя</strong>.
+</div>
+
+<!-- 4. ОТВЕТСТВЕННОСТЬ СТОРОН -->
+<div class="section-title">4. ОТВЕТСТВЕННОСТЬ СТОРОН</div>
+
+<div class="article">
+  4.1. При поставке продукции ненадлежащего качества или с нарушением комплектности
+  <strong>Поставщик</strong> обязан в течение 30 дней со дня получения уведомления <strong>Покупателя</strong> заменить
+  указанную продукцию.
+</div>
+<div class="article">
+  4.2. В случае нарушения сроков поставки, определенных в приложениях, <strong>Поставщик</strong> уплачивает
+  <strong>Покупателю</strong> пеню в размере 0,1 % от стоимости некачественной продукции, некомплектной или
+  недопоставленной за каждый день просрочки, но не более 5 % от стоимости оборудования.
+</div>
+<div class="article">
+  4.3. При недопоставке продукции <strong>Поставщик</strong> обязан поставить недостающее количество
+  продукции без изменения ее цены в течение 40 дней с момента обнаружения недопоставки.
+</div>
+<div class="article">
+  4.4. В случае нарушения сроков оплаты, определенных в приложениях настоящего Договора
+  <strong>Покупатель</strong> уплачивает <strong>Поставщику</strong> пеню в размере 0,1 % от стоимости поставленного
+  неоплаченного оборудования за каждый день просрочки оплаты.
+</div>
+
+
+<!-- ==================== СТРАНИЦА 2 ==================== -->
+<div class="page-break"></div>
+
+<!-- 5. ФОРС-МАЖОР -->
+<div class="section-title">5. ФОРС-МАЖОР</div>
+
+<div class="article">
+  5.1. Стороны освобождаются от ответственности за частичное или полное неисполнение
+  выполнения обязательств по настоящему договору, если таковые явились следствием действия
+  непреодолимой силы, а именно: пожар, наводнение, землетрясение, эпидемия, войны. Военные
+  действия, а также эмбарго Правительства и других компетентных органов на деятельность
+  сторон. Срок исполнения договорных обязательств соразмерно отодвигается на время действия
+  этих обстоятельств.
+</div>
+<div class="article">
+  5.2. Сторона, для которой создается невозможность исполнения обязательств по настоящему
+  договору, должна немедленно известить другую сторону о наступлении и прекращении таких
+  обязательств.
+</div>
+
+<!-- 6. СРОК ДЕЙСТВИЯ ДОГОВОРА -->
+<div class="section-title">6. СРОК ДЕЙСТВИЯ ДОГОВОРА И ПОРЯДОК РАЗРЕШЕНИЯ СПОРОВ.</div>
+
+<div class="article">
+  6.1. Настоящий договор вступает в силу с момента его подписания и действует до полного
+  выполнения сторонами своих обязательств по Договору.
+</div>
+<div class="article">
+  6.2. Все споры, которые могут возникнуть из настоящего договора или по его поводу, стороны
+  будут стремиться разрешить путем соглашения.
+</div>
+<div class="article">
+  6.3. Неурегулированные спорные вопросы стороны регулируют путем предъявления претензий,
+  которые должны быть рассмотрены в течение 30 дней. В случае не достижения согласия споры
+  разрешаются в арбитражном суде по месту нахождения иска.
+</div>
+
+<!-- 7. ЮРИДИЧЕСКИЕ АДРЕСА И ПЛАТЕЖНЫЕ РЕКВИЗИТЫ -->
+<div class="section-title">7. ЮРИДИЧЕСКИЕ АДРЕСА И ПЛАТЕЖНЫЕ РЕКВИЗИТЫ СТОРОН:</div>
+
+<div class="requisites-block">
+  <p class="party-label">Поставщик: #FirmName#</p>
+  <p>Адрес: #FirmAddress#</p>
+  <p>Телефон: #FirmPhone#</p>
+  <p>ОГРН: #FirmOGRN#</p>
+  <p>ИНН: #FirmINN#, КПП: #FirmKPP#</p>
+  <p>Банк: #FirmBank#, БИК: #FirmBIK#</p>
+  <p>Р/счет: #FirmSchet#</p>
+  <p>К/счет: #FirmKSchet#</p>
+</div>
+
+<div class="requisites-block">
+  <p class="party-label">Покупатель: #ClientName#</p>
+  <p>#ClientAddress#</p>
+  <p>Телефон: #ClientPhone#</p>
+  <p>ИНН/КПП: #ClientINN# / #ClientKPP#</p>
+  <p>Банк: #ClientBank#, БИК #ClientBIK#</p>
+  <p>Р/счет: #ClientSchet#</p>
+  <p>К/счет: #ClientKSchet#</p>
+</div>
+
+<!-- ПОДПИСИ -->
+<div class="signatures">
+  <div class="sig-col">
+    <div class="sig-role">ПОСТАВЩИК</div>
+    <div class="sig-firm">#FirmName#</div>
+    <div class="sig-line">_____________________ #FirmFIO#</div>
+  </div>
+  <div class="sig-col">
+    <div class="sig-role">ПОКУПАТЕЛЬ</div>
+    <div class="sig-firm">#Name#</div>
+    <div class="sig-line">_____________________ #ClientFIO#</div>
+    <div class="sig-title">#ClientTitle#</div>
+  </div>
+</div>
+
+
+<!-- ==================== СТРАНИЦА 3: ПРИЛОЖЕНИЕ №1 ==================== -->
+<div class="page-break"></div>
+
+<div class="appendix-title">
+  Приложение №1 к договору № #Number#/#Year# от «#Day#» #Month# #Year# г. между<br>
+  #FirmName# и #OrgName#
+</div>
+
+<div class="appendix-date-line">
+  <span>#FirmCity#</span>
+  <span>«#Day#» #Month# #Year# г.</span>
+</div>
+
+<div class="appendix-intro">
+  Поставка продукции по данному приложению к договору производится на следующих условиях:
+</div>
+
+<div class="appendix-section">
+  1. Ассортимент, объем и цена поставляемой продукции:
+</div>
+
+<table class="app-items">
+  <colgroup>
+    <col class="col-name">
+    <col class="col-qty">
+    <col class="col-price">
+    <col class="col-nonds">
+    <col class="col-nds">
+    <col class="col-total">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>Наименование товара</th>
+      <th>Кол-во</th>
+      <th>Цена, Руб</th>
+      <th>Сумма без НДС, Руб</th>
+      <th>Сумма НДС, Руб</th>
+      <th>Сумма с НДС, Руб</th>
+    </tr>
+  </thead>
+  <tbody>
+#D1    <tr>
+      <td class="cell-left">#ItemName#</td>
+      <td class="cell-center">#ItemQuant#</td>
+      <td class="cell-center">#ItemPrice#</td>
+      <td class="cell-center">#ItemSumNo#</td>
+      <td class="cell-center">#ItemSumNDS#</td>
+      <td class="cell-center">#ItemSum#</td>
+    </tr>
+#1D  </tbody>
+  <tfoot>
+    <tr>
+      <td class="total-label">Итого:</td>
+      <td class="cell-center">#TotQuant#</td>
+      <td class="cell-center"></td>
+      <td class="cell-center">#TotSumNo#</td>
+      <td class="cell-center">#SumNDS#</td>
+      <td class="cell-center">#TotSum#</td>
+    </tr>
+  </tfoot>
+</table>
+
+<div class="appendix-intro">
+  Общая сумма к оплате по данному приложению составляет: #TotSum# (#SumProp# рублей), без НДС.
+</div>
+
+<div class="appendix-section">
+  2. Порядок оплаты, срок и порядок поставки.
+</div>
+
+<div class="appendix-article">
+  2.1. Покупатель производит оплату 100% на расчетный счет Поставщика;
+</div>
+<div class="appendix-article">
+  2.2. Поставщик производит отгрузку продукции в течение 3-х дней с момента поступления 100-
+  процентной предоплаты на р/с Поставщика.
+</div>
+
+<!-- ПОДПИСИ ПРИЛОЖЕНИЯ -->
+<div class="signatures">
+  <div class="sig-col">
+    <div class="sig-role">ПОСТАВЩИК</div>
+    <div class="sig-firm">#FirmName#</div>
+    <div class="sig-line">_____________________ #FirmFIO#</div>
+  </div>
+  <div class="sig-col">
+    <div class="sig-role">ПОКУПАТЕЛЬ</div>
+    <div class="sig-firm">#ClientName#</div>
+    <div class="sig-line">_____________________ #ClientFIO#</div>
+    <div class="sig-title">#ClientTitle#</div>
+  </div>
+</div>
+
+</body>
+</html>

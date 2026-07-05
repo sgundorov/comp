@@ -1,0 +1,27 @@
+<?php
+$sotrPageConfig = [
+    'table'    => 'sotr',
+    'key'      => 'sotr_id',
+    'columns'  => sotr_columns_defaults(),
+    'search_cols' => [
+        'id'          => 's.sotr_id',
+        'last_name'   => 's.last_name',
+        'first_name'  => 's.first_name',
+        'second_name' => 's.second_name',
+        'role'        => 'rl.role',
+        'address'     => 's.address',
+        'title'       => 's.title',
+        'note'        => 's.note',
+    ],
+    'default_sort'    => ['col' => 'last_name', 'dir' => 'asc'],
+    'marks_session'   => 'sotr_select',
+    'marks_tbl'       => 'sotr',
+    'country_filter_field' => null,
+    'country_filter_expr'  => null,
+    'key_expr'             => 's.sotr_id',
+    'col_filters' => [],
+    'select_sql'   => "SELECT s.sotr_id, s.last_name, s.first_name, s.second_name, s.role_id, s.sphone, s.address, s.title, s.user_status, s.note, rl.role AS role_name FROM sotr s LEFT JOIN role rl ON rl.role_id = s.role_id",
+    'count_sql'    => "SELECT COUNT(*) AS cnt FROM sotr s LEFT JOIN role rl ON rl.role_id = s.role_id",
+    'id_select_sql'=> "SELECT s.sotr_id AS id FROM sotr s LEFT JOIN role rl ON rl.role_id = s.role_id",
+    'base_url'     => 'sotr.php',
+];

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Приходная накладная</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 7mm;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #000;
+            margin: 20px;
+            background: #fff;
+        }
+
+        .document {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 3mm;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            margin: 20px 0 30px 0;
+        }
+
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .header-left {
+            flex: 1;
+        }
+
+        .header-right {
+            text-align: right;
+        }
+
+        .info-block {
+            margin-bottom: 15px;
+        }
+
+        .info-block p {
+            margin: 3px 0;
+        }
+
+        .info-block .label-bold {
+            font-weight: bold;
+        }
+
+        .order-reference {
+            text-align: right;
+            margin-bottom: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 10pt;
+        }
+
+        th, td {
+            border: 1px solid #000;
+            padding: 6px 4px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        td {
+            vertical-align: middle;
+        }
+
+        .col-num {
+            width: 4%;
+            text-align: center;
+        }
+
+        .col-article {
+            width: 10%;
+            text-align: center;
+        }
+
+        .col-name {
+            width: auto;
+        }
+
+        .col-unit {
+            width: 6%;
+            text-align: center;
+        }
+
+        .col-qty {
+            width: 8%;
+            text-align: center;
+        }
+
+        .col-price-rub {
+            width: 7%;
+            text-align: right;
+        }
+
+        .col-price-kop {
+            width: 5%;
+            text-align: right;
+        }
+
+        .col-sum-rub {
+            width: 9%;
+            text-align: right;
+        }
+
+        .col-sum-kop {
+            width: 5%;
+            text-align: right;
+        }
+
+        .total-row td {
+            font-weight: bold;
+        }
+
+        .total-label {
+            text-align: right;
+            padding-right: 10px;
+        }
+
+        .total-qty {
+            text-align: center;
+        }
+
+        .total-sum {
+            text-align: right;
+        }
+
+        .total-payment {
+            margin: 15px 0;
+            text-align: right;
+            font-weight: bold;
+            font-size: 12pt;
+        }
+
+        .sum-words {
+            margin: 20px 0 20px 0;
+        }
+
+        .sum-words strong {
+            text-decoration: underline;
+        }
+
+        .signatures {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .signature-block {
+            flex: 1;
+        }
+
+        .signature-line {
+            margin: 15px 0;
+        }
+
+        .signature-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .signature-row {
+            display: flex;
+            align-items: baseline;
+            margin: 10px 0;
+        }
+
+        .signature-label {
+            margin-right: 5px;
+        }
+
+        .signature-blank {
+            border-bottom: 1px solid #000;
+            flex: 1;
+            margin: 0 10px;
+        }
+
+        .signature-name {
+            font-style: italic;
+        }
+
+        .power-of-attorney {
+            margin-top: 30px;
+            font-size: 10pt;
+        }
+
+        .power-of-attorney p {
+            margin: 5px 0;
+        }
+
+        .print-controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+
+        .print-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .print-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls no-print">
+        <button class="print-btn" onclick="window.print()">Печать</button>
+    </div>
+
+    <div class="document">
+        <div class="title">
+            Приходная накладная № #Number# от #Date#
+        </div>
+
+        <div class="header-section">
+            <div class="header-left info-block">
+                <p><span class="label-bold">Поставщик:</span> #FirmName#</p>
+                <p>Адрес: #FirmAddress#</p>
+            </div>
+            <div class="header-right info-block">
+                <p>#FirmPhoneLine#</p>
+            </div>
+        </div>
+
+        <div class="header-section">
+            <div class="header-left info-block">
+                <p><span class="label-bold">Покупатель:</span> #ClientName#</p>
+                <p>Адрес: #ClientAddress#</p>
+                <p>Код ИНН: #ClientINN#</p>
+            </div>
+            <div class="header-right info-block">
+                <p>#ClientPhoneLine#</p>
+            </div>
+        </div>
+
+        <div class="order-reference">
+            #ZakazNumLine#
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-num">№ п/п</th>
+                    <th class="col-article">Артикул</th>
+                    <th class="col-name">Наименование</th>
+                    <th class="col-unit">Ед. изм.</th>
+                    <th class="col-qty">Кол-во</th>
+                    <th class="col-price-rub" colspan="2">Цена,&nbsp;Руб</th>
+                    <th class="col-sum-rub" colspan="2">Сумма,&nbsp;Руб</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="col-num">#N#</td>
+                    <td class="col-article">#ItemArticle#</td>
+                    <td class="col-name">#ItemName#</td>
+                    <td class="col-unit">#ItemEd#</td>
+                    <td class="col-qty">#ItemQuant#</td>
+                    <td class="col-price-rub">#ItemPriceRub#</td>
+                    <td class="col-price-kop">#ItemPriceKop#</td>
+                    <td class="col-sum-rub">#ItemSumRub#</td>
+                    <td class="col-sum-kop">#ItemSumKop#</td>
+                </tr>
+                <tr class="total-row">
+                    <td colspan="4" class="total-label">Итого:</td>
+                    <td class="total-qty">#TotQuant#</td>
+                    <td colspan="2"></td>
+                    <td class="total-sum" colspan="2">#TotSumRub#.#TotSumKop#</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="total-payment">
+            Всего к оплате: #TotSumAll#
+        </div>
+
+        <div class="sum-words">
+            Сумма прописью: <strong>#SumProp#</strong>
+        </div>
+
+        <div class="signatures">
+            <div class="signature-block">
+                <div class="signature-title">Заказчик</div>
+                <div class="signature-row">
+                    <span class="signature-label">Подпись</span>
+                    <span class="signature-blank"></span>
+                    <span>/</span>
+                    <span class="signature-name">#Sotr#</span>
+                </div>
+            </div>
+            <div class="signature-block">
+                <div class="signature-title">Поставщик</div>
+                <div class="signature-row">
+                    <span class="signature-label">Подпись</span>
+                    <span class="signature-blank"></span>
+                    <span>/</span>
+                    <span class="signature-name">#Sotr2#</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="power-of-attorney">
+            <p>Номер доверенности: #DoverNum#</p>
+            <p>Дата выдачи доверенности: #DoverDate#</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Акт оказания услуг</title>
+<style>
+  @page {
+    size: A4 landscape;
+    margin: 15mm 10mm 15mm 10mm;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10pt;
+    width: 277mm;
+    margin: 0 auto;
+    padding: 15mm 10mm;
+  }
+
+  @media print {
+    body {
+      padding: 0;
+    }
+    .no-print {
+      display: none !important;
+    }
+  }
+
+  .print-controls {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+  }
+  .print-btn {
+    background: #4caf50;
+    color: #fff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .print-btn:hover {
+    background: #45a049;
+  }
+
+  h1 {
+    font-size: 16pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 20px;
+    line-height: 1.4;
+  }
+
+  /* Блок исполнителя */
+  .firm-block {
+    margin-bottom: 16px;
+  }
+
+  .firm-name {
+    font-weight: bold;
+  }
+
+  .firm-line {
+    margin-bottom: 2px;
+  }
+
+  .firm-phone {
+    text-align: right;
+    margin-top: -22px;
+    margin-bottom: 8px;
+  }
+
+  /* Блок заказчика */
+  .client-block {
+    margin-bottom: 20px;
+  }
+
+  .client-label {
+    font-weight: bold;
+  }
+
+  .note-line {
+    margin-top: 2px;
+  }
+
+  /* Таблица */
+  table.items {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-bottom: 16px;
+  }
+
+  table.items th,
+  table.items td {
+    border: 1px solid black;
+    padding: 4px 6px;
+    font-size: 11pt;
+    vertical-align: top;
+    word-wrap: break-word;
+  }
+
+  table.items th {
+    font-weight: bold;
+    text-align: center;
+  }
+
+  /* Пропорции столбцов — как на скриншоте */
+  /* №=5%, Артикул=9%, Наименование=42%, Кол-во=8%, Цена=16%, Сумма=16% (неполные — на "Итого") */
+  table.items col.col-n       { width: 5%; }
+  table.items col.col-art     { width: 9%; }
+  table.items col.col-name    { width: 42%; }
+  table.items col.col-qty     { width: 8%; }
+  table.items col.col-price   { width: 16%; }
+  table.items col.col-sum     { width: 16%; }
+
+  /* Выравнивание ячеек данных */
+  table.items td.cell-center { text-align: center; }
+  table.items td.cell-left   { text-align: left; }
+
+  /* Строка итого */
+  table.items tfoot td {
+    font-weight: bold;
+    text-align: center;
+    border-top: 1px solid black;
+  }
+
+  table.items tfoot td.total-label {
+    text-align: right;
+    font-weight: normal;
+    padding-right: 8px;
+  }
+
+  /* Текстовые блоки под таблицей */
+  .summary-block {
+    margin-bottom: 6px;
+  }
+
+  .summary-block p {
+    margin-bottom: 10px;
+  }
+
+  .nds {
+    margin-bottom: 14px;
+  }
+
+  .disclaimer {
+    margin-bottom: 30px;
+  }
+
+  /* Подписи */
+  .signatures {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+  }
+
+  .sig-block {
+    width: 48%;
+  }
+
+  .sig-label {
+    font-weight: bold;
+    margin-bottom: 60px;
+  }
+
+  .sig-stamp {
+    text-align: center;
+    margin-top: 40px;
+  }
+</style>
+</head>
+<body>
+<div class="print-controls no-print">
+  <button class="print-btn" onclick="window.print()">Печать</button>
+</div>
+
+  <h1>Акт оказания услуг #Number# от #Date#</h1>
+
+  <div class="firm-block">
+    <div class="firm-line"><span class="firm-name">#FirmName#</span></div>
+    <div class="firm-line">Адрес: #FirmAddress#</div>
+    <div class="firm-phone">Тел.: #FirmPhone#</div>
+  </div>
+
+  <div class="client-block">
+    <div><span class="client-label">Заказчик: #ClientName#</span></div>
+    <div>Адрес: #ClientAddress#</div>
+    <div class="note-line">#Note#</div>
+  </div>
+
+  <table class="items">
+    <colgroup>
+      <col class="col-n">
+      <col class="col-art">
+      <col class="col-name">
+      <col class="col-qty">
+      <col class="col-price">
+      <col class="col-sum">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>№<br>п/п</th>
+        <th>Артикул</th>
+        <th>Наименование</th>
+        <th>Кол-во</th>
+        <th>Цена, Руб</th>
+        <th>Сумма, Руб</th>
+      </tr>
+    </thead>
+    <tbody>
+#D1      <tr>
+        <td class="cell-center">#ItemNum#</td>
+        <td class="cell-left">#ItemArticle#</td>
+        <td class="cell-left">#ItemName#</td>
+        <td class="cell-center">#ItemQuant#</td>
+        <td class="cell-center">#ItemPrice#</td>
+        <td class="cell-center">#ItemSum#</td>
+      </tr>
+#1D    </tbody>
+    <tfoot>
+      <tr>
+        <td class="total-label" colspan="3">Итого:</td>
+        <td class="cell-center">#TotQuant#</td>
+        <td></td>
+        <td class="cell-center">#TotSum#</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="summary-block">
+    <p>По счету № #Number# от #Date# на сумму #TotSum# руб</p>
+  </div>
+
+  <div class="summary-block">
+    <p>Всего оказано услуг (в том числе зап. части) на сумму:</p>
+    <p><strong>#SumProp#</strong></p>
+  </div>
+
+  <div class="nds">
+    <p>НДС не облагается.</p>
+  </div>
+
+  <div class="disclaimer">
+    <p>Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объёму, качеству и срокам оказания услуг не имеет.</p>
+  </div>
+
+  <div class="signatures">
+    <div class="sig-block">
+      <div class="sig-label">Исполнитель: ___________________________________</div>
+      <div class="sig-stamp">М.П.</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-label">Заказчик: ______________________________________</div>
+      <div class="sig-stamp">М.П.</div>
+    </div>
+  </div>
+
+</body>
+</html>

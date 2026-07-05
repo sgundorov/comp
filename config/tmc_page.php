@@ -1,0 +1,32 @@
+<?php
+$tmcPageConfig = [
+    'table'    => 'product',
+    'key'      => 'product_id',
+    'columns'  => tmc_columns_defaults(),
+    'search_cols' => [
+        'id'      => 'p.product_id',
+        'name'    => 'p.product_name',
+        'article' => 'p.article',
+        'categ'   => 'c.categ',
+        'group'   => 'g.name',
+        'sgroup'  => 'sg.name',
+        'country' => 'co.country',
+        'note'    => 'p.note',
+    ],
+    'default_sort'    => ['col' => 'id', 'dir' => 'asc'],
+    'marks_session'   => 'tmc_select',
+    'marks_tbl'       => 'product',
+    'country_filter_field' => null,
+    'country_filter_expr'  => null,
+    'key_expr'             => 'p.product_id',
+    'col_filters' => [
+        'categ'   => [null, 'categ', 'categ_id', 'categ'],
+        'group'   => [null, 'group', 'group_id', 'group'],
+        'sgroup'  => [null, 'sgroup', 'sgroup_id', 'sgroup'],
+        'country' => [null, 'country', 'country_id', 'country'],
+    ],
+    'select_sql'   => "SELECT p.product_id, p.product_name AS name, p.article, p.categ_id, p.group_id, p.sgroup_id, p.country_id, p.residue AS quant, p.price_in, p.price_out, p.note, c.categ AS categ_name, g.name AS group_name, sg.name AS sgroup_name, co.country AS country_name FROM product p LEFT JOIN categ c ON c.categ_id = p.categ_id LEFT JOIN `group` g ON g.group_id = p.group_id LEFT JOIN sgroup sg ON sg.sgroup_id = p.sgroup_id LEFT JOIN country co ON co.country_id = p.country_id",
+    'count_sql'    => "SELECT COUNT(*) AS cnt FROM product p LEFT JOIN categ c ON c.categ_id = p.categ_id LEFT JOIN `group` g ON g.group_id = p.group_id LEFT JOIN sgroup sg ON sg.sgroup_id = p.sgroup_id LEFT JOIN country co ON co.country_id = p.country_id",
+    'id_select_sql'=> "SELECT p.product_id AS id FROM product p",
+    'base_url'     => 'tmc.php',
+];
