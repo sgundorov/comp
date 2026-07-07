@@ -5,7 +5,7 @@ require_once __DIR__ . '/config/invo_page.php';
 require_once __DIR__ . '/lib/table-template.php';
 require_once __DIR__ . '/lib/marks-actions.php';
 require_once __DIR__ . '/lib/form-modal-handler.php';
-require_once __DIR__ . '/lib/embedded-subtable-template.php';
+require_once __DIR__ . '/lib/EmbeddedTable.php';
 require_once __DIR__ . '/lib/table-page-scripts.php';
 
 $TBL = 'invoice';
@@ -45,7 +45,6 @@ $sortQs       = $tp->sortQs;
 $orderBy      = $tp->orderBy;
 $columnsConfig= $tp->columnsConfig;
 $visibleColumns= $tp->visibleColumns;
-$offset       = $tp->offset;
 $showOnly     = $tp->showOnly;
 $marks        = $tp->marks;
 $marksCount   = $tp->marksCount;
@@ -54,146 +53,28 @@ $COL_META        = $tp->colMeta;
 $columnWidths    = load_columns_widths($conn, $TBL);
 $urlCols = $searchCols;
 
-$tp->appendWhere("i.doctype_id = ?", [10], 'i');
+$clientIds = array_values(array_filter(array_map('intval', explode(',', (string)($_GET['client_id'] ?? ''))), fn($v) => $v > 0));
+$storeIds = array_values(array_filter(array_map('intval', explode(',', (string)($_GET['store_id'] ?? ''))), fn($v) => $v > 0));
+$sotrIds = array_values(array_filter(array_map('intval', explode(',', (string)($_GET['sotr_id'] ?? ''))), fn($v) => $v > 0));
 
-$clientFilter = (string)($_GET['client_id'] ?? '');
-$clientIds = [];
-if ($clientFilter !== '') {
-    $clientIds = array_values(array_filter(array_map('intval', explode(',', $clientFilter)), fn($v) => $v > 0));
-}
-if (count($clientIds) > 0) {
-    $place = implode(',', array_fill(0, count($clientIds), '?'));
-    $tp->appendWhere("i.client_id IN ($place)", $clientIds, str_repeat('i', count($clientIds)));
-}
-
-$storeFilter = (string)($_GET['store_id'] ?? '');
-$storeIds = [];
-if ($storeFilter !== '') {
-    $storeIds = array_values(array_filter(array_map('intval', explode(',', $storeFilter)), fn($v) => $v > 0));
-}
-if (count($storeIds) > 0) {
-    $place = implode(',', array_fill(0, count($storeIds), '?'));
-    $tp->appendWhere("i.store_id IN ($place)", $storeIds, str_repeat('i', count($storeIds)));
-}
-
-$sotrFilter = (string)($_GET['sotr_id'] ?? '');
-$sotrIds = [];
-if ($sotrFilter !== '') {
-    $sotrIds = array_values(array_filter(array_map('intval', explode(',', $sotrFilter)), fn($v) => $v > 0));
-}
-if (count($sotrIds) > 0) {
-    $place = implode(',', array_fill(0, count($sotrIds), '?'));
-    $tp->appendWhere("i.sotr_id IN ($place)", $sotrIds, str_repeat('i', count($sotrIds)));
-}
-
-if (!function_exists('build_filter')) {
-function build_filter(string $search, array $cols = [], string $cond = 'contains'): array {
-    $colToExpr = [
-        'number'   => 'i.number',
-        'date'     => 'i.date',
-        'client'   => 'c.name',
-        'state'    => 'i.state',
-        'store'    => 'st.name',
-        'discount' => 'i.discount',
-        'sum'      => 'i.sum',
-        'sotr'     => 's.doc_name',
-        'note'     => 'i.note',
-    ];
-    $condToOp = [
-        'contains'     => function ($e) { return "$e LIKE ?"; },
-        'not_contains' => function ($e) { return "$e NOT LIKE ?"; },
-        'starts_with'  => function ($e) { return "$e LIKE ?"; },
-        'ends_with'    => function ($e) { return "$e LIKE ?"; },
-        'equals'       => function ($e) { return "$e = ?"; },
-        'not_equals'   => function ($e) { return "$e <> ?"; },
-    ];
-    $where = '';
-    $params = [];
-    $types  = '';
-    if ($search !== '' && count($cols) > 0 && isset($condToOp[$cond])) {
-        $op = $condToOp[$cond];
-        $parts = [];
-        foreach ($cols as $col) {
-            if (!isset($colToExpr[$col])) continue;
-            $parts[] = $op($colToExpr[$col]);
-            switch ($cond) {
-                case 'contains':     $params[] = '%' . $search . '%'; break;
-                case 'not_contains': $params[] = '%' . $search . '%'; break;
-                case 'starts_with':  $params[] = $search . '%'; break;
-                case 'ends_with':    $params[] = '%' . $search; break;
-                case 'equals':       $params[] = $search; break;
-                case 'not_equals':   $params[] = $search; break;
-            }
-            $types .= 's';
-        }
-        if (count($parts) > 0) {
-            $where = 'WHERE (' . implode(' OR ', $parts) . ')';
-        }
-    }
-    return [$where, $params, $types];
-}
-}
+$tp->applyFilterWithLabel($conn, 'client_id', 'i.client_id', 'Контрагент', 'client', 'client_id', 'name');
+$tp->applyFilterWithLabel($conn, 'store_id', 'i.store_id', 'Участок', 'store', 'store_id', 'name');
+$tp->applyFilterWithLabel($conn, 'sotr_id', 'i.sotr_id', 'Сотрудник', 'sotr', 'sotr_id', "CONCAT(COALESCE(last_name,''), ' ', COALESCE(first_name,''))");
 
 handle_marks_actions($conn, $tp, $TBL);
 
-$marks = load_marks_set($conn, $TBL);
-$marksCount = count_marks($conn, $TBL);
-
-$where  = $tp->where;
-$params = $tp->params;
-$types  = $tp->types;
-$whereSql = $tp->whereSql();
+$marks = $tp->marks;
+$marksCount = $tp->marksCount;
 
 $clearQs = function ($drop) use ($tp) { return $tp->clearQs((array)$drop); };
 
 $tp->buildFilters();
 $filters = $tp->filters;
 
-if (count($clientIds) > 0) {
-    $names = [];
-    $stmt = @$conn->prepare("SELECT client_id, name FROM client WHERE client_id IN (" . implode(',', array_fill(0, count($clientIds), '?')) . ") ORDER BY name");
-    if ($stmt) {
-        stmt_bind($stmt, str_repeat('i', count($clientIds)), $clientIds);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        while ($r = $res->fetch_assoc()) $names[] = (string)$r['name'];
-        $stmt->close();
-    }
-    $filters[] = ['kind' => 'client', 'text' => 'Контрагент = ' . implode(', ', $names), 'clear' => ['client_id']];
-}
-
-if (count($storeIds) > 0) {
-    $names = [];
-    $stmt = @$conn->prepare("SELECT store_id, name FROM store WHERE store_id IN (" . implode(',', array_fill(0, count($storeIds), '?')) . ") ORDER BY name");
-    if ($stmt) {
-        stmt_bind($stmt, str_repeat('i', count($storeIds)), $storeIds);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        while ($r = $res->fetch_assoc()) $names[] = (string)$r['name'];
-        $stmt->close();
-    }
-    $filters[] = ['kind' => 'store', 'text' => 'Участок = ' . implode(', ', $names), 'clear' => ['store_id']];
-}
-
-if (count($sotrIds) > 0) {
-    $names = [];
-    $stmt = @$conn->prepare("SELECT sotr_id, CONCAT(COALESCE(last_name,''), ' ', COALESCE(first_name,'')) AS name FROM sotr WHERE sotr_id IN (" . implode(',', array_fill(0, count($sotrIds), '?')) . ") ORDER BY last_name, first_name");
-    if ($stmt) {
-        stmt_bind($stmt, str_repeat('i', count($sotrIds)), $sotrIds);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        while ($r = $res->fetch_assoc()) $names[] = (string)$r['name'];
-        $stmt->close();
-    }
-    $filters[] = ['kind' => 'sotr', 'text' => 'Сотрудник = ' . implode(', ', $names), 'clear' => ['sotr_id']];
-}
-
-$total = $tp->getTotalCount($conn);
-$pages = $tp->pages;
-$page  = $tp->page;
-$offset= $tp->offset;
-
-$rows = $tp->getRows($conn);
+[$rows, $pagination] = $tp->fetchPage($conn);
+$total = $pagination['totalCount'];
+$page = $pagination['pageNum'];
+$pages = $pagination['pageCount'];
 
 $clientLookupOptions = [];
 $cr = @$conn->query("SELECT client_id AS id, name FROM client ORDER BY name");
@@ -261,13 +142,7 @@ render_form_modal(); ?>
 
       $paginationHtml = render_pagination($page, $pages, $baseQs, true);
 
-      $exportQs = http_build_query(array_filter([
-          'q'    => $searchActive && $search !== '' ? $search : null,
-          'cols' => $searchActive && count($searchCols) > 0 ? implode(',', $searchCols) : null,
-          'cond' => $searchActive ? $searchCond : null,
-          'sf'   => $searchActive ? '1' : null,
-          'sort' => $sortQs !== '' ? $sortQs : null,
-      ], function ($v) { return $v !== null && $v !== ''; }));
+      $exportQs = $tp->buildExportQs();
 
       $exportDropdownHtml = '';
       foreach ([
@@ -509,54 +384,56 @@ render_form_modal(); ?>
         ColumnFilter.init({ thSelector: '.col-state', pageUrl: 'invo.php', param: 'state' });
     ",
 ]); ?>
+<?php
+$d2Table = new EmbeddedTable([
+    'prefix'           => 'd2',
+    'columns'          => [
+        ['key' => 'product_name', 'label' => 'Товар', 'type' => 'lookup', 'dbField' => 'product_id'],
+        ['key' => 'quant',        'label' => 'Кол-во', 'align' => 'right'],
+        ['key' => 'price',        'label' => 'Цена', 'align' => 'right'],
+        ['key' => 'discount',     'label' => 'Скидка', 'align' => 'right'],
+        ['key' => 'sum',          'label' => 'Сумма', 'align' => 'right'],
+        ['key' => 'note',         'label' => 'Примечание'],
+    ],
+    'saveUrl'          => 'invoice2_field_save.php',
+    'parentField'      => 'invoice_id',
+    'childFormUrl'     => 'invoice2_form.php',
+    'childFormName'    => 'invoice2',
+    'hasExport'        => false,
+    'hasPrint'         => false,
+    'hasSearch'        => true,
+    'lookupData' => [
+        'product_name' => $productLookupOptions,
+    ],
+    'totalsCallback' => 'applyInvoice2Totals',
+]);
+$platTable = new EmbeddedTable([
+    'prefix'           => 'plat',
+    'columns'          => [
+        ['key' => 'datetime',    'label' => 'Дата/Время', 'readonly' => true],
+        ['key' => 'client_name', 'label' => 'Контрагент', 'readonly' => true],
+        ['key' => 'zat_name',    'label' => 'Вид операции', 'readonly' => true],
+        ['key' => 'sum',         'label' => 'Сумма', 'align' => 'right'],
+        ['key' => 'plat_type',   'label' => 'Вид платежа'],
+        ['key' => 'out_flag',    'label' => 'Тип', 'readonly' => true],
+        ['key' => 'note',        'label' => 'Примечание'],
+    ],
+    'saveUrl'          => 'plat_field_save.php',
+    'parentField'      => 'doc_id',
+    'childFormUrl'     => 'plat_form.php?doc_type=10',
+    'childFormName'    => 'plat',
+    'hasExport'        => false,
+    'hasPrint'         => false,
+    'hasSearch'        => true,
+    'totalsCallback' => 'applyInvoice2Totals',
+]);
+?>
 <script>
-    <?php render_embedded_subtable_scripts([
-        'prefix'           => 'd2',
-        'columns'          => [
-            ['key' => 'product_name', 'label' => 'Товар', 'type' => 'lookup', 'dbField' => 'product_id'],
-            ['key' => 'quant',        'label' => 'Кол-во', 'align' => 'right'],
-            ['key' => 'price',        'label' => 'Цена', 'align' => 'right'],
-            ['key' => 'discount',     'label' => 'Скидка', 'align' => 'right'],
-            ['key' => 'sum',          'label' => 'Сумма', 'align' => 'right'],
-            ['key' => 'note',         'label' => 'Примечание'],
-        ],
-        'saveUrl'          => 'invoice2_field_save.php',
-        'parentField'      => 'invoice_id',
-        'childFormUrl'     => 'invoice2_form.php',
-        'childFormName'    => 'invoice2',
-        'hasExport'        => false,
-        'hasPrint'         => false,
-        'hasSearch'        => true,
-        'columnResizeUrl'  => 'invoice2_column_width_save.php',
-        'columnResizeTbl'  => 'invoice2',
-        'lookupData' => [
-            'product_name' => $productLookupOptions,
-        ],
-        'totalsCallback' => 'applyInvoice2Totals',
-    ]); ?>
-  </script>
-  <script>
-    <?php render_embedded_subtable_scripts([
-        'prefix'           => 'plat',
-        'columns'          => [
-            ['key' => 'datetime',    'label' => 'Дата/Время', 'readonly' => true],
-            ['key' => 'client_name', 'label' => 'Контрагент', 'readonly' => true],
-            ['key' => 'zat_name',    'label' => 'Вид операции', 'readonly' => true],
-            ['key' => 'sum',         'label' => 'Сумма', 'align' => 'right'],
-            ['key' => 'plat_type',   'label' => 'Вид платежа'],
-            ['key' => 'out_flag',    'label' => 'Тип', 'readonly' => true],
-            ['key' => 'note',        'label' => 'Примечание'],
-        ],
-        'saveUrl'          => 'plat_field_save.php',
-        'parentField'      => 'doc_id',
-        'childFormUrl'     => 'plat_form.php?doc_type=10',
-        'childFormName'    => 'plat',
-        'hasExport'        => false,
-        'hasPrint'         => false,
-        'hasSearch'        => true,
-        'totalsCallback' => 'applyInvoice2Totals',
-    ]); ?>
-  </script>
+    <?php $d2Table->renderScripts(); ?>
+</script>
+<script>
+    <?php $platTable->renderScripts(); ?>
+</script>
 <?php render_page_footer(); ?>
 <script>
 (function(){

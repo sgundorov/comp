@@ -82,7 +82,7 @@
     var filtered = this.data;
     if (this.showOnlyChecked && this.checkedIds.size > 0) {
       var checked = this.checkedIds;
-      filtered = filtered.filter(function (item) { return checked.has(item.id); });
+      filtered = filtered.filter(function (item) { return checked.has(Number(item.id)); });
     }
     if (this.searchActive && this.searchText) {
       var st = this.searchText.toLowerCase();
@@ -141,14 +141,14 @@
       for (var i = 0; i < items.length; i++) {
         var item = items[i];
         var sel = (item.id == this.selectedId) ? ' selected' : '';
-        var chk = this.checkedIds.has(item.id) ? ' checked' : '';
+        var chk = this.checkedIds.has(Number(item.id)) ? ' checked' : '';
         html += '<tr data-id="' + item.id + '" data-row-id="' + item.id + '" class="d2-row' + sel + '">';
         html += '<td class="col-check"><input type="checkbox" class="d2-row-check" data-id="' + item.id + '"' + chk + ' /></td>';
         for (var j = 0; j < this.columns.length; j++) {
           var col = this.columns[j];
           var val = item[col.key] != null ? item[col.key] : '';
           var cellVal = (col.dbField && col.dbField !== col.key) ? (item[col.dbField] != null ? item[col.dbField] : '') : val;
-          var display = col.render ? col.render(val, item) : esc(val);
+          var display = col.render ? col.render(val, item) : (col.hideZero && (val === 0 || val === '0') ? '' : esc(val));
           if (st && this.searchCols.indexOf(col.key) >= 0) {
             display = this._highlight(display, st);
           }
@@ -436,15 +436,15 @@
               var cp = opts.currentPage || self.currentPage;
               var tp = opts.totalPages || Math.ceil(self.data.length / self.pageSize) || 1;
               if (opts.desiredIdx >= 0 && opts.desiredIdx < self.data.length) {
-                self.selectedId = self.data[opts.desiredIdx].id;
+                self.selectedId = Number(self.data[opts.desiredIdx].id);
                 self.currentPage = Math.floor(opts.desiredIdx / self.pageSize) + 1;
               } else if (cp < tp) {
                 self.currentPage = cp + 1;
                 self.selectedId = 0;
                 var firstOnPage = (self.currentPage - 1) * self.pageSize;
-                if (firstOnPage < self.data.length) self.selectedId = self.data[firstOnPage].id;
+                if (firstOnPage < self.data.length) self.selectedId = Number(self.data[firstOnPage].id);
               } else if (opts.desiredIdx - 1 >= 0) {
-                self.selectedId = self.data[opts.desiredIdx - 1].id;
+                self.selectedId = Number(self.data[opts.desiredIdx - 1].id);
                 self.currentPage = Math.floor((opts.desiredIdx - 1) / self.pageSize) + 1;
               } else if (cp > 1) {
                 self.currentPage = cp - 1;
@@ -457,12 +457,12 @@
               for (var i = 0; i < self.data.length; i++) {
                 if (self.data[i].id == opts.focusId) {
                   self.currentPage = Math.floor(i / self.pageSize) + 1;
-                  self.selectedId = opts.focusId;
+                  self.selectedId = Number(opts.focusId);
                   found = true;
                   break;
                 }
               }
-              if (!found && self.selectedId > 0 && !self.data.some(function (item) { return item.id === self.selectedId; })) {
+              if (!found && self.selectedId > 0 && !self.data.some(function (item) { return Number(item.id) === Number(self.selectedId); })) {
                 var pages = Math.ceil(self.data.length / self.pageSize) || 1;
                 if (self.currentPage > pages) self.currentPage = pages;
                 self.selectedId = 0;
@@ -487,6 +487,7 @@
 
   EmbeddedSubTable.prototype.deleteById = function (id) {
     var self = this;
+    id = Number(id);
     var fd = new FormData();
     fd.set('field', '_delete');
     fd.set('id', String(id));
@@ -495,20 +496,20 @@
       .then(function (d) {
         if (d && d.ok) {
           var idx = -1;
-          for (var i = 0; i < self.data.length; i++) { if (self.data[i].id === id) { idx = i; break; } }
-          self.data = self.data.filter(function (item) { return item.id !== id; });
+          for (var i = 0; i < self.data.length; i++) { if (self.data[i].id == id) { idx = i; break; } }
+          self.data = self.data.filter(function (item) { return Number(item.id) !== id; });
           self.checkedIds.delete(id);
-          if (self.selectedId === id) {
+          if (Number(self.selectedId) === id) {
             var tp = Math.ceil(self.data.length / self.pageSize) || 1;
             if (idx >= 0 && idx < self.data.length) {
-              self.selectedId = self.data[idx].id;
+              self.selectedId = Number(self.data[idx].id);
             } else if (self.currentPage < tp) {
               self.currentPage++;
               self.selectedId = 0;
               var firstOnPage = (self.currentPage - 1) * self.pageSize;
-              if (firstOnPage < self.data.length) self.selectedId = self.data[firstOnPage].id;
+              if (firstOnPage < self.data.length) self.selectedId = Number(self.data[firstOnPage].id);
             } else if (idx - 1 >= 0 && idx - 1 < self.data.length) {
-              self.selectedId = self.data[idx - 1].id;
+              self.selectedId = Number(self.data[idx - 1].id);
             } else if (self.currentPage > 1) {
               self.currentPage--;
               self.selectedId = 0;
@@ -541,7 +542,7 @@
       fetch(self.saveUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
         .then(function () {
-          self.data = self.data.filter(function (item) { return item.id !== ids[i]; });
+          self.data = self.data.filter(function (item) { return Number(item.id) !== ids[i]; });
           next(i + 1);
         })
         .catch(function () { next(i + 1); });

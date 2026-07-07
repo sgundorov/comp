@@ -145,7 +145,7 @@ class SimplePdf {
         }
         $objs[$fontObjN]  = "<< /Type /Font /Subtype /Type0 /BaseFont /ArialMT /Encoding /Identity-H /DescendantFonts [$cidObjN 0 R] /ToUnicode $touniObjN 0 R >>";
         $wArray = $this->buildWArray();
-        $objs[$cidObjN]   = "<< /Type /Font /Subtype /CIDFontType2 /BaseFont /ArialMT /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor $descObjN 0 R /DW 500 /W $wArray /CIDToGIDMap /Identity >>";
+        $objs[$cidObjN]   = "<< /Type /Font /Subtype /CIDFontType2 /BaseFont /ArialMT /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor $descObjN 0 R /DW 500 /W $wArray >>";
         $objs[$descObjN]  = "<< /Type /FontDescriptor /FontName /ArialMT /Flags 32 /FontBBox [0 -200 1000 800] /ItalicAngle 0 /Ascent " . self::$ascender . " /Descent " . self::$descender . " /CapHeight 700 /StemV 80 /FontFile2 $ttfObjN 0 R >>";
         $objs['s' . $ttfObjN] = self::$ttfBytes;
         $objs['s' . $touniObjN] = $this->buildToUnicodeCMap();
@@ -170,6 +170,7 @@ class SimplePdf {
         }
         foreach ($streamNums as $sn) {
             $offsets['s' . $sn] = strlen($pdf);
+            $offsets[$sn] = strlen($pdf);
             $length = strlen($objs['s' . $sn]);
             $pdf .= "$sn 0 obj\n<< /Length $length >>\nstream\n" . $objs['s' . $sn] . "\nendstream\nendobj\n";
         }
@@ -212,7 +213,7 @@ class SimplePdf {
     private function textOp($x, $y, $text, $size) {
         $bytes = $this->toGlyphCodes($text);
         $hex = bin2hex($bytes);
-        return sprintf("BT /F1 %s Tf 1 0 0 1 %s %s Tm <%s> Tj ET\n",
+        return sprintf("BT /F1 %s Tf 0 0 0 rg 1 0 0 1 %s %s Tm <%s> Tj ET\n",
             $this->fmt($size), $this->fmt($x), $this->fmt($this->pageH - $y), $hex);
     }
 
@@ -227,8 +228,7 @@ class SimplePdf {
         for ($i = 0; $i < $len; $i++) {
             $c = mb_substr($text, $i, 1, 'UTF-8');
             $code = mb_ord($c, 'UTF-8');
-            $gid = self::$cmap[$code] ?? 0;
-            $out .= chr(($gid >> 8) & 0xFF) . chr($gid & 0xFF);
+            $out .= chr(($code >> 8) & 0xFF) . chr($code & 0xFF);
         }
         return $out;
     }
@@ -302,38 +302,38 @@ class SimplePdf {
     }
 
     private function buildToUnicodeCMap() {
-        $cmap = "/CIDInit /ProcSet findresource begin\n";
-        $cmap .= "12 dict begin\n";
-        $cmap .= "begincmap\n";
-        $cmap .= "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n";
-        $cmap .= "/CMapName /Adobe-Identity-UCS def\n";
-        $cmap .= "/CMapType 2 def\n";
-        $cmap .= "1 begincodespacerange\n";
-        $cmap .= "<0000> <FFFF>\n";
-        $cmap .= "endcodespacerange\n";
-
-        $entries = [];
-        foreach (self::$cmap as $unicodeCode => $gid) {
-            $entries[] = sprintf("<%04X> <%04X>", $gid, $unicodeCode);
-        }
-        $i = 0;
-        while ($i < count($entries)) {
-            $chunk = array_slice($entries, $i, 100);
-            $cmap .= count($chunk) . " beginbfchar\n";
-            foreach ($chunk as $e) $cmap .= $e . "\n";
-            $cmap .= "endbfchar\n";
-            $i += 100;
-        }
-        $cmap .= "endcmap\n";
-        $cmap .= "CMapName currentdict /CMap defineresource pop\n";
-        $cmap .= "end\n";
-        $cmap .= "end\n";
-        return $cmap;
+        return "/CIDInit /ProcSet findresource begin\n"
+            . "12 dict begin\n"
+            . "begincmap\n"
+            . "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n"
+            . "/CMapName /Adobe-Identity-UCS def\n"
+            . "/CMapType 2 def\n"
+            . "1 begincodespacerange\n"
+            . "<0000> <FFFF>\n"
+            . "endcodespacerange\n"
+            . "1 beginbfrange\n"
+            . "<0000> <FFFF> <0000>\n"
+            . "endbfrange\n"
+            . "endcmap\n"
+            . "CMapName currentdict /CMap defineresource pop\n"
+            . "end\n"
+            . "end\n";
     }
 
     private function loadTtf() {
         if (self::$loaded) return;
-        self::$ttfBytes = file_get_contents(self::TTF_PATH);
+        $paths = [
+            self::TTF_PATH,
+            __DIR__ . '/../assets/fonts/LiberationSans-Regular.ttf',
+            'C:/Windows/Fonts/arial.ttf',
+            'C:/Windows/Fonts/Arial.ttf',
+        ];
+        $loaded = false;
+        foreach ($paths as $p) {
+            $b = @file_get_contents($p);
+            if ($b !== false) { self::$ttfBytes = $b; $loaded = true; break; }
+        }
+        if (!$loaded) { self::$loaded = true; return; }
         self::$ttfLen = strlen(self::$ttfBytes);
 
         $numTables = self::u16(4);

@@ -2,7 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/table-helper.php';
-require_once __DIR__ . '/lib/embedded-subtable-template.php';
+require_once __DIR__ . '/lib/EmbeddedTable.php';
 require_once __DIR__ . '/config/invo_columns.php';
 
 $isAjax = (
@@ -280,6 +280,50 @@ if (!empty($platList)) {
     }
 }
 
+$d2Table = new EmbeddedTable([
+    'prefix'           => 'd2',
+    'columns'          => [
+        ['key' => 'product_name', 'label' => 'Товар', 'type' => 'lookup', 'dbField' => 'product_id'],
+        ['key' => 'quant',        'label' => 'Кол-во', 'align' => 'right'],
+        ['key' => 'price',        'label' => 'Цена', 'align' => 'right'],
+        ['key' => 'discount',     'label' => 'Скидка', 'align' => 'right'],
+        ['key' => 'sum',          'label' => 'Сумма', 'align' => 'right'],
+        ['key' => 'note',         'label' => 'Примечание'],
+    ],
+    'colWidths'  => ['product_name' => '250px', 'quant' => '80px', 'price' => '100px', 'discount' => '80px', 'sum' => '100px', 'note' => 'auto'],
+    'saveUrl'          => 'invoice2_field_save.php',
+    'parentField'      => 'invoice_id',
+    'childFormUrl'     => 'invoice2_form.php',
+    'childFormName'    => 'invoice2',
+    'hasExport'        => false,
+    'hasPrint'         => false,
+    'hasSearch'        => true,
+    'lookupData' => [
+        'product_name' => $productList ?? [],
+    ],
+    'totalsCallback' => 'applyInvoice2Totals',
+]);
+$platTable = new EmbeddedTable([
+    'prefix'           => 'plat',
+    'columns'          => [
+        ['key' => 'datetime',    'label' => 'Дата/Время', 'readonly' => true],
+        ['key' => 'client_name', 'label' => 'Контрагент', 'readonly' => true],
+        ['key' => 'zat_name',    'label' => 'Вид операции', 'readonly' => true],
+        ['key' => 'sum',         'label' => 'Сумма', 'align' => 'right'],
+        ['key' => 'plat_type',   'label' => 'Вид платежа'],
+        ['key' => 'out_flag',    'label' => 'Тип', 'readonly' => true],
+        ['key' => 'note',        'label' => 'Примечание'],
+    ],
+    'colWidths'  => ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'plat_type' => '100px', 'out_flag' => '70px', 'note' => 'auto'],
+    'saveUrl'          => 'plat_field_save.php',
+    'parentField'      => 'doc_id',
+    'childFormUrl'     => 'plat_form.php?doc_type=10&client_id=' . $values['client_id'] . '&sotr_id=' . $CurSotrID . '&zat_id=' . $zatIdForPlat . '&sum_in=' . urlencode($values['sum'] - $values['sum_plat']),
+    'childFormName'    => 'plat',
+    'hasExport'        => false,
+    'hasPrint'         => false,
+    'hasSearch'        => true,
+    'totalsCallback' => 'applyInvoice2Totals',
+]);
 $stateOptions = ['Черновик', 'Выставлен', 'Оплачен', 'Отменен'];
 
 function dv($v) { return ((float)str_replace(',', '.', $v)) == 0 ? '' : (string)$v; }
@@ -466,47 +510,19 @@ ob_start();
   </div>
 
   <div class="tab-pane" data-tab-index="1">
-    <?php if ($id > 0 && ($mode !== 'new')): ?>
-    <?= render_embedded_subtable([
-        'prefix'     => 'd2',
-        'columns'    => [
-            ['key' => 'product_name', 'label' => 'Товар'],
-            ['key' => 'quant',        'label' => 'Кол-во'],
-            ['key' => 'price',        'label' => 'Цена'],
-            ['key' => 'discount',     'label' => 'Скидка'],
-            ['key' => 'sum',          'label' => 'Сумма'],
-            ['key' => 'note',         'label' => 'Примечание'],
-        ],
-        'colWidths'  => ['product_name' => '250px', 'quant' => '80px', 'price' => '100px', 'discount' => '80px', 'sum' => '100px', 'note' => 'auto'],
-        'data'       => $itemsList ? array_map(function($i) { return ['id' => (int)$i['invoice2_id'], 'product_id' => (int)$i['product_id'], 'product_name' => $i['product_name'], 'quant' => fmt_qty($i['quant']), 'price' => dv($i['price']), 'discount' => fmt_qty($i['discount']), 'sum' => dv($i['sum']), 'note' => $i['note']]; }, $itemsList) : [],
-        'hasExport'  => false,
-        'hasPrint'   => false,
-        'hasSearch'  => true,
-    ]) ?>
+    <?php if ($id > 0 && ($mode !== 'new')):
+    $d2Data = $itemsList ? array_map(function($i) { return ['id' => (int)$i['invoice2_id'], 'product_id' => (int)$i['product_id'], 'product_name' => $i['product_name'], 'quant' => fmt_qty($i['quant']), 'price' => dv($i['price']), 'discount' => fmt_qty($i['discount']), 'sum' => dv($i['sum']), 'note' => $i['note']]; }, $itemsList) : [];
+    echo $d2Table->render($d2Data);
+    ?>
     <?php elseif ($mode === 'new'): ?>
     <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">Сохраните счет, чтобы добавить товары</div>
     <?php endif; ?>
   </div>
 
   <div class="tab-pane" data-tab-index="2">
-    <?php if ($id > 0 && ($mode !== 'new')): ?>
-    <?= render_embedded_subtable([
-        'prefix'     => 'plat',
-        'columns'    => [
-            ['key' => 'datetime',    'label' => 'Дата/Время'],
-            ['key' => 'client_name', 'label' => 'Контрагент'],
-            ['key' => 'zat_name',    'label' => 'Вид операции'],
-            ['key' => 'sum',         'label' => 'Сумма'],
-            ['key' => 'plat_type',   'label' => 'Вид платежа'],
-            ['key' => 'out_flag',    'label' => 'Тип'],
-            ['key' => 'note',        'label' => 'Примечание'],
-        ],
-        'colWidths'  => ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'plat_type' => '100px', 'out_flag' => '70px', 'note' => 'auto'],
-        'data'       => $platDataForSubtable,
-        'hasExport'  => false,
-        'hasPrint'   => false,
-        'hasSearch'  => true,
-    ]) ?>
+    <?php if ($id > 0 && ($mode !== 'new')):
+    echo $platTable->render($platDataForSubtable);
+    ?>
     <?php elseif ($mode === 'new'): ?>
     <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">Сохраните счет, чтобы добавить платежи</div>
     <?php endif; ?>
@@ -582,53 +598,11 @@ if ($isAjax) {
     })();
   </script>
   <script>
-    <?php render_embedded_subtable_scripts([
-        'prefix'           => 'd2',
-        'columns'          => [
-            ['key' => 'product_name', 'label' => 'Товар', 'type' => 'lookup', 'dbField' => 'product_id'],
-            ['key' => 'quant',        'label' => 'Кол-во', 'align' => 'right'],
-            ['key' => 'price',        'label' => 'Цена', 'align' => 'right'],
-            ['key' => 'discount',     'label' => 'Скидка', 'align' => 'right'],
-            ['key' => 'sum',          'label' => 'Сумма', 'align' => 'right'],
-            ['key' => 'note',         'label' => 'Примечание'],
-        ],
-        'saveUrl'          => 'invoice2_field_save.php',
-        'parentField'      => 'invoice_id',
-        'childFormUrl'     => 'invoice2_form.php',
-        'childFormName'    => 'invoice2',
-        'hasExport'        => false,
-        'hasPrint'         => false,
-        'hasSearch'        => true,
-        'columnResizeUrl'  => 'invoice2_column_width_save.php',
-        'columnResizeTbl'  => 'invoice2',
-        'lookupData' => [
-            'product_name' => $productList,
-        ],
-        'totalsCallback' => 'applyInvoice2Totals',
-    ]); ?>
+    <?php $d2Table->renderScripts(); ?>
     initD2Table();
   </script>
   <script>
-    <?php render_embedded_subtable_scripts([
-        'prefix'           => 'plat',
-        'columns'          => [
-            ['key' => 'datetime',    'label' => 'Дата/Время', 'readonly' => true],
-            ['key' => 'client_name', 'label' => 'Контрагент', 'readonly' => true],
-            ['key' => 'zat_name',    'label' => 'Вид операции', 'readonly' => true],
-            ['key' => 'sum',         'label' => 'Сумма', 'align' => 'right'],
-            ['key' => 'plat_type',   'label' => 'Вид платежа'],
-            ['key' => 'out_flag',    'label' => 'Тип', 'readonly' => true],
-            ['key' => 'note',        'label' => 'Примечание'],
-        ],
-        'saveUrl'          => 'plat_field_save.php',
-        'parentField'      => 'doc_id',
-        'childFormUrl'     => 'plat_form.php?doc_type=10&client_id=' . $values['client_id'] . '&sotr_id=' . $CurSotrID . '&zat_id=' . $zatIdForPlat . '&sum_in=' . urlencode($values['sum'] - $values['sum_plat']),
-        'childFormName'    => 'plat',
-        'hasExport'        => false,
-        'hasPrint'         => false,
-        'hasSearch'        => true,
-        'totalsCallback' => 'applyInvoice2Totals',
-    ]); ?>
+    <?php $platTable->renderScripts(); ?>
     initPlatTable();
   </script>
 </body>

@@ -3,11 +3,8 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/config/invo_columns.php';
 require_once __DIR__ . '/config/invo_page.php';
 
-$groupId = (int)($_GET['group_id'] ?? 0);
-
 $format = strtolower((string)($_GET['format'] ?? ''));
-$validFormats = ['csv', 'xls'];
-if (!in_array($format, $validFormats, true)) {
+if (!in_array($format, ['csv', 'xls'], true)) {
     http_response_code(400);
     echo 'Unknown format';
     exit;
@@ -16,119 +13,25 @@ if (!in_array($format, $validFormats, true)) {
 $tp = new TablePage($conn, $invoPageConfig);
 $tp->appendWhere("i.doctype_id = ?", [10], 'i');
 
-$idsParam = trim((string)($_GET['ids'] ?? ''));
-$explicitIds = [];
-if ($idsParam !== '') {
-    $explicitIds = array_values(array_filter(array_map('intval', explode(',', $idsParam)), fn($v) => $v > 0));
-}
-$onlySelected = ((string)($_GET['all'] ?? '0') === '1');
-$skipQuery = false;
+$rows = $tp->fetchAll($conn);
 
-if (count($explicitIds) > 0) {
-    $place = implode(',', array_fill(0, count($explicitIds), '?'));
-    $keyExpr = $tp->keyExpr ?? ($tp->table . '.' . $tp->key);
-    $extra = "$keyExpr IN ($place)";
-    $tp->appendWhere($extra, $explicitIds, str_repeat('i', count($explicitIds)));
-} elseif ($onlySelected) {
-    $marks = load_marks_set($conn, $tp->marksTbl);
-    $selectedIds = array_keys($marks);
-    if (count($selectedIds) === 0) {
-        $skipQuery = true;
-    } else {
-        $place = implode(',', array_fill(0, count($selectedIds), '?'));
-        $keyExpr = $tp->keyExpr ?? ($tp->table . '.' . $tp->key);
-        $extra = "$keyExpr IN ($place)";
-        $tp->appendWhere($extra, $selectedIds, str_repeat('i', count($selectedIds)));
-    }
-}
-
-$rows = [];
-if (!$skipQuery) {
-    $sql = str_placeholder($tp->selectSql, $tp->whereSql())
-         . ' ORDER BY ' . $tp->orderBy;
-    $stmt = @mysqli_prepare($conn, $sql);
-    if ($stmt) {
-        if ($tp->types !== '') stmt_bind($stmt, $tp->types, $tp->params);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        if ($res) while ($r = $res->fetch_assoc()) $rows[] = $r;
-        $stmt->close();
-    }
-}
-
-$COL_META = [];
-foreach ($tp->columns as $c) {
-    $COL_META[$c['name']] = [
-        'label' => $c['label'],
-        'value' => null,
-    ];
-}
-$COL_META['number']['value']   = function ($r) { return (string)$r['number']; };
-$COL_META['date']['value']     = function ($r) { return (string)$r['date']; };
-$COL_META['client']['value']   = function ($r) { return (string)($r['client_name'] ?? ''); };
-$COL_META['state']['value']    = function ($r) { $states = ['1'=>'Черновик','2'=>'Выставлен','3'=>'Оплачен','4'=>'Отменен']; return $states[(string)$r['state']] ?? $r['state']; };
-$COL_META['store']['value']    = function ($r) { return (string)($r['store_name'] ?? ''); };
-$COL_META['discount']['value'] = function ($r) { return (int)$r['discount'] ? (string)(int)$r['discount'] . '%' : ''; };
-$COL_META['sum']['value']      = function ($r) { return (float)$r['sum'] ? number_format((float)$r['sum'], 2, '.', ' ') : ''; };
-$COL_META['sotr']['value']     = function ($r) { return (string)($r['sotr_name'] ?? ''); };
-$COL_META['pos']['value']      = function ($r) { return (int)$r['pos'] ? (string)(int)$r['pos'] : ''; };
-$COL_META['note']['value']     = function ($r) { return (string)$r['note']; };
-
-$baseName = 'Счета';
-
-$customName = trim((string)($_GET['filename'] ?? ''));
-if ($customName !== '') {
-    $customName = preg_replace('/[\x00-\x1F\x7F\/\\\\<>:"|?*]+/u', '_', $customName);
-    $customName = trim($customName, ". \t\n\r\0\x0B");
-    $customName = mb_substr($customName, 0, 120, 'UTF-8');
-    if ($customName !== '') {
-        $customName = preg_replace('/\.(csv|xls)$/i', '', $customName);
-        if ($customName !== '') $baseName = $customName;
-    }
-}
-
-if ($format === 'csv') {
-    exportCsv($rows, $baseName, $tp->visibleColumns, $COL_META);
-} elseif ($format === 'xls') {
-    exportXls($rows, $baseName, $tp->visibleColumns, $COL_META);
-}
-
-function exportCsv(array $rows, string $baseName, array $visibleCols, array $colMeta) {
-    $filename = $baseName . '.csv';
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Cache-Control: no-cache, no-store, must-revalidate');
-    $headers = [];
-    foreach ($visibleCols as $vc) $headers[] = $colMeta[$vc['name']]['label'];
-    $out = fopen('php://output', 'w');
-    fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, $headers, ';', '"', '\\');
-    foreach ($rows as $r) {
-        $cells = [];
-        foreach ($visibleCols as $vc) $cells[] = $colMeta[$vc['name']]['value']($r);
-        fputcsv($out, $cells, ';', '"', '\\');
-    }
-    fclose($out);
-}
-
-function exportXls(array $rows, string $baseName, array $visibleCols, array $colMeta) {
-    $filename = $baseName . '.xls';
-    header('Content-Type: application/vnd.ms-excel; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Cache-Control: no-cache, no-store, must-revalidate');
-    echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
-    echo '<head><meta charset="UTF-8"><title>' . htmlspecialchars($baseName, ENT_QUOTES, 'UTF-8') . '</title>';
-    echo '<style>table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; } th, td { border: 1px solid #888; padding: 4px 8px; } th { background: #ddd; font-weight: bold; }</style>';
-    echo '</head><body><table><thead><tr>';
-    foreach ($visibleCols as $vc) echo '<th>' . htmlspecialchars($colMeta[$vc['name']]['label'], ENT_QUOTES, 'UTF-8') . '</th>';
-    echo '</tr></thead><tbody>';
-    foreach ($rows as $r) {
-        echo '<tr>';
-        foreach ($visibleCols as $vc) {
-            $v = $colMeta[$vc['name']]['value']($r);
-            echo '<td>' . htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8') . '</td>';
-        }
-        echo '</tr>';
-    }
-    echo '</tbody></table></body></html>';
-}
+$tp->renderExport($format, $rows, [
+    'baseName' => 'Счета',
+    'colValues' => [
+        'number'       => fn($r) => (string)$r['number'],
+        'date'         => fn($r) => (string)$r['date'],
+        'client'       => fn($r) => (string)($r['client_name'] ?? ''),
+        'state'        => function ($r) { $s = ['1'=>'Черновик','2'=>'Выставлен','3'=>'Оплачен','4'=>'Отменен']; return $s[(string)$r['state']] ?? $r['state']; },
+        'store'        => fn($r) => (string)($r['store_name'] ?? ''),
+        'discount'     => fn($r) => (int)$r['discount'] ? (string)(int)$r['discount'] . '%' : '',
+        'sum'          => fn($r) => (float)$r['sum'] ? number_format((float)$r['sum'], 2, '.', ' ') : '',
+        'sotr'         => fn($r) => (string)($r['sotr_name'] ?? ''),
+        'pos'          => fn($r) => (int)$r['pos'] ? (string)(int)$r['pos'] : '',
+        'sum_plat'     => fn($r) => (float)$r['sum_plat'] ? number_format((float)$r['sum_plat'], 2, '.', ' ') : '',
+        'sum_nds'      => fn($r) => (float)$r['sum_nds'] ? number_format((float)$r['sum_nds'], 2, '.', ' ') : '',
+        'date_plat'    => fn($r) => (string)($r['date_plat'] ?? ''),
+        'sum_discount' => fn($r) => (float)$r['sum_discount'] ? number_format((float)$r['sum_discount'], 2, '.', ' ') : '',
+        'time'         => fn($r) => (string)($r['time'] ?? ''),
+        'note'         => fn($r) => (string)$r['note'],
+    ],
+]);

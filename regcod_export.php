@@ -1,43 +1,43 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/lib/table-helper.php';
 require_once __DIR__ . '/config/regcod_columns.php';
 require_once __DIR__ . '/config/regcod_page.php';
 
-$tp = new TablePage($regcodPageConfig);
-$tp->parseRequest();
-$tp->buildWhere();
-$tp->buildOrderBy();
-$rows = $tp->getRows($conn);
-$visibleColumns = $tp->getVisibleColumns();
-$COL_META = $tp->getColumnMeta();
-
-$format = $_GET['format'] ?? 'csv';
-$exportTimestamp = date('d.m.Y_H.i');
-
-if ($format === 'csv') {
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="Регистрационные коды ' . $exportTimestamp . '.csv"');
-    $out = fopen('php://output', 'w');
-    $header = [];
-    foreach ($visibleColumns as $vc) { $header[] = $vc['label']; }
-    fputcsv($out, $header, ';');
-    foreach ($rows as $r) {
-        $line = [];
-        foreach ($visibleColumns as $vc) { $line[] = $r[$vc['name']] ?? ''; }
-        fputcsv($out, $line, ';');
-    }
-    fclose($out);
-} else {
-    header('Content-Type: application/vnd.ms-excel');
-    header('Content-Disposition: attachment; filename="Регистрационные коды ' . $exportTimestamp . '.xls"');
-    echo '<table border="1"><tr>';
-    foreach ($visibleColumns as $vc) { echo '<th>' . h($vc['label']) . '</th>'; }
-    echo '</tr>';
-    foreach ($rows as $r) {
-        echo '<tr>';
-        foreach ($visibleColumns as $vc) { echo '<td>' . h($r[$vc['name']] ?? '') . '</td>'; }
-        echo '</tr>';
-    }
-    echo '</table>';
+$format = strtolower((string)($_GET['format'] ?? ''));
+if (!in_array($format, ['csv', 'xls'], true)) {
+    http_response_code(400);
+    echo 'Unknown format';
+    exit;
 }
+
+$regcodPageConfig['columns'] = regcod_columns_defaults();
+$regcodPageConfig['default_sort'] = ['col' => 'regcod', 'dir' => 'desc'];
+$regcodPageConfig['key_expr'] = 'r.regcod_id';
+
+$tp = new TablePage($conn, $regcodPageConfig);
+
+$clientId = (int)($_GET['client_id'] ?? 0);
+if ($clientId > 0) {
+    $tp->appendWhere("r.client_id = ?", [$clientId], 'i');
+}
+
+$rows = $tp->fetchAll($conn);
+
+$baseName = 'Регистрационные коды';
+$customName = trim((string)($_GET['filename'] ?? ''));
+if ($customName !== '') {
+    $customName = preg_replace('/[\x00-\x1F\x7F\/\\\\<>:"|?*]+/u', '_', $customName);
+    $customName = trim($customName, ". \t\n\r\0\x0B");
+    $customName = mb_substr($customName, 0, 120, 'UTF-8');
+    if ($customName !== '') {
+        $customName = preg_replace('/\.(csv|xls)$/i', '', $customName);
+        if ($customName !== '') $baseName = $customName;
+    }
+}
+
+$tp->renderExport($format, $rows, [
+    'baseName' => $baseName,
+    'colValues' => [
+        'days' => fn($r) => (int)($r['days'] ?? 0) === 0 ? '' : $r['days'],
+    ],
+]);

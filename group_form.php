@@ -2,7 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/table-helper.php';
-require_once __DIR__ . '/lib/embedded-subtable-template.php';
+require_once __DIR__ . '/lib/EmbeddedTable.php';
 
 $isAjax = (
     (string)($_GET['ajax'] ?? '') === '1' ||
@@ -143,6 +143,24 @@ if ($id > 0 && $mode !== 'new') {
     $stmt->close();
 }
 
+$sgTable = new EmbeddedTable([
+    'prefix'           => 'sg',
+    'columns'          => [
+        ['key' => 'name', 'label' => 'Название подгруппы', 'align' => 'left'],
+        ['key' => 'note', 'label' => 'Примечание', 'align' => 'left'],
+    ],
+    'colWidths'  => ['name' => '250px', 'note' => 'auto'],
+    'saveUrl'          => 'sgroup_field_save.php',
+    'parentField'      => 'group_id',
+    'childFormUrl'     => 'sgroup_form.php',
+    'childFormName'    => 'sgroup',
+    'hasExport'        => true,
+    'hasPrint'         => true,
+    'exportUrl'        => 'sgroup_export.php',
+    'printUrl'         => 'sgroup_print.php',
+    'parentParam'      => 'group_id=',
+]);
+
 ob_start();
 ?>
 <h2 class="page-title<?= $mode === 'delete' ? ' page-title--delete' : '' ?>"><img src="img/group.png" alt="" /> <?= h($pageTitle) ?></h2>
@@ -196,18 +214,7 @@ ob_start();
   </div>
 
   <div class="tab-pane" data-tab-index="1">
-    <?= render_embedded_subtable([
-        'prefix'     => 'sg',
-        'columns'    => [
-            ['key' => 'name', 'label' => 'Название'],
-            ['key' => 'note', 'label' => 'Примечание'],
-        ],
-        'colWidths'  => ['name' => '250px', 'note' => 'auto'],
-        'data'       => $sgroupData,
-        'hasExport'  => true,
-        'hasPrint'   => true,
-        'hasSearch'  => true,
-    ]) ?>
+    <?= $sgTable->render($sgroupData) ?>
   </div>
 </div>
 
@@ -244,24 +251,7 @@ if ($isAjax) {
   </div>
   <script src="assets/embedded-subtable.js"></script>
   <script>
-    <?= render_embedded_subtable_scripts([
-        'prefix'           => 'sg',
-        'columns'          => [
-            ['key' => 'name', 'label' => 'Название подгруппы', 'align' => 'left'],
-            ['key' => 'note', 'label' => 'Примечание', 'align' => 'left'],
-        ],
-        'saveUrl'          => 'sgroup_field_save.php',
-        'parentField'      => 'group_id',
-        'childFormUrl'     => 'sgroup_form.php',
-        'childFormName'    => 'sgroup',
-        'hasExport'        => true,
-        'hasPrint'         => true,
-        'exportUrl'        => 'sgroup_export.php',
-        'printUrl'         => 'sgroup_print.php',
-        'parentParam'      => 'group_id=',
-        'columnResizeUrl'  => 'sgroup_column_width_save.php',
-        'columnResizeTbl'  => 'sgroup',
-    ]); ?>
+    <?php $sgTable->renderScripts(); ?>
   </script>
 </body>
 </html>

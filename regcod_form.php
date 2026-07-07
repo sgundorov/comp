@@ -29,7 +29,7 @@ $values = [
     'date'       => date('Y-m-d'),
     'city'       => '',
     'signat'     => '',
-    'days'       => '0',
+    'days'       => '',
     'sotr_id'    => 0,
     'block_flag' => 0,
     'note'       => '',
@@ -50,7 +50,7 @@ if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
         $values['client_id']  = (int)$r['client_id'];
         $values['product_id'] = (int)$r['product_id'];
         $values['quant']      = (string)$r['quant'];
-        $values['days']       = (string)$r['days'];
+        $values['days']       = ((int)$r['days'] === 0) ? '' : (string)$r['days'];
         $values['block_flag'] = (int)$r['block_flag'];
         $values['datetime']   = (string)$r['datetime'];
     }

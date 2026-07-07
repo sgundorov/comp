@@ -91,6 +91,14 @@ function render_form_modal_script(array $config = []): void {
           try{ eval(s.textContent); }catch(ex){ console.error('[FM] script error', ex); }
         });
         <?= $autoInitJs ?>
+        try {
+          if (typeof window.ColumnResize !== 'undefined') {
+            root.querySelectorAll('.data-table').forEach(function(t) {
+              t.removeAttribute('data-col-resize-inited');
+              window.ColumnResize.init({ selector: '#' + t.id });
+            });
+          }
+        } catch(ex) { console.error('[FM] ColumnResize re-init error', ex); }
       }
 
       function stashCurrentForm(onRestore) {

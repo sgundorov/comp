@@ -3,6 +3,7 @@ require_once __DIR__ . '/config.php';
 ensure_marks_table($conn);
 require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/table-helper.php';
+require_once __DIR__ . '/lib/EmbeddedTable.php';
 require_once __DIR__ . '/config/docum2_columns.php';
 
 $isAjax = (
@@ -157,6 +158,94 @@ $prs = $conn->query("SELECT product_id, product_name, article AS code, price_out
 if ($prs) while ($pr = $prs->fetch_assoc()) {
     $productList[] = ['id' => (int)$pr['product_id'], 'name' => (string)$pr['product_name'], 'code' => (string)$pr['code'], 'price' => (string)$pr['price']];
 }
+
+$d2Columns = [
+    ['key' => 'product_name', 'label' => 'Товар', 'type' => 'lookup', 'dbField' => 'product_id'],
+    ['key' => 'quant',        'label' => 'Кол-во', 'align' => 'right'],
+    ['key' => 'price',        'label' => 'Цена', 'align' => 'right'],
+];
+if (!in_array($typeop, [127, 100], true)) {
+    $d2Columns[] = ['key' => 'discount', 'label' => 'Скидка', 'align' => 'right'];
+}
+$d2Columns[] = ['key' => 'sum', 'label' => 'Сумма', 'align' => 'right'];
+$d2Columns[] = ['key' => 'note', 'label' => 'Примечание'];
+
+$d2ColWidths = ['product_name' => 'auto', 'quant' => '80px', 'price' => '90px', 'discount' => '80px', 'sum' => '100px', 'note' => '250px'];
+foreach ($docum2ColWidths as $name => $w) {
+    if (isset($d2ColWidths[$name])) $d2ColWidths[$name] = $w . 'px';
+}
+
+$d2Table = new EmbeddedTable([
+    'prefix'           => 'd2',
+    'columns'          => $d2Columns,
+    'colWidths'        => $d2ColWidths,
+    'saveUrl'          => 'docum2_field_save.php',
+    'parentField'      => 'docum_id',
+    'childFormUrl'     => 'docum2_form.php',
+    'childFormName'    => 'docum2',
+    'hasExport'        => true,
+    'hasPrint'         => true,
+    'hasSearch'        => true,
+    'lookupData' => [
+        'product_name' => $productList,
+    ],
+    'totalsCallback' => 'applyDocum2Totals',
+]);
+
+$d2RenderData = array_map(function($item) {
+    $data = [
+        'id' => $item['id'],
+        'product_id' => $item['product_id'],
+        'product_name' => $item['product_name'],
+        'quant' => $item['quant'],
+        'price' => $item['price'],
+        'sum' => $item['sum'],
+        'note' => $item['note'],
+    ];
+    if (!in_array($GLOBALS['typeop'], [127, 100], true)) {
+        $data['discount'] = $item['discount'];
+    }
+    return $data;
+}, $docum2Data);
+
+$platColumns = [
+    ['key' => 'datetime',    'label' => 'Дата/Время', 'readonly' => true],
+    ['key' => 'client_name', 'label' => 'Контрагент', 'readonly' => true],
+    ['key' => 'zat_name',    'label' => 'Вид операции', 'readonly' => true],
+    ['key' => 'sum',         'label' => 'Сумма', 'align' => 'right'],
+    ['key' => 'plat_type',   'label' => 'Вид платежа'],
+    ['key' => 'note',        'label' => 'Примечание'],
+];
+
+$platColWidths = ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'plat_type' => '100px', 'note' => 'auto'];
+
+$platTable = new EmbeddedTable([
+    'prefix'           => 'plat',
+    'columns'          => $platColumns,
+    'colWidths'        => $platColWidths,
+    'saveUrl'          => 'plat_field_save.php',
+    'parentField'      => 'doc_id',
+    'childFormUrl'     => 'plat_form.php?doc_type=' . $typeop . '&client_id=' . $values['client_id'] . '&sotr_id=' . $CurSotrID . '&zat_id=' . $zatIdForPlat . '&return_url=' . urlencode('sale_form.php?mode=edit&id=' . (int)$id . '&typeop=' . $typeop),
+    'childFormName'    => 'plat',
+    'hasExport'        => false,
+    'hasPrint'         => false,
+    'hasSearch'        => true,
+    'totalsCallback' => 'applyDocum2Totals',
+]);
+
+$platListData = array_map(function($p) {
+    $dt = strtotime((string)$p['datetime']);
+    return [
+        'id' => (int)$p['plat_id'],
+        'datetime' => $dt ? date('d.m.Y H:i', $dt) : '-',
+        'client_name' => (string)($p['client_name'] ?? '-'),
+        'zat_name' => (string)($p['zat_name'] ?? '-'),
+        'sum' => (float)$p['sum'],
+        'plat_type' => (string)$p['plat_type'],
+        'out_flag' => (int)$p['out_flag'],
+        'note' => (string)$p['note'],
+    ];
+}, $platList);
 
 if ($mode === 'new' || $mode === 'copy') {
     $nr = $conn->query("SELECT COALESCE(MAX(number), 0) + 1 AS next_num FROM docum WHERE typeop = $typeop");
@@ -576,80 +665,7 @@ ob_start();
 
   <div class="tab-pane" data-tab-index="1">
 <?php if ($id > 0 && ($mode !== 'new')): ?>
-    <div class="toolbar" style="margin-top:0;padding-top:0" id="d2-toolbar">
-      <div class="toolbar-left">
-        <?php if (!$ro): ?>
-        <button type="button" class="icon-btn" title="Добавить" id="d2-add-btn"><img src="img/add.png" alt="" /></button>
-        <button type="button" class="icon-btn" title="Изменить" id="d2-edit-btn" disabled><img src="img/edit.png" alt="" /></button>
-        <button type="button" class="icon-btn" title="Удалить" id="d2-del-btn" disabled><img src="img/delete.png" alt="" /></button>
-        <button type="button" class="icon-btn" title="Копировать" id="d2-copy-btn" disabled><img src="img/copy.png" alt="" /></button>
-        <?php endif; ?>
-        <button type="button" class="icon-btn" title="Обновить" id="d2-refresh-btn"><img src="img/refresh.png" alt="" /></button>
-        <div class="dropdown">
-          <button type="button" class="icon-btn" title="Экспорт" id="d2-export-btn"><img src="img/export.png" alt="" /></button>
-          <div class="dropdown-menu">
-            <a class="dropdown-item" href="#" id="d2-export-csv">Экспорт в CSV</a>
-            <a class="dropdown-item" href="#" id="d2-export-xls">Экспорт в Excel</a>
-          </div>
-        </div>
-        <div class="dropdown">
-          <button type="button" class="icon-btn" title="Печать" id="d2-print-btn"><img src="img/print.png" alt="" /></button>
-          <div class="dropdown-menu">
-            <a class="dropdown-item" href="#" id="d2-print-all">Все записи</a>
-            <a class="dropdown-item" href="#" id="d2-print-selected">Выбранные</a>
-            <a class="dropdown-item" href="#" id="d2-print-page">Текущая страница</a>
-          </div>
-        </div>
-        <?php if (!$ro): ?>
-        <button type="button" class="icon-btn" title="Импорт отмеченных" id="d2-import-btn"><img src="img/import.png" alt="" /></button>
-        <div class="dropdown selected-actions" id="d2-sel-wrap">
-          <button type="button" class="menu-btn" id="d2-sel-btn">Выбрано <b><span id="d2-sel-count">0</span></b> <span class="btn-caret">▼</span></button>
-          <div class="dropdown-menu" style="min-width:160px">
-            <a class="dropdown-item" href="#" id="d2-sel-clear">Очистить выбор</a>
-            <a class="dropdown-item" href="#" id="d2-sel-invert">Инвертировать выбор</a>
-            <a class="dropdown-item" href="#" id="d2-sel-show">Показать выбранные</a>
-            <a class="dropdown-item" href="#" id="d2-sel-export">Экспорт</a>
-            <a class="dropdown-item" href="#" id="d2-sel-print">Печать</a>
-            <a class="dropdown-item" href="#" id="d2-sel-delete">Удалить отмеченные</a>
-          </div>
-        </div>
-        <?php endif; ?>
-      </div>
-      <div class="toolbar-right">
-        <div id="d2-search-form" style="display:flex;gap:4px;align-items:center;">
-          <input class="quick-search" type="text" id="d2-search-input" name="q" placeholder="Быстрый поиск" />
-          <button class="icon-btn clear-filter-btn" type="button" id="d2-clear-filter-btn" title="Очистить фильтр" style="display:none">✕</button>
-          <button class="icon-btn search-toggle-btn" type="button" id="d2-search-btn" title="Искать"><img src="img/find.png" alt="" /></button>
-          <button class="icon-btn search-mini-btn" type="button" id="d2-search-cond-btn" title="Условия поиска"><img src="img/look.png" alt="" /></button>
-        </div>
-        <button type="button" class="icon-btn" id="d2-sort-btn" title="Сортировка"><img src="img/sort.png" alt="" /></button>
-        <button type="button" class="icon-btn" id="d2-columns-btn" title="Настройка столбцов таблицы"><img src="img/setup.png" alt="" /></button>
-      </div>
-    </div>
-    <div id="d2-filter-banner" class="mode-banner" style="display:none;margin-bottom:8px"></div>
-    <div class="table-wrap" style="max-height:360px;overflow:auto">
-<table class="data-table docum2-table" style="min-width:auto;table-layout:fixed;width:100%" data-save-url="docum2_field_save.php"
-        data-docum2-table data-typeop="<?= $typeop ?>" data-items='<?= h(json_encode($docum2Data, JSON_UNESCAPED_UNICODE)) ?>' data-products='<?= h(json_encode($productList, JSON_UNESCAPED_UNICODE)) ?>' data-columns='<?= h($docum2ColInitialJs) ?>' data-columns-defaults='<?= h($docum2ColDefaultsJs) ?>'>
-        <colgroup>
-          <col class="col-check" style="width:32px" />
-<?php foreach ($docum2ColConfig as $d2c): ?>
-          <?php if (in_array($typeop, [127, 100], true) && $d2c['name'] === 'discount') continue; ?>
-          <col class="col-<?= h($d2c['name']) ?>" style="width:<?= $d2w($d2c['name']) ?>" />
-<?php endforeach; ?>
-        </colgroup>
-        <thead>
-          <tr>
-            <th class="col-check"><input type="checkbox" id="d2-check-all" /></th>
-<?php foreach ($docum2ColConfig as $d2c): ?>
-            <?php if (in_array($typeop, [127, 100], true) && $d2c['name'] === 'discount') continue; ?>
-            <th class="col-<?= h($d2c['name']) ?>" data-col="<?= h($d2c['name']) ?>"><?= h($d2c['label']) ?></th>
-<?php endforeach; ?>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <div class="pagination" id="d2-pagination" style="min-height:28px"></div>
+    <?= $d2Table->render($d2RenderData) ?>
 <?php elseif ($mode === 'new'): ?>
     <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">Сохраните продажу, чтобы добавить товары</div>
 <?php endif; ?>
@@ -657,61 +673,7 @@ ob_start();
 
   <div class="tab-pane" data-tab-index="2">
 <?php if ($id > 0 && $mode !== 'new'): ?>
-    <div class="toolbar" style="margin-top:0;padding-top:0" id="plat-toolbar">
-      <div class="toolbar-left">
-        <?php if ($mode !== 'delete' && !$ro): ?>
-        <?php $platRemain = (float)$values['sum'] - (float)$values['sum_plat']; ?>
-        <button type="button" class="icon-btn" title="Добавить" id="plat-add-btn" data-plat-url="plat_form.php?mode=new&amp;doc_id=<?= (int)$id ?>&amp;doc_type=<?= $typeop ?>&amp;client_id=<?= (int)$values['client_id'] ?>&amp;<?= $typeop === 120 ? 'sum_in' : 'sum_out' ?>=<?= urlencode($platRemain) ?>&amp;sotr_id=<?= (int)$CurSotrID ?>&amp;zat_id=<?= $zatIdForPlat ?>&amp;return_url=<?= urlencode('sale_form.php?mode=edit&id=' . (int)$id . '&typeop=' . $typeop) ?>"><img src="img/add.png" alt="" /></button>
-        <button type="button" class="icon-btn" title="Изменить" id="plat-edit-btn" disabled><img src="img/edit.png" alt="" /></button>
-        <button type="button" class="icon-btn" title="Удалить" id="plat-del-btn" disabled><img src="img/delete.png" alt="" /></button>
-        <?php endif; ?>
-        <button type="button" class="icon-btn" title="Обновить" id="plat-refresh-btn"><img src="img/refresh.png" alt="" /></button>
-      </div>
-      <div class="toolbar-right">
-        <div id="plat-search-form" style="display:flex;gap:4px;align-items:center;">
-          <input class="quick-search" type="text" id="plat-search-input" name="q" placeholder="Быстрый поиск" />
-          <button class="icon-btn clear-filter-btn" type="button" id="plat-clear-filter-btn" title="Очистить фильтр" style="display:none">✕</button>
-          <button class="icon-btn search-toggle-btn" type="button" id="plat-search-btn" title="Искать"><img src="img/find.png" alt="" /></button>
-        </div>
-      </div>
-    </div>
-    <div id="plat-filter-banner" class="mode-banner" style="display:none;margin-bottom:8px"></div>
-    <div class="table-wrap" style="max-height:360px;overflow-y:auto">
-      <table class="data-table plat-table" style="min-width:auto;table-layout:fixed;width:100%"
-             data-plat-table data-items='<?= h(json_encode(array_map(function($p) {
-                 $dt = strtotime((string)$p['datetime']);
-                 return [
-                     'id' => (int)$p['plat_id'],
-                     'datetime' => $dt ? date('d.m.Y H:i', $dt) : '-',
-                     'client_name' => (string)($p['client_name'] ?? '-'),
-                     'zat_name' => (string)($p['zat_name'] ?? '-'),
-                     'sum' => (float)$p['sum'],
-                     'plat_type' => (string)$p['plat_type'],
-                     'out_flag' => (int)$p['out_flag'],
-                     'note' => (string)$p['note'],
-                 ];
-             }, $platList), JSON_UNESCAPED_UNICODE)) ?>'>
-        <colgroup>
-          <col class="col-datetime" style="width:140px" />
-          <col class="col-client" style="width:auto" />
-          <col class="col-zat" style="width:150px" />
-          <col class="col-sum" style="width:100px" />
-          <col class="col-plat_type" style="width:100px" />
-          <col class="col-note" style="width:auto" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th data-col="datetime">Дата/Время</th>
-            <th data-col="client_name">Контрагент</th>
-            <th data-col="zat_name">Вид операции</th>
-            <th data-col="sum">Сумма</th>
-            <th data-col="plat_type">Вид платежа</th>
-            <th data-col="note">Примечание</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <?= $platTable->render($platListData) ?>
 <?php else: ?>
     <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">Сохраните продажу, чтобы добавить платежи</div>
 <?php endif; ?>
@@ -747,33 +709,7 @@ ob_start();
     .form-table td:last-child { padding-right: 0; }
     .form-table td.form-label { font-size: 12px; color: var(--muted); padding-bottom: 2px; }
     input.full, textarea.full { width: 100%; box-sizing: border-box; }
-    .docum2-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px; flex-wrap:wrap; }
-    .docum2-toolbar .toolbar-left, .docum2-toolbar .toolbar-right { display:flex; align-items:center; gap:4px; }
-    .docum2-table td { cursor:default; }
-    .docum2-table .cell-editable { cursor:text; }
 </style>
-<script>
-if (window.__openFormModal) (function(){
-  var tbl = document.querySelector('.docum2-table');
-  if (!tbl) return;
-  window.__docum2Data = [];
-  try { window.__docum2Data = JSON.parse(tbl.dataset.items || '[]'); } catch(e) {}
-  console.log('[D2] data-items raw:', tbl.dataset.items);
-  console.log('[D2] parsed:', JSON.stringify(window.__docum2Data));
-  if (window.__docum2Render) window.__docum2Render();
-  var refBtn = document.getElementById('d2-refresh-btn');
-  if (refBtn) refBtn.addEventListener('click', function(e){
-    e.preventDefault();
-    var fd = new FormData();
-    fd.set('field', '_list');
-    var idEl = document.querySelector('input[name="id"]');
-    if (idEl) fd.set('docum_id', idEl.value);
-    fetch(tbl.getAttribute('data-save-url') || 'docum2_field_save.php', {method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})
-      .then(function(r){return r.json();})
-      .then(function(d){if(Array.isArray(d)){window.__docum2Data=d;if(window.__docum2Render)window.__docum2Render();}});
-  });
-})();
-</script>
 <?php
 $formHtml = ob_get_clean();
 
@@ -788,47 +724,26 @@ if ($isAjax) {
   <meta charset="UTF-8" />
   <title><?= h($pageTitle) ?></title>
   <link rel="stylesheet" href="app.css" />
-  <style>
-    .lookup-wrap { position: relative; max-width: 430px; }
-    .form-modal { max-width: 990px; }
-    .page--form { max-width: 990px; }
-    .form { max-width: 990px; }
-    .tab-container { margin-bottom: 16px; width: 100%; }
-    .tab-headers { display: flex; border-bottom: 2px solid var(--accent); margin-bottom: 12px; }
-    .tab-header { padding: 8px 20px; cursor: pointer; font-size: 14px; font-weight: bold; color: var(--muted); border: 1px solid transparent; border-bottom: none; border-radius: 4px 4px 0 0; user-select: none; }
-    .tab-header.active { color: #fff; background: var(--accent); border-color: var(--accent); }
-    .tab-header:hover:not(.active) { color: #fff; background: var(--btn-hover); }
-    .tab-pane { display: none; width: 100%; }
-    .tab-pane.active { display: block; width: 100%; }
-    .table-wrap { width: 100%; box-sizing: border-box; }
-    .form-table { width: 100%; border-collapse: collapse; }
-    .form-table td { vertical-align: top; padding-bottom: 6px; padding-right: 28px; }
-    .form-table td:last-child { padding-right: 0; }
-    .form-table td.form-label { font-size: 12px; color: var(--muted); padding-bottom: 2px; }
-    input.full, textarea.full { width: 100%; box-sizing: border-box; }
-    .docum2-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px; flex-wrap:wrap; }
-    .docum2-toolbar .toolbar-left, .docum2-toolbar .toolbar-right { display:flex; align-items:center; gap:4px; }
-    .docum2-table td { cursor:default; }
-    .docum2-table .cell-editable { cursor:text; }
-  </style>
 </head>
 <body>
   <div class="page page--form">
     <?= $formHtml ?>
   </div>
   <script src="assets/lookup.js"></script>
-  <script src="assets/inline-edit.js"></script>
-  <script src="assets/search-panel.js"></script>
-  <script src="assets/columns-panel.js"></script>
-  <script src="assets/column-resize.js"></script>
-  <script src="assets/embedded-table.js"></script>
-  <script src="assets/keyboard.js"></script>
+  <script src="assets/embedded-subtable.js"></script>
   <script>
   // Standalone page init (not modal). Modal init is in sale.php.
   (function() {
     if (window.__openFormModal) return;
-    if (typeof initSaleForm === 'function') initSaleForm();
-    if (typeof initPlatTable === 'function') initPlatTable();
+    <?php $d2Table->renderScripts(); ?>
+    initD2Table();
+  })();
+  </script>
+  <script>
+  (function() {
+    if (window.__openFormModal) return;
+    <?php $platTable->renderScripts(); ?>
+    initPlatTable();
   })();
   </script>
 </body>

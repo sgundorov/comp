@@ -310,25 +310,43 @@ function render_embedded_subtable_scripts(array $cfg): void {
         window['__<?= $p ?>Table'].render();
       });
 
+      function sgQs(tbl) {
+        if (!tbl || !tbl.searchActive || !tbl.searchText) return '';
+        var q = 'q=' + encodeURIComponent(tbl.searchText) + '&sf=1';
+        if (tbl.searchCols && tbl.searchCols.length > 0) q += '&cols=' + encodeURIComponent(tbl.searchCols.join(','));
+        q += '&cond=' + encodeURIComponent(tbl.searchCond || 'contains');
+        return q;
+      }
+
       <?php if ($hasExport && $exportUrl): ?>
       var sgGroupId = groupId;
       var sgBaseUrl = '<?= $exportUrl ?>?<?= $parentParam ?>' + sgGroupId;
       var sgExportAll = formBody.querySelector('#<?= $p ?>-export-all');
       if (sgExportAll) sgExportAll.addEventListener('click', function (e) {
         e.preventDefault();
-        window.open(sgBaseUrl + '&format=csv', '_blank');
+        var tbl = window['__<?= $p ?>Table'];
+        var ids = tbl && tbl.showOnlyChecked ? Array.from(tbl.checkedIds) : [];
+        var url = sgBaseUrl + '&format=csv' + (ids.length > 0 ? '&ids=' + ids.join(',') : '');
+        var q = sgQs(tbl); if (q) url += '&' + q;
+        window.open(url, '_blank');
       });
       var sgExportAllXls = formBody.querySelector('#<?= $p ?>-export-all-xls');
       if (sgExportAllXls) sgExportAllXls.addEventListener('click', function (e) {
         e.preventDefault();
-        window.open(sgBaseUrl + '&format=xls', '_blank');
+        var tbl = window['__<?= $p ?>Table'];
+        var ids = tbl && tbl.showOnlyChecked ? Array.from(tbl.checkedIds) : [];
+        var url = sgBaseUrl + '&format=xls' + (ids.length > 0 ? '&ids=' + ids.join(',') : '');
+        var q = sgQs(tbl); if (q) url += '&' + q;
+        window.open(url, '_blank');
       });
       var selExport = formBody.querySelector('#<?= $p ?>-sel-export');
       if (selExport) selExport.addEventListener('click', function (e) {
         e.preventDefault();
         var ids = Array.from(window['__<?= $p ?>Table'].checkedIds);
         if (ids.length === 0) return;
-        window.open(sgBaseUrl + '&format=csv&ids=' + ids.join(','), '_blank');
+        var url = sgBaseUrl + '&format=csv&ids=' + ids.join(',');
+        var q = sgQs(window['__<?= $p ?>Table']); if (q) url += '&' + q;
+        window.open(url, '_blank');
       });
       <?php endif; ?>
 
@@ -337,19 +355,29 @@ function render_embedded_subtable_scripts(array $cfg): void {
       var sgPrintAll = formBody.querySelector('#<?= $p ?>-print-all');
       if (sgPrintAll) sgPrintAll.addEventListener('click', function (e) {
         e.preventDefault();
-        window.open(sgPrintUrl, '_blank');
+        var tbl = window['__<?= $p ?>Table'];
+        var ids = tbl && tbl.showOnlyChecked ? Array.from(tbl.checkedIds) : [];
+        var url = sgPrintUrl + (ids.length > 0 ? '&ids=' + ids.join(',') : '');
+        var q = sgQs(tbl); if (q) url += '&' + q;
+        window.open(url, '_blank');
       });
       var sgPrintPage = formBody.querySelector('#<?= $p ?>-print-page');
       if (sgPrintPage) sgPrintPage.addEventListener('click', function (e) {
         e.preventDefault();
-        window.open(sgPrintUrl + '&page=' + (window['__<?= $p ?>Table'] ? window['__<?= $p ?>Table'].currentPage : 1), '_blank');
+        var tbl = window['__<?= $p ?>Table'];
+        var ids = tbl && tbl.showOnlyChecked ? Array.from(tbl.checkedIds) : [];
+        var url = sgPrintUrl + '&page=' + (tbl ? tbl.currentPage : 1) + (ids.length > 0 ? '&ids=' + ids.join(',') : '');
+        var q = sgQs(tbl); if (q) url += '&' + q;
+        window.open(url, '_blank');
       });
       var selPrint = formBody.querySelector('#<?= $p ?>-sel-print');
       if (selPrint) selPrint.addEventListener('click', function (e) {
         e.preventDefault();
         var ids = Array.from(window['__<?= $p ?>Table'].checkedIds);
         if (ids.length === 0) return;
-        window.open(sgPrintUrl + '&ids=' + ids.join(','), '_blank');
+        var url = sgPrintUrl + '&ids=' + ids.join(',');
+        var q = sgQs(window['__<?= $p ?>Table']); if (q) url += '&' + q;
+        window.open(url, '_blank');
       });
       <?php endif; ?>
 

@@ -37,7 +37,7 @@ $salePageConfig = [
     'col_filters' => [
         'client' => [null, 'client', 'client_id', 'name'],
         'store'  => [null, 'store', 'store_id', 'name'],
-        'store2' => [null, 'store', 'store2_id', 'name'],
+        'store2' => [null, 'store', 'store_id', 'name'],
     ],
     'select_sql'      => "SELECT d.docum_id, d.accept_flag, d.number, d.date, d.time, d.client_id, d.store_id, d.store2_id, d.discount, d.sum_discount, d.sum, d.sum_plat, d.pos, d.note, d.zakaz_num, d.date_plat, d.sotr_id, d.sotr2_id, d.sum_balans, c.name AS client_name, st.name AS store_name, st2.name AS store2_name, sotr.doc_name AS sotr_name, sotr2.doc_name AS sotr2_name FROM docum d LEFT JOIN client c ON d.client_id = c.client_id LEFT JOIN store st ON d.store_id = st.store_id LEFT JOIN store st2 ON d.store2_id = st2.store_id LEFT JOIN sotr ON d.sotr_id = sotr.sotr_id LEFT JOIN sotr sotr2 ON d.sotr2_id = sotr2.sotr_id",
     'count_sql'       => "SELECT COUNT(*) AS cnt FROM docum d LEFT JOIN client c ON d.client_id = c.client_id LEFT JOIN store st ON d.store_id = st.store_id LEFT JOIN store st2 ON d.store2_id = st2.store_id LEFT JOIN sotr ON d.sotr_id = sotr.sotr_id LEFT JOIN sotr sotr2 ON d.sotr2_id = sotr2.sotr_id",

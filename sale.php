@@ -6,6 +6,7 @@ require_once __DIR__ . '/lib/TablePage.php';
 require_once __DIR__ . '/lib/table-template.php';
 require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/form-modal-handler.php';
+require_once __DIR__ . '/lib/EmbeddedTable.php';
 
 $typeop = (int)($_GET['typeop'] ?? 120);
 if (!in_array($typeop, [10, 20, 100, 110, 120, 127], true)) $typeop = 120;
@@ -209,6 +210,8 @@ $clientFilter = (string)($_GET['client_id'] ?? '');
 $clientFilterIds = []; $clientFilterNames = [];
 $storeFilter = (string)($_GET['store_id'] ?? '');
 $storeFilterIds = []; $storeFilterNames = [];
+$store2Filter = (string)($_GET['store2_id'] ?? '');
+$store2FilterIds = []; $store2FilterNames = [];
 
 function loadFilterNames(mysqli $conn, string $table, string $idCol, string $labelExpr, array $ids): array {
     if (empty($ids)) return [];
@@ -241,6 +244,15 @@ if (count($storeFilterIds) > 0) {
     $storeFilterNames = loadFilterNames($conn, 'store', 'store_id', 'name', $storeFilterIds);
     $ph = implode(',', array_fill(0, count($storeFilterIds), '?'));
     $tp->appendWhere("d.store_id IN ($ph)", $storeFilterIds, str_repeat('i', count($storeFilterIds)));
+}
+
+if ($store2Filter !== '') {
+    $store2FilterIds = array_values(array_filter(array_map('intval', explode(',', $store2Filter)), fn($v) => $v > 0));
+}
+if (count($store2FilterIds) > 0) {
+    $store2FilterNames = loadFilterNames($conn, 'store', 'store_id', 'name', $store2FilterIds);
+    $ph = implode(',', array_fill(0, count($store2FilterIds), '?'));
+    $tp->appendWhere("d.store2_id IN ($ph)", $store2FilterIds, str_repeat('i', count($store2FilterIds)));
 }
 
 $tp->getTotalCount($conn);
@@ -279,6 +291,7 @@ $clearQs = function($drop) use ($search, $searchActive, $searchCols, $searchCond
     if (!in_array('sort', $drop, true) && $sortQs !== '') $qs['sort'] = $sortQs;
     if (!in_array('client_id', $drop, true) && !empty($_GET['client_id'])) $qs['client_id'] = $_GET['client_id'];
     if (!in_array('store_id', $drop, true) && !empty($_GET['store_id'])) $qs['store_id'] = $_GET['store_id'];
+    if (!in_array('store2_id', $drop, true) && !empty($_GET['store2_id'])) $qs['store2_id'] = $_GET['store2_id'];
     return 'sale.php' . ($qs ? '?' . http_build_query($qs) : '');
 };
 
@@ -298,6 +311,13 @@ if (count($storeFilterIds) > 0) {
     }
     $filters[] = ['kind' => 'store', 'text' => 'Участок = ' . implode(', ', $names), 'clear' => 'store_id'];
 }
+if (count($store2FilterIds) > 0) {
+    $names = [];
+    foreach ($store2FilterIds as $sid) {
+        $names[] = $store2FilterNames[$sid] ?? ('#' . $sid);
+    }
+    $filters[] = ['kind' => 'store2', 'text' => 'Склад-получатель = ' . implode(', ', $names), 'clear' => 'store2_id'];
+}
 
 $exportQs = http_build_query(array_filter([
     'typeop'   => $typeop,
@@ -308,6 +328,7 @@ $exportQs = http_build_query(array_filter([
     'sort' => $sortQs !== '' ? $sortQs : null,
     'client_id' => $clientFilter !== '' ? $clientFilter : null,
     'store_id' => $storeFilter !== '' ? $storeFilter : null,
+    'store2_id' => $store2Filter !== '' ? $store2Filter : null,
 ], function ($v) { return $v !== null && $v !== ''; }));
 
 $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs, $typeop) {
@@ -322,6 +343,7 @@ $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $s
     if ($sortQs !== '') $qs['sort'] = $sortQs;
     if (!empty($_GET['client_id'])) $qs['client_id'] = $_GET['client_id'];
     if (!empty($_GET['store_id'])) $qs['store_id'] = $_GET['store_id'];
+    if (!empty($_GET['store2_id'])) $qs['store2_id'] = $_GET['store2_id'];
     return 'sale.php?' . http_build_query($qs);
 };
 $paginationHtml = render_pagination($page, $pages, $baseQs, true);
@@ -344,6 +366,59 @@ if (count($repmenuTemplates) > 0) {
     $printDropdownHtml .= '<div class="dropdown-divider"></div>';
 }
 $printDropdownHtml .= render_print_dropdown_items('sale', $exportQs, (int)$page, $marksCount > 0);
+
+// ---- d2 (Товары) columns ----
+$_d2cols = [
+    ['key' => 'product_name', 'label' => 'Товар', 'type' => 'lookup', 'dbField' => 'product_id'],
+    ['key' => 'quant',        'label' => 'Кол-во', 'align' => 'right'],
+    ['key' => 'price',        'label' => 'Цена', 'align' => 'right'],
+];
+if (!in_array($typeop, [127, 100], true)) {
+    $_d2cols[] = ['key' => 'discount', 'label' => 'Скидка', 'align' => 'right'];
+}
+$_d2cols[] = ['key' => 'sum', 'label' => 'Сумма', 'align' => 'right'];
+$_d2cols[] = ['key' => 'note', 'label' => 'Примечание'];
+
+$_d2w = ['product_name' => 'auto', 'quant' => '80px', 'price' => '90px', 'discount' => '80px', 'sum' => '100px', 'note' => '250px'];
+
+$d2Table = new EmbeddedTable([
+    'prefix'       => 'd2',
+    'columns'      => $_d2cols,
+    'colWidths'    => $_d2w,
+    'saveUrl'      => 'docum2_field_save.php',
+    'parentField'  => 'docum_id',
+    'childFormUrl' => 'docum2_form.php',
+    'childFormName'=> 'docum2',
+    'hasExport'    => true,
+    'hasPrint'     => true,
+    'hasSearch'    => true,
+    'totalsCallback' => 'applyDocum2Totals',
+]);
+
+// ---- plat (Оплата) columns ----
+$_pcols = [
+    ['key' => 'datetime',    'label' => 'Дата/Время', 'readonly' => true],
+    ['key' => 'client_name', 'label' => 'Контрагент', 'readonly' => true],
+    ['key' => 'zat_name',    'label' => 'Вид операции', 'readonly' => true],
+    ['key' => 'sum',         'label' => 'Сумма', 'align' => 'right'],
+    ['key' => 'plat_type',   'label' => 'Вид платежа'],
+    ['key' => 'note',        'label' => 'Примечание'],
+];
+$_pw = ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'plat_type' => '100px', 'note' => 'auto'];
+
+$platTable = new EmbeddedTable([
+    'prefix'       => 'plat',
+    'columns'      => $_pcols,
+    'colWidths'    => $_pw,
+    'saveUrl'      => 'plat_field_save.php',
+    'parentField'  => 'doc_id',
+    'childFormUrl' => 'plat_form.php?doc_type=' . $typeop,
+    'childFormName'=> 'plat',
+    'hasExport'    => false,
+    'hasPrint'     => false,
+    'hasSearch'    => true,
+    'totalsCallback' => 'applyDocum2Totals',
+]);
 
 render_head_start($PAGE_TITLE);
 ?>
@@ -464,7 +539,7 @@ render_head_end(); ?>
       ); ?>
       <?php render_table_tbody($visibleColumns, $rows, $marks, $search, 'docum_id', function($r, $cn, $vc) use ($typeop, $prihodFlag) {
           switch ($cn) {
-              case 'accept':   $af = (int)$r['accept_flag']; return [$af, $af ? '<img src="img/lock.png" alt="Утверждено" width="18" height="18" style="vertical-align:middle" />' : ''];
+               case 'accept':   $af = (int)$r['accept_flag']; return [$af, $af ? '<img src="img/lock.png" alt="Утверждено" width="18" height="18" style="vertical-align:middle" />' : ''];
               case 'number':   return [(int)$r['number'] > 0 ? (int)$r['number'] : '', (int)$r['number'] > 0 ? (int)$r['number'] : ''];
               case 'date':
                   $dt = strtotime((string)$r['date']);
@@ -498,7 +573,7 @@ render_head_end(); ?>
   </div>
 
 <?php
-render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-filter.js', 'assets/embedded-table.js']]);
+render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded-subtable.js', 'assets/column-filter.js', 'assets/embedded-table.js']]);
 ?>
   <script>
     window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
@@ -575,8 +650,9 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
         getPrintUrl: function () { return 'sale_print.php?all=1&' + new URLSearchParams(location.search).toString(); }
       });
 
-      ColumnFilter.init({ thSelector: '.col-client', pageUrl: 'sale.php?typeop=<?= $typeop ?>' });
-      ColumnFilter.init({ thSelector: '.col-store', pageUrl: 'sale.php?typeop=<?= $typeop ?>' });
+      ColumnFilter.init({ thSelector: '.col-client', pageUrl: 'sale.php' });
+      ColumnFilter.init({ thSelector: '.col-store', pageUrl: 'sale.php' });
+      ColumnFilter.init({ thSelector: '.col-store2', pageUrl: 'sale.php' });
 
       const SORT_COLS = <?= json_encode(array_values(array_filter(array_map(function ($c) { return $c['name'] === 'accept' || empty($c['sort_expr']) ? null : ['key' => $c['name'], 'label' => $c['label']]; }, $COLUMN_DEFAULTS))), JSON_UNESCAPED_UNICODE) ?>;
       const SEARCH_COLS = <?= json_encode(array_values(array_map(function ($key) use ($salePageConfig) {
@@ -779,14 +855,9 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
   </script>
   <script>
     // ---- Tab switching + docum2 items (invoice-pattern) ----
-    window.renderDocum2 = window.renderDocum2 || function(){};
-    window.__docum2Render = window.__docum2Render || function(){};
     var formModal = document.getElementById('formModal');
     var formBody  = document.getElementById('formModalBody');
     var stashed   = null;
-    window.__docum2SelectedId = window.__docum2SelectedId || 0;
-    if (!window.__d2CheckedIds) window.__d2CheckedIds = new Set();
-    var d2ShowOnlyFilter = false;
 
     function applyDocum2Totals(d) {
       var s = d && d.total_sum !== undefined ? d.total_sum : (d && d.sum !== undefined ? d.sum : undefined);
@@ -809,1114 +880,16 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
       }
     }
 
-    function initDocum2Table() {
-      var formBody = document.querySelector('.form-modal-body') || document.querySelector('[data-form-modal]') || document.body;
-      var formEl = formBody.querySelector('form');
-      if (formEl && formEl.classList.contains('form--delete')) return;
-      var table = formBody.querySelector('.docum2-table');
-      if (!table) return;
-
-      /* Delegated event handlers (attached once) */
-      table.addEventListener('change', function(e) {
-        if (e.target.classList && e.target.classList.contains('d2-row-check')) {
-          e.stopPropagation();
-          var id = parseInt(e.target.dataset.id, 10);
-          if (!window.__d2CheckedIds) window.__d2CheckedIds = new Set();
-          if (e.target.checked) { window.__d2CheckedIds.add(id); }
-          else { window.__d2CheckedIds.delete(id); }
-          updateD2CheckedUI();
-        }
-        if (e.target.id === 'd2-check-all') {
-          var pageIds = formBody.querySelectorAll('.d2-row-check');
-          if (!window.__d2CheckedIds) window.__d2CheckedIds = new Set();
-          if (e.target.checked) {
-            pageIds.forEach(function(cb) { window.__d2CheckedIds.add(parseInt(cb.dataset.id, 10)); });
-          } else {
-            pageIds.forEach(function(cb) { window.__d2CheckedIds.delete(parseInt(cb.dataset.id, 10)); });
-          }
-          pageIds.forEach(function(cb) { cb.checked = e.target.checked; });
-          updateD2CheckedUI();
-        }
-      });
-
-      table.addEventListener('click', function(e) {
-        var tr = e.target.closest('.d2-row');
-        if (!tr) return;
-        if (e.target.type === 'checkbox') return;
-        var id = parseInt(tr.dataset.id, 10);
-        formBody.querySelectorAll('.d2-row.selected').forEach(function(r) { r.classList.remove('selected'); });
-        window.__docum2SelectedId = id;
-        tr.classList.add('selected');
-        updateD2Buttons();
-      });
-
-      table.addEventListener('dblclick', function(e) {
-        var tr = e.target.closest('.d2-row');
-        if (!tr) return;
-        var id = parseInt(tr.dataset.id, 10);
-        if (id > 0) onEdit(id);
-      });
-
-      /* Hotkeys — register once at document level */
-      if (!window.__d2HotkeysInited) {
-        window.__d2HotkeysInited = true;
-        document.addEventListener('keydown', function(e) {
-          if (!formModal || !formModal.classList.contains('open')) return;
-          if (!formBody.querySelector('.docum2-table')) return;
-          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-          var activeHeader = formBody.querySelector('.tab-header.active');
-          var activeTab = activeHeader ? activeHeader.getAttribute('data-tab-index') : '';
-          if (activeTab !== '1' && activeTab !== '2') return;
-          var isPlat = activeTab === '2';
-          var rowSel = isPlat ? '.plat-row' : '.d2-row';
-          var rows = Array.from(formBody.querySelectorAll(rowSel));
-          if (rows.length === 0) return;
-          var curId = isPlat ? (window.__platSelectedId || 0) : (window.__docum2SelectedId || 0);
-          var curIdx = -1;
-          for (var k = 0; k < rows.length; k++) {
-            if (parseInt(rows[k].dataset.id, 10) === curId) { curIdx = k; break; }
-          }
-          function platSetSel(id, idx) {
-            rows.forEach(function(r) { r.classList.remove('selected'); });
-            if (idx >= 0 && idx < rows.length) rows[idx].classList.add('selected');
-            if (isPlat) window.__platSelectedId = id;
-            else window.__docum2SelectedId = id;
-            if (isPlat) { if (typeof window.updatePlatButtons === 'function') window.updatePlatButtons(); }
-            else updateD2Buttons();
-          }
-          switch (e.key) {
-            case 'Insert':
-              e.preventDefault();
-              var addBtn = formBody.querySelector(isPlat ? '#plat-add-btn' : '#d2-add-btn');
-              if (addBtn) addBtn.click();
-              break;
-            case 'Enter':
-              e.preventDefault();
-              if (curId > 0) { var editBtn = formBody.querySelector(isPlat ? '#plat-edit-btn' : '#d2-edit-btn'); if (editBtn) editBtn.click(); }
-              break;
-            case 'Delete':
-              e.preventDefault();
-              if (curId > 0) { var delBtn = formBody.querySelector(isPlat ? '#plat-del-btn' : '#d2-del-btn'); if (delBtn) delBtn.click(); }
-              break;
-            case 'ArrowDown':
-              e.preventDefault();
-              if (curIdx < rows.length - 1) platSetSel(parseInt(rows[curIdx + 1].dataset.id, 10), curIdx + 1);
-              break;
-            case 'ArrowUp':
-              e.preventDefault();
-              if (curIdx > 0) platSetSel(parseInt(rows[curIdx - 1].dataset.id, 10), curIdx - 1);
-              break;
-            case 'Home':
-              e.preventDefault();
-              if (rows.length > 0) platSetSel(parseInt(rows[0].dataset.id, 10), 0);
-              break;
-            case 'End':
-              e.preventDefault();
-              if (rows.length > 0) platSetSel(parseInt(rows[rows.length - 1].dataset.id, 10), rows.length - 1);
-              break;
-          }
-        });
-      }
-
-      var saveUrl = table.getAttribute('data-save-url') || 'docum2_field_save.php';
-      var documIdEl = formBody.querySelector('input[name="id"]');
-      var documId = documIdEl ? parseInt(documIdEl.value, 10) : 0;
-
-      if (!window.__docum2Data || window.__docum2Data.length === 0) {
-        window.__docum2Data = [];
-        try { window.__docum2Data = JSON.parse(table.dataset.items || '[]'); } catch(e) {}
-      }
-
-      var PAGE_SIZE = 15;
-      var currentPage = 1;
-      var searchText = '';
-      var searchActive = false;
-      var sortCol = -1;
-      var sortDir = 'asc';
-      var D2_SEARCH_COLS = [
-        { key: 'product_name', label: 'Товар' },
-        { key: 'quant', label: 'Кол-во' },
-        { key: 'price', label: 'Цена' },
-        { key: 'discount', label: 'Скидка' },
-        { key: 'sum', label: 'Сумма' },
-        { key: 'note', label: 'Примечание' }
-      ];
-      var d2Typeop = parseInt((table && table.dataset.typeop) || '120', 10);
-      if (d2Typeop === 127 || d2Typeop === 100) D2_SEARCH_COLS = D2_SEARCH_COLS.filter(function(c) { return c.key !== 'discount'; });
-      var D2_COL_KEYS = D2_SEARCH_COLS.map(function(c) { return c.key; });
-      var searchCols = new Set(D2_COL_KEYS);
-      var searchCond = 'contains';
-
-      function cn(v) { return (v === '' || v === null || v === undefined) ? '' : v; }
-      function disp(v) { return (v == null || v === '') ? '' : String(v); }
-
-      function hl(v) {
-        if (!searchActive || !searchText) return cn(v);
-        var s = String(v !== null && v !== undefined ? v : '');
-        if (s === '') return '-';
-        var st = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        var re = new RegExp('(' + st + ')', 'gi');
-        return s.replace(re, '<span class="hl">$1</span>');
-      }
-
-      function renderDocum2() {
-        var tbody = formBody.querySelector('.docum2-table tbody');
-        if (!tbody) return;
-        var filtered = window.__docum2Data;
-        if (d2ShowOnlyFilter && window.__d2CheckedIds && window.__d2CheckedIds.size > 0) {
-          filtered = filtered.filter(function(item) { return window.__d2CheckedIds.has(item.id); });
-        }
-        if (searchActive && searchText) {
-          var st = searchText.toLowerCase();
-          var cond = searchCond || 'contains';
-          var colSet = (searchCols && searchCols.size > 0) ? searchCols : new Set(D2_COL_KEYS);
-          filtered = filtered.filter(function(item) {
-            return D2_COL_KEYS.some(function(key) {
-              if (!colSet.has(key)) return false;
-              var val = (item[key] || '').toString().toLowerCase();
-              if (cond === 'contains') return val.indexOf(st) >= 0;
-              if (cond === 'not_contains') return val.indexOf(st) < 0;
-              if (cond === 'starts_with') return val.indexOf(st) === 0;
-              if (cond === 'ends_with') return val.indexOf(st) === val.length - st.length;
-              if (cond === 'equals') return val === st;
-              if (cond === 'not_equals') return val !== st;
-              return false;
-            });
-          });
-        }
-        if (sortCol >= 0) {
-          var key = ['product_name','quant','price','discount','sum','note'][sortCol] || 'id';
-          filtered.sort(function(a, b) {
-            var va = (a[key] || '').toString().toLowerCase();
-            var vb = (b[key] || '').toString().toLowerCase();
-            var na = parseFloat(va.replace(',','.'));
-            var nb = parseFloat(vb.replace(',','.'));
-            if (!isNaN(na) && !isNaN(nb)) { va = na; vb = nb; }
-            if (va < vb) return sortDir === 'asc' ? -1 : 1;
-            if (va > vb) return sortDir === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-        var total = filtered.length;
-        var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-        if (currentPage > pages) currentPage = pages;
-        var start = (currentPage - 1) * PAGE_SIZE;
-        var pageItems = filtered.slice(start, start + PAGE_SIZE);
-
-        if (total === 0) {
-          tbody.innerHTML = '<tr><td colspan="' + (1 + document.querySelectorAll('.docum2-table thead th').length) + '" class="col-d2-empty">Нет товаров</td></tr>';
-        } else {
-          var ths = formBody.querySelectorAll('.docum2-table thead th:not(.col-check)');
-          var colOrder = [];
-          ths.forEach(function(th) { var c = th.dataset.col; if (c && c !== 'id') colOrder.push(c); });
-          if (colOrder.length === 0) colOrder = ['product_name','quant','price','discount','sum','note'];
-          var html = '';
-          for (var i = 0; i < pageItems.length; i++) {
-            var item = pageItems[i];
-            var sel = (item.id === window.__docum2SelectedId) ? ' selected' : '';
-            var chk = window.__d2CheckedIds && window.__d2CheckedIds.has(item.id) ? ' checked' : '';
-            html += '<tr data-id="' + item.id + '" data-row-id="' + item.id + '" class="d2-row' + sel + '">'
-              + '<td class="col-check"><input type="checkbox" class="d2-row-check" data-id="' + item.id + '"' + chk + ' /></td>';
-            colOrder.forEach(function(c) {
-              var val = item[c] || '';
-              var align = (c === 'quant') ? 'center' : (c === 'product_name' || c === 'note') ? 'left' : 'right';
-              var editable = (c !== 'sum' && !((d2Typeop === 100 || d2Typeop === 127) && c === 'price')) ? ' class="cell-editable"' : '';
-              var displayVal = (c === 'product_name' || c === 'note') ? hl(val) : disp(val);
-              html += '<td' + editable + ' data-field="' + c + '" data-value="' + (item[c] || '0') + '" style="text-align:' + align + '"><span class="cell-value">' + displayVal + '</span></td>';
-            });
-            html += '</tr>';
-          }
-          tbody.innerHTML = html;
-          var ceCells = tbody.querySelectorAll('td.cell-editable');
-          console.log('[D2] cells=' + pageItems.length + ' editable=' + ceCells.length + ' cols=' + colOrder.join(','));
-        }
-
-        var pagEl = formBody.querySelector('#d2-pagination');
-        if (pagEl) {
-          if (pages <= 1) { pagEl.innerHTML = ''; } else {
-            var ph = '';
-            var firstDisabled = currentPage <= 1 ? ' aria-disabled="true" style="pointer-events:none;opacity:.5;"' : '';
-            var lastDisabled = currentPage >= pages ? ' aria-disabled="true" style="pointer-events:none;opacity:.5;"' : '';
-            ph += '<a class="page-btn" href="#" data-page="1"' + firstDisabled + '>«</a>';
-            var startP = Math.max(1, currentPage - 2);
-            var endP = Math.min(pages, currentPage + 2);
-            for (var p = startP; p <= endP; p++) {
-              var active = p === currentPage ? ' active' : '';
-              ph += '<a class="page-btn' + active + '" href="#" data-page="' + p + '">' + p + '</a>';
-            }
-            ph += '<a class="page-btn" href="#" data-page="' + pages + '"' + lastDisabled + '>»</a>';
-            ph += '<span class="page-info">' + currentPage + ' из ' + pages + '</span>';
-            pagEl.innerHTML = ph;
-            pagEl.querySelectorAll('a.page-btn').forEach(function(a) {
-              a.addEventListener('click', function(e) {
-                e.preventDefault();
-                var pg = parseInt(a.dataset.page, 10);
-                if (pg > 0 && pg !== currentPage) { currentPage = pg; renderDocum2(); }
-              });
-            });
-          }
-        }
-
-        var bannerEl = formBody.querySelector('#d2-filter-banner');
-        var clearBtn = formBody.querySelector('#d2-clear-filter-btn');
-        var showOnlyFilter = d2ShowOnlyFilter && window.__d2CheckedIds && window.__d2CheckedIds.size > 0;
-        if (searchActive && searchText) {
-          if (bannerEl) {
-            bannerEl.style.display = '';
-            var bannerParts = [];
-            var colLabels = D2_SEARCH_COLS.filter(function(c) { return !searchCols || searchCols.has(c.key); }).map(function(c) { return c.label; });
-            if (colLabels.length === 0) colLabels = D2_SEARCH_COLS.map(function(c) { return c.label; });
-            var condLabel = ({ contains: 'Содержит', not_contains: 'Не содержит', starts_with: 'Начинается с', ends_with: 'Заканчивается на', equals: 'Равно', not_equals: 'Не равно' })[searchCond] || 'Содержит';
-            bannerParts.push('<img src="img/filter.png" alt="" /><span class="filter-chip"><span class="filter-chip-text">(' + colLabels.join(', ') + ' ' + condLabel + '  «' + searchText + '»)</span><button type="button" class="filter-chip-close" id="d2-banner-clear" title="Снять фильтр">✕</button></span>');
-            if (showOnlyFilter) bannerParts.push('<span class="filter-chip" style="margin-left:6px"><span class="filter-chip-text">Показаны только выбранные</span><button type="button" class="filter-chip-close" id="d2-banner-showoff" title="Показать все">✕</button></span>');
-            bannerEl.innerHTML = bannerParts.join('');
-            var bc = bannerEl.querySelector('#d2-banner-clear'); if (bc) bc.addEventListener('click', function () { var sb = formBody.querySelector('#d2-search-btn'); if (sb) sb.click(); });
-            var so = bannerEl.querySelector('#d2-banner-showoff'); if (so) so.addEventListener('click', function () { d2ShowOnlyFilter = false; renderDocum2(); });
-          }
-          if (clearBtn) clearBtn.style.display = '';
-        } else if (showOnlyFilter) {
-          if (bannerEl) {
-            bannerEl.style.display = '';
-            bannerEl.innerHTML = '<span class="filter-chip"><span class="filter-chip-text">Показаны только выбранные</span><button type="button" class="filter-chip-close" id="d2-banner-showoff" title="Показать все">✕</button></span>';
-            var so = bannerEl.querySelector('#d2-banner-showoff'); if (so) so.addEventListener('click', function () { d2ShowOnlyFilter = false; renderDocum2(); });
-          }
-          if (clearBtn) clearBtn.style.display = 'none';
-        } else {
-          if (bannerEl) bannerEl.style.display = 'none';
-          if (clearBtn) clearBtn.style.display = 'none';
-        }
-
-        syncD2CheckAll();
-      }
-
-      window.__docum2Render = function() { renderDocum2(); };
-
-      function updateD2Buttons() {
-        var editBtn = formBody.querySelector('#d2-edit-btn');
-        var delBtn = formBody.querySelector('#d2-del-btn');
-        var copyBtn = formBody.querySelector('#d2-copy-btn');
-        var disabled = !window.__docum2SelectedId;
-        if (editBtn) editBtn.disabled = disabled;
-        if (delBtn) delBtn.disabled = disabled;
-        if (copyBtn) copyBtn.disabled = disabled;
-      }
-
-      function refreshDocum2Data() {
-        var fd = new FormData();
-        fd.set('field', '_list');
-        fd.set('docum_id', String(documId));
-        fetch(saveUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            if (data && Array.isArray(data)) {
-              window.__docum2Data = data;
-        (window.__docum2Render || renderDocum2)();
-      }
-          });
-      }
-
-      function printD2Checked() {
-        var ids = window.__d2CheckedIds ? Array.from(window.__d2CheckedIds) : [];
-        if (ids.length === 0) return;
-        var items = window.__docum2Data.filter(function(i) { return ids.indexOf(i.id) >= 0; });
-        var w = window.open('', '_blank', 'width=800,height=600');
-        var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Печать</title><style>body{font:14px sans-serif;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:6px 10px;text-align:left}th{background:#eee}</style></head><body><table><thead><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Скидка</th><th>Сумма</th><th>Примечание</th></tr></thead><tbody>';
-        items.forEach(function(item) {
-          h += '<tr><td>' + (item.product_name || '') + '</td><td>' + (item.quant || '1') + '</td><td>' + (item.price || '0') + '</td><td>' + (item.discount || '0') + '</td><td>' + (item.sum || '0') + '</td><td>' + (item.note || '') + '</td></tr>';
-        });
-        h += '</tbody></table></body></html>';
-        w.document.write(h);
-        w.document.close();
-        setTimeout(function() { w.print(); }, 500);
-      }
-      function exportD2Checked() {
-        var ids = window.__d2CheckedIds ? Array.from(window.__d2CheckedIds) : [];
-        if (ids.length === 0) return;
-        var items = window.__docum2Data.filter(function(i) { return ids.indexOf(i.id) >= 0; });
-        var lines = ['Товар;Кол-во;Цена;Скидка;Сумма;Примечание'];
-        items.forEach(function(item) {
-          lines.push([
-            '"' + (item.product_name || '').replace(/"/g, '""') + '"',
-            item.quant || '1',
-            item.price || '0',
-            item.discount || '0',
-            item.sum || '0',
-            '"' + (item.note || '').replace(/"/g, '""') + '"'
-          ].join(';'));
-        });
-        var blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'Товары_документа.csv';
-        a.click();
-      }
-
-      function exportAllD2() {
-        var items = window.__docum2Data || [];
-        if (items.length === 0) return;
-        var csv = '\uFEFF';
-        csv += 'Товар;Кол-во;Цена;Скидка;Сумма;Примечание\n';
-        items.forEach(function(item) {
-          csv += (item.product_name || '') + ';' + (item.quant || '1') + ';' + (item.price || '0') + ';' + (item.discount || '0') + ';' + (item.sum || '0') + ';' + (item.note || '') + '\n';
-        });
-        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'docum_items.csv'; a.click();
-        URL.revokeObjectURL(a.href);
-      }
-      function printAllD2() {
-        var items = window.__docum2Data || [];
-        if (items.length === 0) return;
-        var w = window.open('', '_blank', 'width=800,height=600');
-        var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Печать</title><style>body{font:14px sans-serif;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:6px 10px;text-align:left}th{background:#eee}</style></head><body><table><thead><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Скидка</th><th>Сумма</th><th>Примечание</th></tr></thead><tbody>';
-        items.forEach(function(item) {
-          h += '<tr><td>' + (item.product_name || '') + '</td><td>' + (item.quant || '1') + '</td><td>' + (item.price || '0') + '</td><td>' + (item.discount || '0') + '</td><td>' + (item.sum || '0') + '</td><td>' + (item.note || '') + '</td></tr>';
-        });
-        h += '</tbody></table></body></html>';
-        w.document.write(h);
-        w.document.close();
-        setTimeout(function() { w.print(); }, 500);
-      }
-      function printPageD2() {
-        var pagEl = formBody.querySelector('#d2-pagination');
-        var pageInfo = pagEl ? pagEl.querySelector('.page-info') : null;
-        var pageText = pageInfo ? pageInfo.textContent : '';
-        var items = window.__docum2Data || [];
-        var w = window.open('', '_blank', 'width=800,height=600');
-        var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Печать - ' + pageText + '</title><style>body{font:14px sans-serif;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:6px 10px;text-align:left}th{background:#eee}</style></head><body><p>' + pageText + '</p><table><thead><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Скидка</th><th>Сумма</th><th>Примечание</th></tr></thead><tbody>';
-        items.forEach(function(item) {
-          h += '<tr><td>' + (item.product_name || '') + '</td><td>' + (item.quant || '1') + '</td><td>' + (item.price || '0') + '</td><td>' + (item.discount || '0') + '</td><td>' + (item.sum || '0') + '</td><td>' + (item.note || '') + '</td></tr>';
-        });
-        h += '</tbody></table></body></html>';
-        w.document.write(h);
-        w.document.close();
-        setTimeout(function() { w.print(); }, 500);
-      }
-
-      /* Batch operations on checked items */
-      function batchDeleteChecked() {
-        var ids = window.__d2CheckedIds ? Array.from(window.__d2CheckedIds) : [];
-        if (ids.length === 0) return;
-        if (!confirm('Удалить ' + ids.length + ' отмеченных товаров?')) return;
-        (function next(i) {
-          if (i >= ids.length) {
-            window.__docum2SelectedId = 0;
-            window.__d2CheckedIds = new Set();
-            updateD2CheckedUI();
-            renderDocum2();
-            return;
-          }
-          var fd = new FormData();
-          fd.set('field', '_delete');
-          fd.set('docum2_id', String(ids[i]));
-          fetch(saveUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-              if (d && d.ok) {
-                window.__docum2Data = window.__docum2Data.filter(function(item) { return item.id !== ids[i]; });
-                applyDocum2Totals(d);
-              }
-              next(i + 1);
-            })
-            .catch(function() { next(i + 1); });
-        })(0);
-      }
-
-      function onEdit(id) {
-        var url = 'docum2_form.php?mode=edit&id=' + id + '&docum_id=' + documId;
-        openFormModal(url, { onRestore: onItemSaved, activeId: 'product-id' });
-      }
-
-      function onItemSaved(data) {
-        if (!data || !data.ok) return;
-        applyDocum2Totals(data);
-        if (data.id) {
-          var idx = -1;
-          for (var i = 0; i < window.__docum2Data.length; i++) {
-            if (window.__docum2Data[i].id == data.id) { idx = i; break; }
-          }
-          if (idx >= 0) {
-            window.__docum2Data[idx] = {
-              id: data.id, product_id: data.product_id || 0,
-              code: data.code || '', product_name: data.product_name || '',
-              quant: data.quant || '', price: data.price || '',
-              discount: data.discount || '', sum: data.sum || '',
-              sum_discount: data.sum_discount || '',
-              note: data.note || ''
-            };
-          } else {
-            window.__docum2Data.push({
-              id: data.id, product_id: data.product_id || 0,
-              code: data.code || '', product_name: data.product_name || '',
-              quant: data.quant || '', price: data.price || '',
-              discount: data.discount || '', sum: data.sum || '',
-              sum_discount: data.sum_discount || '',
-              note: data.note || ''
-            });
-          }
-          window.__docum2SelectedId = data.id;
-          (window.__docum2Render || renderDocum2)();
-        }
-      }
-      function onItemDeleted(data) {
-        if (!data || !data.ok || !data._deleted) return;
-        applyDocum2Totals(data);
-        var deletedId = data.id;
-        var idx = -1;
-        for (var i = 0; i < window.__docum2Data.length; i++) {
-          if (window.__docum2Data[i].id == deletedId) { idx = i; break; }
-        }
-        window.__docum2Data = window.__docum2Data.filter(function(item) { return item.id !== deletedId; });
-        if (window.__d2CheckedIds) window.__d2CheckedIds.delete(deletedId);
-        if (window.__docum2Data.length > 0) {
-          var newIdx = Math.min(idx, window.__docum2Data.length - 1);
-          window.__docum2SelectedId = window.__docum2Data[newIdx].id;
-        } else {
-          window.__docum2SelectedId = 0;
-        }
-        (window.__docum2Render || renderDocum2)();
-        updateD2CheckedUI();
-      }
-
-      function syncD2CheckAll() {
-        var formBodyEl = document.querySelector('.form-modal-body') || document.body;
-        var checkAll = formBodyEl.querySelector('#d2-check-all');
-        if (!checkAll) return;
-        var cbs = formBodyEl.querySelectorAll('.d2-row-check');
-        if (cbs.length === 0) { checkAll.checked = false; checkAll.indeterminate = false; return; }
-        var checked = 0;
-        cbs.forEach(function(cb) { if (cb.checked) checked++; });
-        checkAll.checked = checked === cbs.length;
-        checkAll.indeterminate = checked > 0 && checked < cbs.length;
-      }
-      function updateD2CheckedUI() {
-        var n = window.__d2CheckedIds ? window.__d2CheckedIds.size : 0;
-        var countEl = document.querySelector('#d2-sel-count');
-        var selWrap = document.querySelector('#d2-sel-wrap');
-        if (countEl) countEl.textContent = n;
-        if (selWrap) selWrap.classList.toggle('visible', n > 0);
-        syncD2CheckAll();
-      }
-      function updateD2Buttons() {
-        var editBtn = formBody.querySelector('#d2-edit-btn');
-        var delBtn = formBody.querySelector('#d2-del-btn');
-        var copyBtn = formBody.querySelector('#d2-copy-btn');
-        var disabled = !window.__docum2SelectedId;
-        if (editBtn) editBtn.disabled = disabled;
-        if (delBtn) delBtn.disabled = disabled;
-        if (copyBtn) copyBtn.disabled = disabled;
-      }
-      function clearChecked() {
-        window.__d2CheckedIds = new Set();
-        d2ShowOnlyFilter = false;
-        updateD2CheckedUI();
-        renderDocum2();
-      }
-      function invertChecked() {
-        var all = window.__docum2Data.map(function(i) { return i.id; });
-        var cur = window.__d2CheckedIds;
-        window.__d2CheckedIds = new Set(all.filter(function(id) { return !cur.has(id); }));
-        updateD2CheckedUI();
-        renderDocum2();
-      }
-      function toggleD2ShowOnly() {
-        d2ShowOnlyFilter = !d2ShowOnlyFilter;
-        renderDocum2();
-      }
-
-      renderDocum2();
-      if (window.__docum2SelectedId === 0 && window.__docum2Data && window.__docum2Data.length > 0) {
-        window.__docum2SelectedId = window.__docum2Data[0].id;
-        renderDocum2();
-      }
-      updateD2CheckedUI();
-
-      var d2ProductData = [];
-      try { d2ProductData = JSON.parse((table && table.dataset.products) || '[]'); } catch(e) {}
-      InlineEdit.init({
-        tbody: formBody.querySelector('.docum2-table tbody'),
-        saveUrl: saveUrl,
-        fields: {
-          product_id:   { dbField: 'product_id', type: 'lookup', label: 'Товар' },
-          product_name: { dbField: 'product_id', type: 'lookup', label: 'Товар' },
-          quant:        { dbField: 'quant', type: 'text', label: 'Кол-во' },
-          price:        { dbField: 'price', type: 'text', label: 'Цена' },
-          discount:     { dbField: 'discount', type: 'text', label: 'Скидка' },
-          note:         { dbField: 'note', type: 'textarea', label: 'Примечание' }
-        },
-        getLookupData: function (field) {
-          if (field === 'product_id' || field === 'product_name') return d2ProductData;
-          return [];
-        },
-        onSaveSuccess: function (data, field) {
-          if (data && data.item && data.item.id) {
-            var item = data.item;
-            var found = false;
-            window.__docum2Data = window.__docum2Data.map(function(it) {
-              if (it.id == item.id) { found = true; return item; }
-              return it;
-            });
-            if (!found) window.__docum2Data.push(item);
-            window.__docum2SelectedId = item.id;
-            (window.__docum2Render || renderDocum2)();
-          }
-          applyDocum2Totals(data);
-        }
-      });
-
-      var addBtn = formBody.querySelector('#d2-add-btn');
-      if (addBtn) {
-        addBtn.addEventListener('click', function () {
-          if (!documId) return;
-          var url = 'docum2_form.php?mode=new&docum_id=' + documId;
-          openFormModal(url, { onRestore: onItemSaved, activeId: 'product-id' });
-        });
-      }
-
-      var editBtn = formBody.querySelector('#d2-edit-btn');
-      if (editBtn) editBtn.addEventListener('click', function() { if (window.__docum2SelectedId) onEdit(window.__docum2SelectedId); });
-
-      var delBtn = formBody.querySelector('#d2-del-btn');
-      if (delBtn) {
-        delBtn.addEventListener('click', function() {
-          var sid = window.__docum2SelectedId;
-          if (!sid) return;
-          var url = 'docum2_form.php?mode=delete&id=' + sid + '&docum_id=' + documId;
-          openFormModal(url, { onRestore: onItemDeleted, activeId: null });
-        });
-      }
-
-      var copyBtn = formBody.querySelector('#d2-copy-btn');
-      if (copyBtn) {
-        copyBtn.addEventListener('click', function() {
-          var sid = window.__docum2SelectedId;
-          if (!sid) return;
-          var url = 'docum2_form.php?mode=copy&id=' + sid + '&docum_id=' + documId;
-          openFormModal(url, { onRestore: onItemSaved, activeId: 'product-id' });
-        });
-      }
-
-      var refreshBtn = formBody.querySelector('#d2-refresh-btn');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', function() {
-          refreshDocum2Data();
-        });
-      }
-
-      var importBtn = formBody.querySelector('#d2-import-btn');
-      if (importBtn) {
-        importBtn.addEventListener('click', function() {
-          var fd = new FormData();
-          fd.set('field', '_import_marked_count');
-          fd.set('docum_id', String(documId));
-          fetch(saveUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-              if (!data || !data.ok) return;
-              var cnt = data.count || 0;
-              if (cnt === 0) {
-                var indicator = document.createElement('div');
-                indicator.className = 'flash flash--error';
-                indicator.textContent = 'Нет отмеченных товаров';
-                var form = formBody.querySelector('form');
-                if (form) form.insertBefore(indicator, form.firstChild);
-                setTimeout(function() { if (indicator.parentNode) indicator.parentNode.removeChild(indicator); }, 3000);
-                return;
-              }
-              if (!confirm('Вставить в продажу ' + cnt + ' отмеченных товаров?')) return;
-              var fd2 = new FormData();
-              fd2.set('field', '_import_marked');
-              fd2.set('docum_id', String(documId));
-              fetch(saveUrl, { method: 'POST', body: fd2, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                  if (data && data.ok) {
-                    var msg = 'Импортировано товаров: ' + (data.inserted || 0);
-                    refreshBtn.click();
-                    applyDocum2Totals(data);
-                    var indicator = document.createElement('div');
-                    indicator.className = 'flash flash--success';
-                    indicator.textContent = msg;
-                    var form = formBody.querySelector('form');
-                    if (form) form.insertBefore(indicator, form.firstChild);
-                    setTimeout(function() { if (indicator.parentNode) indicator.parentNode.removeChild(indicator); }, 3000);
-                  }
-                });
-            });
-        });
-      }
-
-      /* Export dropdown */
-      var exportCsvBtn = formBody.querySelector('#d2-export-csv');
-      if (exportCsvBtn) exportCsvBtn.addEventListener('click', function(e) { e.preventDefault(); exportAllD2(); });
-      var exportXlsBtn = formBody.querySelector('#d2-export-xls');
-      if (exportXlsBtn) exportXlsBtn.addEventListener('click', function(e) { e.preventDefault(); exportAllD2(); });
-      /* Print dropdown */
-      var printAllBtn = formBody.querySelector('#d2-print-all');
-      if (printAllBtn) printAllBtn.addEventListener('click', function(e) { e.preventDefault(); printAllD2(); });
-      var printSelBtn = formBody.querySelector('#d2-print-selected');
-      if (printSelBtn) printSelBtn.addEventListener('click', function(e) { e.preventDefault(); printD2Checked(); });
-      var printPageBtn = formBody.querySelector('#d2-print-page');
-      if (printPageBtn) printPageBtn.addEventListener('click', function(e) { e.preventDefault(); printPageD2(); });
-
-      /* Batch actions — guard against duplicate binding */
-      function bindOnce(el, fn) { if (!el || el.dataset.d2Bound) return; el.dataset.d2Bound = '1'; el.addEventListener('click', fn); }
-      bindOnce(formBody.querySelector('#d2-sel-clear'), function(e) { e.preventDefault(); clearChecked(); });
-      bindOnce(formBody.querySelector('#d2-sel-invert'), function(e) { e.preventDefault(); invertChecked(); });
-      bindOnce(formBody.querySelector('#d2-sel-show'), function(e) { e.preventDefault(); toggleD2ShowOnly(); });
-      bindOnce(formBody.querySelector('#d2-sel-export'), function(e) { e.preventDefault(); exportD2Checked(); });
-      bindOnce(formBody.querySelector('#d2-sel-print'), function(e) { e.preventDefault(); printD2Checked(); });
-      bindOnce(formBody.querySelector('#d2-sel-delete'), function(e) { e.preventDefault(); batchDeleteChecked(); });
-
-      /* Search */
-      var searchInput = formBody.querySelector('#d2-search-input');
-      var searchBtn = formBody.querySelector('#d2-search-btn');
-      var clearFilterBtn = formBody.querySelector('#d2-clear-filter-btn');
-      if (searchInput) {
-        searchInput.addEventListener('input', function() {
-          if (!searchActive) return;
-          searchText = searchInput.value;
-          currentPage = 1;
-          renderDocum2();
-        });
-        searchInput.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            searchActive = true;
-            searchText = searchInput.value.trim();
-            searchBtn.classList.add('active');
-            currentPage = 1;
-            renderDocum2();
-          }
-        });
-      }
-      if (clearFilterBtn) {
-        clearFilterBtn.addEventListener('click', function() {
-          searchActive = false;
-          searchText = '';
-          searchCols = new Set(D2_COL_KEYS);
-          searchCond = 'contains';
-          if (searchBtn) searchBtn.classList.remove('active');
-          if (searchInput) searchInput.value = '';
-          currentPage = 1;
-          renderDocum2();
-          document.querySelectorAll('.search-cond-panel, .search-cond-pop, .columns-panel').forEach(function(p) { p.remove(); });
-        });
-      }
-      function updateClearFilterBtn() {
-        if (clearFilterBtn) {
-          clearFilterBtn.style.display = (searchActive && searchText) ? '' : 'none';
-        }
-      }
-      var _origRender = renderDocum2;
-      renderDocum2 = function() {
-        _origRender();
-        updateClearFilterBtn();
-      };
-      function closeD2Panels() {
-        document.querySelectorAll('.search-cond-panel, .search-cond-pop, .columns-panel').forEach(function(p) { p.remove(); });
-        document.querySelectorAll('.sort-modal-backdrop.open').forEach(function(p) { p.classList.remove('open'); });
-      }
-      var searchCondBtn = formBody.querySelector('#d2-search-cond-btn');
-      if (searchBtn && searchCondBtn && typeof SearchPanel !== 'undefined') {
-        var ns = searchBtn.cloneNode(true);
-        searchBtn.parentNode.replaceChild(ns, searchBtn);
-        searchBtn = ns;
-        var nc = searchCondBtn.cloneNode(true);
-        searchCondBtn.parentNode.replaceChild(nc, searchCondBtn);
-        searchCondBtn = nc;
-        SearchPanel.init({
-          form: formBody.querySelector('#d2-search-form'),
-          condBtn: searchCondBtn,
-          toggleBtn: searchBtn,
-          columns: D2_SEARCH_COLS,
-          pageUrl: location.href,
-          popupCheckboxes: true,
-          emptyClass: 'search-cond-placeholder',
-          closeAllPanels: closeD2Panels,
-          labels: {
-            cols: 'Столбцы',
-            cond: 'Условие',
-            emptyCols: 'Выберите столбцы…'
-          },
-          onApply: function(state) {
-            searchCols = state.cols;
-            searchCond = state.cond;
-            searchActive = true;
-            searchText = searchInput ? searchInput.value.trim() : '';
-            searchBtn.classList.add('active');
-            currentPage = 1;
-            renderDocum2();
-            closeD2Panels();
-          },
-          onToggle: function(state) {
-            if (searchActive) {
-              searchActive = false;
-              searchText = '';
-              if (searchInput) searchInput.value = '';
-              searchBtn.classList.remove('active');
-            } else {
-              searchActive = true;
-              searchText = searchInput ? searchInput.value.trim() : '';
-              searchBtn.classList.add('active');
-            }
-            currentPage = 1;
-            renderDocum2();
-          }
-        });
-      }
-
-      /* Sort */
-      var updateSortIndicators = function() {
-        table.querySelectorAll('thead th[data-col] .sort-indicator').forEach(function(s) { s.remove(); });
-        if (sortCol >= 0) {
-          var th = table.querySelectorAll('thead th[data-col]')[sortCol];
-          if (th) {
-            var ind = document.createElement('span');
-            ind.className = 'sort-indicator';
-            ind.textContent = sortDir === 'asc' ? ' ▲' : ' ▼';
-            th.appendChild(ind);
-          }
-        }
-      };
-      table.querySelectorAll('thead th[data-col]').forEach(function(th) {
-        th.addEventListener('click', function(e) {
-          var colIdx = Array.from(th.parentNode.querySelectorAll('th[data-col]')).indexOf(th);
-          if (sortCol === colIdx) {
-            sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
-          } else {
-            sortCol = colIdx;
-            sortDir = 'asc';
-          }
-          currentPage = 1;
-          updateSortIndicators();
-          renderDocum2();
-        });
-      });
-      var sortBtn = formBody.querySelector('#d2-sort-btn');
-      if (sortBtn) {
-        sortBtn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          closeD2Panels();
-          var cols = D2_SEARCH_COLS;
-          var directions = [{ key: 'asc', label: 'По возрастанию' }, { key: 'desc', label: 'По убыванию' }];
-          var levels = sortCol >= 0
-            ? [{ col: D2_COL_KEYS[sortCol], dir: sortDir }]
-            : [{ col: 'product_name', dir: 'asc' }];
-
-          function colLabel(k) { for (var i = 0; i < cols.length; i++) if (cols[i].key === k) return cols[i].label; return k; }
-          function dirLabel(k) { for (var i = 0; i < directions.length; i++) if (directions[i].key === k) return directions[i].label; return k; }
-          function serialize(lvs) { return lvs.map(function(l) { return l.col + ':' + l.dir; }).join(','); }
-          function usedCols(lvs, exceptIdx) { var u = []; lvs.forEach(function(l, i) { if (i !== exceptIdx) u.push(l.col); }); return u; }
-
-          var backdrop = document.createElement('div');
-          backdrop.className = 'sort-modal-backdrop';
-          backdrop.innerHTML =
-            '<div class="sort-modal" role="dialog" aria-labelledby="d2SortTitle">' +
-              '<div class="sort-modal-header">' +
-                '<span id="d2SortTitle">Сортировка</span>' +
-                '<button class="sort-modal-close" type="button" title="Закрыть">✕</button>' +
-              '</div>' +
-              '<div class="sort-modal-body">' +
-                '<div class="sort-level-actions">' +
-                  '<button type="button" class="sort-add-level" id="d2SortAddBtn">+ Добавить уровень</button>' +
-                  '<button type="button" class="sort-remove-level" id="d2SortRemoveBtn">− Удалить уровень</button>' +
-                '</div>' +
-                '<div class="sort-levels">' +
-                  '<div class="sort-cols">' +
-                    '<div class="sort-cols-header">Столбец</div>' +
-                    '<div class="sort-cols-list" id="d2SortColsList"></div>' +
-                  '</div>' +
-                  '<div class="sort-dirs">' +
-                    '<div class="sort-dirs-header">Направление</div>' +
-                    '<div class="sort-dirs-list" id="d2SortDirsList"></div>' +
-                  '</div>' +
-                '</div>' +
-                '<div class="sort-modal-actions">' +
-                   '<button type="button" class="sort-apply" id="d2SortApplyBtn"><img src="img/ok.png" alt="" />Сортировать</button>' +
-                   '<button type="button" class="sort-cancel" id="d2SortCancelBtn"><img src="img/cancel.png" alt="" />Отменить</button>' +
-                '</div>' +
-              '</div>' +
-            '</div>';
-          document.body.appendChild(backdrop);
-
-          var modal = backdrop.querySelector('.sort-modal');
-          var colsList = backdrop.querySelector('#d2SortColsList');
-          var dirsList = backdrop.querySelector('#d2SortDirsList');
-          var addBtnLvl = backdrop.querySelector('#d2SortAddBtn');
-          var removeBtnLvl = backdrop.querySelector('#d2SortRemoveBtn');
-          var cancelBtn = backdrop.querySelector('#d2SortCancelBtn');
-          var applyBtn = backdrop.querySelector('#d2SortApplyBtn');
-          var closeBtn = backdrop.querySelector('.sort-modal-close');
-
-          var pop = document.createElement('div');
-          pop.className = 'sort-pop';
-          document.body.appendChild(pop);
-
-          function positionPopup(target, p) {
-            var r = target.getBoundingClientRect();
-            var pw = p.offsetWidth || 320;
-            var ph = p.offsetHeight;
-            var left = r.left;
-            if (left + pw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - pw - 8);
-            var top = r.bottom + 4;
-            if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 4);
-            p.style.left = left + 'px';
-            p.style.top = top + 'px';
-          }
-
-          function closePop() { pop.classList.remove('open'); pop.dataset.kind = ''; }
-          function closeModal() { backdrop.classList.remove('open'); closePop(); }
-
-          function render() {
-            colsList.innerHTML = '';
-            dirsList.innerHTML = '';
-            addBtnLvl.disabled = levels.length >= cols.length;
-            removeBtnLvl.disabled = levels.length <= 1;
-            levels.forEach(function(l, i) {
-              var cRow = document.createElement('div');
-              cRow.className = 'sort-row';
-              var cLabel = document.createElement('span');
-              cLabel.className = 'sort-label';
-              cLabel.textContent = i === 0 ? 'Сначала по' : 'Затем по';
-              var cSel = document.createElement('div');
-              cSel.className = 'sort-select';
-              cSel.tabIndex = 0;
-              cSel.innerHTML = '<span class="sort-select-label">' + colLabel(l.col) + '</span>';
-              cSel.addEventListener('click', function(idx) {
-                return function(e) { e.stopPropagation(); openColPop(idx, cSel); };
-              }(i));
-              cRow.appendChild(cLabel);
-              cRow.appendChild(cSel);
-              colsList.appendChild(cRow);
-
-              var dRow = document.createElement('div');
-              dRow.className = 'sort-row';
-              dRow.style.gap = '0';
-              var dSel = document.createElement('div');
-              dSel.className = 'sort-select';
-              dSel.tabIndex = 0;
-              dSel.innerHTML = '<span class="sort-select-label">' + dirLabel(l.dir) + '</span>';
-              dSel.addEventListener('click', function(idx) {
-                return function(e) { e.stopPropagation(); openDirPop(idx, dSel); };
-              }(i));
-              dRow.appendChild(dSel);
-              dirsList.appendChild(dRow);
-            });
-          }
-
-          function openColPop(idx, target) {
-            var used = usedCols(levels, idx);
-            pop.innerHTML = '';
-            cols.forEach(function(c) {
-              var isSel = levels[idx].col === c.key;
-              var isUsed = used.indexOf(c.key) !== -1;
-              var item = document.createElement('div');
-              item.className = 'sort-pop-item' + (isSel ? ' selected' : '');
-              item.textContent = c.label;
-              if (isUsed && !isSel) {
-                item.style.opacity = '0.45';
-                item.style.cursor = 'default';
-              } else {
-                item.addEventListener('click', function(colKey) {
-                  return function(e) {
-                    e.stopPropagation();
-                    levels[idx].col = colKey;
-                    closePop();
-                    render();
-                  };
-                }(c.key));
-              }
-              pop.appendChild(item);
-            });
-            pop.classList.add('open');
-            pop.dataset.kind = 'col';
-            positionPopup(target, pop);
-          }
-
-          function openDirPop(idx, target) {
-            pop.innerHTML = '';
-            directions.forEach(function(d) {
-              var isSel = levels[idx].dir === d.key;
-              var item = document.createElement('div');
-              item.className = 'sort-pop-item' + (isSel ? ' selected' : '');
-              item.textContent = d.label;
-              item.addEventListener('click', function(dirKey) {
-                return function(e) {
-                  e.stopPropagation();
-                  levels[idx].dir = dirKey;
-                  closePop();
-                  render();
-                };
-              }(d.key));
-              pop.appendChild(item);
-            });
-            pop.classList.add('open');
-            pop.dataset.kind = 'dir';
-            positionPopup(target, pop);
-          }
-
-          addBtnLvl.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (levels.length >= cols.length) return;
-            var used = usedCols(levels, -1);
-            var available = [];
-            cols.forEach(function(c) { if (used.indexOf(c.key) === -1) available.push(c); });
-            if (available.length === 0) return;
-            levels.push({ col: available[0].key, dir: 'asc' });
-            render();
-          });
-
-          removeBtnLvl.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (levels.length <= 1) return;
-            levels.pop();
-            render();
-          });
-
-          cancelBtn.addEventListener('click', function(e) { e.stopPropagation(); closeModal(); });
-          closeBtn.addEventListener('click', function(e) { e.stopPropagation(); closeModal(); });
-
-          applyBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (levels.length > 0) {
-              var col = levels[0].col;
-              var idx = D2_COL_KEYS.indexOf(col);
-              sortCol = idx >= 0 ? idx : 0;
-              sortDir = levels[0].dir;
-              currentPage = 1;
-              renderDocum2();
-              table.querySelectorAll('thead th[data-col] .sort-indicator').forEach(function(s) { s.remove(); });
-              var ths = table.querySelectorAll('thead th[data-col]');
-              if (ths[sortCol]) {
-                var ind = document.createElement('span');
-                ind.className = 'sort-indicator';
-                ind.textContent = sortDir === 'asc' ? ' ▲' : ' ▼';
-                ths[sortCol].appendChild(ind);
-              }
-            }
-            closeModal();
-          });
-
-          document.addEventListener('click', function(e) {
-            if (!backdrop.classList.contains('open')) return;
-            if (e.target.closest('.sort-modal, .sort-pop.open')) return;
-            e.stopPropagation();
-            closeModal();
-          });
-
-          document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && backdrop.classList.contains('open')) closeModal();
-          });
-
-          render();
-          backdrop.classList.add('open');
-        });
-      }
-
-      updateD2Buttons();
-      /* ColumnsPanel for docum2 */
-      var d2ColBtn = formBody.querySelector('#d2-columns-btn');
-      if (d2ColBtn && window.ColumnsPanel) {
-        var d2ColData = [];
-        var d2ColDefData = [];
-        try { d2ColData = JSON.parse(table.dataset.columns || '[]'); } catch(e) {}
-        try { d2ColDefData = JSON.parse(table.dataset.columnsDefaults || '[]'); } catch(e) {}
-        ColumnsPanel.init({
-          btn: d2ColBtn,
-          saveUrl: 'docum2_columns_save.php',
-          tbl: 'docum2',
-          closeAllPanels: closeD2Panels,
-          initialColumns: d2ColData,
-          defaultColumns: d2ColDefData.length > 0 ? d2ColDefData : d2ColData,
-          onSave: function(state) {
-            closeD2Panels();
-            var ie = formBody.querySelector('input[name="id"]');
-            var iid = ie ? parseInt(ie.value, 10) : 0;
-            if (!iid) return;
-            fetch('sale_form.php?typeop=<?= $typeop ?>&mode=edit&id=' + iid + '&ajax=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
-              .then(function(r) { return r.json(); })
-              .then(function(d) {
-                if (!d || !d.html) return;
-                var ai = 0; var at = formBody.querySelector('.tab-header.active');
-                if (at) ai = parseInt(at.dataset.tabIndex, 10);
-                formBody.innerHTML = d.html;
-                resetD2ColResize();
-                initFormLookups(); initFormTabs();
-                try { initDocum2Table(); } catch(e) {}
-                initSaleFormTabSwitch();
-                try { initPlatTable(); } catch(e) { console.error('initPlatTable', e); }
-                var f = formBody.querySelector('form[data-form-modal]');
-                bindForm(f);
-                var hdr = formBody.querySelector('.tab-header[data-tab-index="' + ai + '"]');
-                var pane = formBody.querySelector('.tab-pane[data-tab-index="' + ai + '"]');
-                if (hdr && pane) {
-                  formBody.querySelectorAll('.tab-header').forEach(function(h) { h.classList.remove('active'); });
-                  formBody.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); });
-                  hdr.classList.add('active'); pane.classList.add('active');
-                }
-              });
-          },
-          onResetWidth: function() {
-            closeD2Panels();
-            var ie = formBody.querySelector('input[name="id"]');
-            var iid = ie ? parseInt(ie.value, 10) : 0;
-            if (!iid) return;
-            fetch('sale_form.php?typeop=<?= $typeop ?>&mode=edit&id=' + iid + '&ajax=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
-              .then(function(r) { return r.json(); })
-              .then(function(d) {
-                if (!d || !d.html) return;
-                var ai = 0; var at = formBody.querySelector('.tab-header.active');
-                if (at) ai = parseInt(at.dataset.tabIndex, 10);
-                formBody.innerHTML = d.html;
-                resetD2ColResize();
-                initFormLookups(); initFormTabs();
-                try { initDocum2Table(); } catch(e) { console.error('initDocum2Table', e); }
-                initSaleFormTabSwitch();
-                var f = formBody.querySelector('form[data-form-modal]'); bindForm(f);
-                var hdr = formBody.querySelector('.tab-header[data-tab-index="' + ai + '"]');
-                var pane = formBody.querySelector('.tab-pane[data-tab-index="' + ai + '"]');
-                if (hdr && pane) { formBody.querySelectorAll('.tab-header').forEach(function(h) { h.classList.remove('active'); }); formBody.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); }); hdr.classList.add('active'); pane.classList.add('active'); }
-              });
-          },
-          onResetOrder: function() {
-            closeD2Panels();
-            var ie = formBody.querySelector('input[name="id"]');
-            var iid = ie ? parseInt(ie.value, 10) : 0;
-            if (!iid) return;
-            fetch('sale_form.php?typeop=<?= $typeop ?>&mode=edit&id=' + iid + '&ajax=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
-              .then(function(r) { return r.json(); })
-              .then(function(d) {
-                if (!d || !d.html) return;
-                var ai = 0; var at = formBody.querySelector('.tab-header.active');
-                if (at) ai = parseInt(at.dataset.tabIndex, 10);
-                formBody.innerHTML = d.html;
-                resetD2ColResize();
-                initFormLookups(); initFormTabs();
-                try { initDocum2Table(); } catch(e) { console.error('initDocum2Table', e); }
-                initSaleFormTabSwitch();
-                var f = formBody.querySelector('form[data-form-modal]'); bindForm(f);
-                var hdr = formBody.querySelector('.tab-header[data-tab-index="' + ai + '"]');
-                var pane = formBody.querySelector('.tab-pane[data-tab-index="' + ai + '"]');
-                if (hdr && pane) { formBody.querySelectorAll('.tab-header').forEach(function(h) { h.classList.remove('active'); }); formBody.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); }); hdr.classList.add('active'); pane.classList.add('active'); }
-              });
-          }
-        });
-      }
-
-    } /* end initDocum2Table */
+    <?php $d2Table->renderScripts(); ?>
 
     function restoreStashedForm(data) {
       if (!stashed) return;
       formBody.innerHTML = stashed.html;
-      resetD2ColResize(); { window.__docum2Data = stashed.docum2Data; }
       initFormLookups();
-      initFormTabs();
-      try { initDocum2Table(); } catch(e) { console.error('initDocum2Table', e); }
+      try { initD2Table(); } catch(e) { console.error('initD2Table', e); }
       initSaleFormTabSwitch();
       try { initPlatTable(); } catch(e) { console.error('initPlatTable', e); }
       evalFormScripts();
-      var pc = formBody.querySelector('.tab-pane[data-tab-index="1"]');
-      if (pc) try { initDocum2Table(); } catch(e) {}
       var old = stashed;
       stashed = null;
       if (old.tabIndex && old.tabIndex !== 0 && typeof window.__switchSaleTab === 'function') { window.__switchSaleTab(old.tabIndex); }
@@ -1964,7 +937,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
         syncFormValues();
         var activeTabEl = document.querySelector('.tab-header.active');
         var activeTabIndex = activeTabEl ? parseInt(activeTabEl.getAttribute('data-tab-index'), 10) : 0;
-        stashed = { html: formBody.innerHTML, onRestore: stash.onRestore || null, activeId: stash.activeId || null, docum2Data: window.__docum2Data ? window.__docum2Data.slice() : [], tabIndex: activeTabIndex };
+        stashed = { html: formBody.innerHTML, onRestore: stash.onRestore || null, activeId: stash.activeId || null, tabIndex: activeTabIndex };
       } else if (!formBody.innerHTML) { stashed = null; }
       formModal.classList.add('open');
       document.body.style.overflow = 'hidden';
@@ -1973,10 +946,8 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
         .then(function (data) {
           if (!data || typeof data.html !== 'string') throw new Error('bad response');
           formBody.innerHTML = data.html;
-          resetD2ColResize();
           initFormLookups();
-          initFormTabs();
-          try { initDocum2Table(); } catch(e) { console.error('initDocum2Table', e); }
+          try { initD2Table(); } catch(e) { console.error('initD2Table', e); }
           initSaleFormTabSwitch();
           try { initPlatTable(); } catch(e) { console.error('initPlatTable', e); }
           evalFormScripts();
@@ -2005,7 +976,6 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
       document.body.style.overflow = '';
       formBody.innerHTML = '';
       stashed = null;
-      window.__d2CheckedIds = new Set();
     }
     function bindForm(form) {
       if (!form) return;
@@ -2035,7 +1005,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
                   location.href = 'sale.php?' + params.toString();
                 }
               }
-            } else { formBody.innerHTML = (data && data.html) || '<div class="flash flash--error">Ошибка подключения к БД</div>'; resetD2ColResize(); initFormLookups(); initFormTabs();                 try { initDocum2Table(); } catch(e) { console.error('initDocum2Table', e); }
+            } else { formBody.innerHTML = (data && data.html) || '<div class="flash flash--error">Ошибка подключения к БД</div>'; initFormLookups(); try { initD2Table(); } catch(e) { console.error('initD2Table', e); }
                 initSaleFormTabSwitch();
                 try { initPlatTable(); } catch(e) { console.error('initPlatTable', e); }
                 evalFormScripts();
@@ -2069,9 +1039,9 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
                 fetch('docum2_field_save.php', { method: 'POST', body: fd2, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                   .then(function(r) { return r.json(); })
                   .then(function(list) {
-                    if (Array.isArray(list)) {
-                      window.__docum2Data = list;
-                      if (window.__docum2Render) window.__docum2Render();
+                    if (Array.isArray(list) && window.__d2Table) {
+                      window.__d2Table.data = list;
+                      window.__d2Table.render();
                     }
                   });
               }
@@ -2102,12 +1072,12 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
           if (ph && d.id) ph.value = d.id;
           var li = root.querySelector('.lookup-input');
           if (li && d.product_name) li.value = d.product_name;
-          var items = window.__docum2Data;
-          if (items && d.id) {
-            for (var i = 0; i < items.length; i++) {
-              if (items[i].product_id == d.id) items[i].product_name = d.product_name;
+          var tbl = window.__d2Table;
+          if (tbl && d.id) {
+            for (var i = 0; i < tbl.data.length; i++) {
+              if (tbl.data[i].product_id == d.id) tbl.data[i].product_name = d.product_name;
             }
-            if (window.__docum2Render) window.__docum2Render();
+            tbl.render();
           }
         }
       });
@@ -2137,7 +1107,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
       const trig = e.target.closest('[data-form-open]');
       if (trig) { e.preventDefault(); openFormModal(trig.getAttribute('data-form-open')); return; }
       if (e.target.closest('[data-form-close]')) { e.preventDefault(); if (stashed) { restoreStashedForm(null); } else { closeFormModal(); location.reload(); } return; }
-      if (e.target.closest('[data-lookup-add]')) { e.preventDefault(); syncFormValues(); var openFn = openFormModal; FormModalCore.handleLookupAdd(e.target.closest('[data-lookup-add]'), function (fn) { stashed = { html: formBody.innerHTML, onRestore: fn, activeId: document.activeElement ? document.activeElement.id : null, docum2Data: window.__docum2Data ? window.__docum2Data.slice() : [] }; }, openFn); return; }
+      if (e.target.closest('[data-lookup-add]')) { e.preventDefault(); syncFormValues(); var openFn = openFormModal; FormModalCore.handleLookupAdd(e.target.closest('[data-lookup-add]'), function (fn) { stashed = { html: formBody.innerHTML, onRestore: fn, activeId: document.activeElement ? document.activeElement.id : null }; }, openFn); return; }
     });
 
     function initSaleFormTabSwitch() {
@@ -2155,12 +1125,11 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
       }
 
       headers.forEach(function(h) {
-        h.removeEventListener('click', h._d2TabHandler);
-        h._d2TabHandler = function() {
+        h.addEventListener('click', function() {
           var idx = parseInt(this.getAttribute('data-tab-index'), 10);
           if (idx === 1) {
-            var d2t = document.querySelector('.docum2-table');
-            var curId = d2t ? d2t.getAttribute('data-docum-id') : '0';
+            var idInput = document.querySelector('input[name="id"]');
+            var curId = idInput ? idInput.value : '0';
             if (!curId || curId === '0') {
               var form = document.querySelector('form[data-form-modal]');
               if (!form) { switchTab(idx); return; }
@@ -2173,20 +1142,11 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
                 if (xhr.status === 200) {
                   try {
                     var data = JSON.parse(xhr.responseText);
-                    var newId = '0';
-                    if (data.html) {
-                      var p = new DOMParser();
-                      var d = p.parseFromString(data.html, 'text/html');
-                      var inp = d.querySelector('input[name="id"]');
-                      if (inp && inp.value) newId = inp.value;
-                    }
-                    if (newId !== '0') {
-                      if (d2t) d2t.setAttribute('data-docum-id', newId);
-                      var idInput = document.querySelector('input[name="id"]');
-                      if (idInput) idInput.value = newId;
-                      window.__docum2Data = [];
-                      try { window.__docum2Data = JSON.parse(d2t.dataset.items || '[]'); } catch(e) {}
-                      initDocum2Table();
+                    if (data && data.ok && data.id && data.id !== '0') {
+                      var newId = String(data.id);
+                      var idInput2 = document.querySelector('input[name="id"]');
+                      if (idInput2) idInput2.value = newId;
+                      initD2Table();
                       switchTab(1);
                       return;
                     }
@@ -2198,8 +1158,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
             }
           }
           switchTab(idx);
-        };
-        h.addEventListener('click', h._d2TabHandler);
+        });
       });
 
       switchTab(0);
@@ -2208,242 +1167,12 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
 
     window.initSaleForm = function() { initFormLookups(); initSaleFormTabSwitch(); };
 
-    /* Column resize (deferred until tab visible) */
-    var d2ColResizeInited = false;
-    function resetD2ColResize() { d2ColResizeInited = false; }
-    function tryInitD2ColResize() {
-      if (d2ColResizeInited) return;
-      var pane = document.querySelector('.tab-pane[data-tab-index="1"]');
-      if (!pane || !pane.classList.contains('active')) return;
-      var d2t = document.querySelector('.docum2-table');
-      if (!d2t || d2t.dataset.colResizeInited) return;
-      d2ColResizeInited = true;
-      if (typeof ColumnResize !== 'undefined') {
-        ColumnResize.init({ saveUrl: 'docum2_column_width_save.php', tbl: 'docum2', selector: '.docum2-table' });
-      }
-    }
-    setTimeout(tryInitD2ColResize, 100);
 
-    function openPlatForm(url) {
-      openFormModal(url, { onRestore: function(data) {
-        if (data && data.sum_plat !== undefined) {
-          var el = document.getElementById('sale-sum-plat');
-          if (el) { el.value = data.sum_plat || ''; el.style.color = data.sum_plat_red ? '#e57373' : ''; el.style.fontWeight = data.sum_plat_red ? 'bold' : ''; }
-        }
-        var deletedIdx = -1;
-        if (data && data.mode === 'delete' && data.id) {
-          for (var i = 0; i < window.__platData.length; i++) {
-            if (window.__platData[i].id == data.id) { deletedIdx = i; break; }
-          }
-        }
-        refreshPlatTable(function() {
-          if (data && data.ok && data.id && data.mode !== 'delete') {
-            var found = false;
-            for (var i = 0; i < window.__platData.length; i++) {
-              if (window.__platData[i].id == data.id) {
-                window.__platSelectedId = window.__platData[i].id;
-                found = true;
-                break;
-              }
-            }
-            if (!found) window.__platSelectedId = 0;
-          } else if (deletedIdx >= 0 && window.__platData && window.__platData.length > 0) {
-            var newIdx = Math.min(deletedIdx, window.__platData.length - 1);
-            window.__platSelectedId = window.__platData[newIdx].id;
-          } else {
-            window.__platSelectedId = 0;
-          }
-          if (typeof window.__platRender === 'function') window.__platRender();
-          if (typeof window.updatePlatButtons === 'function') window.updatePlatButtons();
-        });
-      }});
-    }
 
-    function refreshPlatTable(callback) {
-      var container = formBody.querySelector('.tab-pane[data-tab-index="2"]');
-      if (!container) return;
-      delete container.__platInited;
-      var tableEl = container.querySelector('[data-plat-table]');
-      if (!tableEl) return;
-      var docIdEl = formBody.querySelector('input[name="id"]');
-      var docId = docIdEl ? parseInt(docIdEl.value, 10) : 0;
-      if (docId <= 0) return;
-      var typeopEl = formBody.querySelector('input[name="typeop"]');
-      var typeop = typeopEl ? parseInt(typeopEl.value, 10) : 120;
-      fetch('sale_form.php?ajax=1&mode=edit&id=' + docId + '&typeop=' + typeop, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (!d || !d.html) return;
-          var p = new DOMParser();
-          var doc = p.parseFromString(d.html, 'text/html');
-          var newTableEl = doc.querySelector('[data-plat-table]');
-          if (newTableEl && tableEl) {
-            tableEl.dataset.items = newTableEl.dataset.items;
-            window.__platSelectedId = 0;
-            initPlatTable();
-          }
-          var sumPlatInput = doc.querySelector('#sale-sum-plat');
-          if (sumPlatInput) {
-            var cur = document.getElementById('sale-sum-plat');
-            if (cur) { cur.value = sumPlatInput.value; cur.style.color = sumPlatInput.style.color; cur.style.fontWeight = sumPlatInput.style.fontWeight; }
-          }
-          if (typeof callback === 'function') callback();
-        });
-    }
-
-    function initPlatTable() {
-      var container = formBody.querySelector('.tab-pane[data-tab-index="2"]');
-      if (!container) return;
-      if (container.__platInited) return;
-      container.__platInited = true;
-      var tableEl = container.querySelector('[data-plat-table]');
-      if (!tableEl) return;
-
-      var platData = [];
-      try { platData = JSON.parse(tableEl.dataset.items || '[]'); } catch(e) {}
-      window.__platData = platData;
-      if (!window.__platSelectedId) window.__platSelectedId = 0;
-
-      if (!container.__platEventsInited) {
-        container.__platEventsInited = '1';
-
-        tableEl.addEventListener('click', function(e) {
-          var tr = e.target.closest('.plat-row');
-          if (!tr) return;
-          var id = parseInt(tr.dataset.id, 10);
-          tableEl.querySelectorAll('.plat-row.selected').forEach(function(r) { r.classList.remove('selected'); });
-          window.__platSelectedId = id;
-          tr.classList.add('selected');
-          if (typeof window.updatePlatButtons === 'function') window.updatePlatButtons();
-        });
-
-        tableEl.addEventListener('dblclick', function(e) {
-          var tr = e.target.closest('.plat-row');
-          if (!tr) return;
-          var id = parseInt(tr.dataset.id, 10);
-          if (id > 0) openPlatForm('plat_form.php?mode=edit&id=' + id);
-        });
-      }
-
-      var searchInput = formBody.querySelector('#plat-search-input');
-      var searchBtn = formBody.querySelector('#plat-search-btn');
-      var clearBtn = formBody.querySelector('#plat-clear-filter-btn');
-      var filterBanner = formBody.querySelector('#plat-filter-banner');
-
-      window.__platSearchActive = false;
-      window.__platSearchText = '';
-
-      window.updatePlatButtons = function() {
-        var editBtn = formBody.querySelector('#plat-edit-btn');
-        var delBtn = formBody.querySelector('#plat-del-btn');
-        var disabled = !window.__platSelectedId;
-        if (editBtn) editBtn.disabled = disabled;
-        if (delBtn) delBtn.disabled = disabled;
-      };
-
-      function cn(v) { return (v === '' || v === null || v === undefined) ? '' : v; }
-      function hl(v) {
-        if (!window.__platSearchActive || !window.__platSearchText) return cn(v);
-        var s = String(v !== null && v !== undefined ? v : '');
-        if (s === '') return '-';
-        var st = window.__platSearchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        var re = new RegExp('(' + st + ')', 'gi');
-        return s.replace(re, '<span class="hl">$1</span>');
-      }
-
-      function renderPlat() {
-        var tbody = tableEl.querySelector('tbody');
-        if (!tbody) return;
-        var data = window.__platData;
-        if (window.__platSearchActive && window.__platSearchText) {
-          var st = window.__platSearchText.toLowerCase();
-          data = data.filter(function(item) {
-            return (item.datetime || '').toLowerCase().indexOf(st) >= 0
-              || (item.client_name || '').toLowerCase().indexOf(st) >= 0
-              || (item.zat_name || '').toLowerCase().indexOf(st) >= 0
-              || (item.sum || '').toString().toLowerCase().indexOf(st) >= 0
-              || (item.plat_type || '').toLowerCase().indexOf(st) >= 0
-              || (item.note || '').toLowerCase().indexOf(st) >= 0;
-          });
-        }
-        if (data.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" class="col-d2-empty">Нет платежей</td></tr>';
-          return;
-        }
-        function fmt(v) {
-          var n = parseFloat(v);
-          return isNaN(n) ? '' : n.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2});
-        }
-        var html = '';
-        for (var i = 0; i < data.length; i++) {
-          var item = data[i];
-          var sel = (item.id === window.__platSelectedId) ? ' selected' : '';
-          html += '<tr data-id="' + item.id + '" data-row-id="' + item.id + '" class="plat-row' + sel + '">'
-            + '<td>' + hl(item.datetime) + '</td>'
-            + '<td>' + hl(item.client_name) + '</td>'
-            + '<td>' + hl(item.zat_name) + '</td>'
-            + '<td class="col-sum">' + hl(fmt(item.sum)) + '</td>'
-            + '<td>' + hl(item.plat_type) + '</td>'
-            + '<td>' + hl(item.note) + '</td>'
-            + '</tr>';
-        }
-        tbody.innerHTML = html;
-      }
-      window.__platRender = function() {
-        if (window.__platSelectedId === 0 && window.__platData && window.__platData.length > 0) {
-          window.__platSelectedId = window.__platData[0].id;
-        }
-        renderPlat();
-      };
-
-      function updatePlatFilterUI() {
-        if (clearBtn) clearBtn.style.display = (window.__platSearchActive && window.__platSearchText) ? '' : 'none';
-        if (filterBanner) {
-          if (window.__platSearchActive && window.__platSearchText) {
-            filterBanner.style.display = '';
-            filterBanner.innerHTML = '<span class="filter-chip"><span class="filter-chip-text">(Содержит «' + window.__platSearchText.replace(/</g,'&lt;') + '»)</span><button type="button" class="filter-chip-close" id="plat-banner-clear" title="Снять фильтр">✕</button></span>';
-            var cb = filterBanner.querySelector('#plat-banner-clear');
-            if (cb) cb.addEventListener('click', function() { window.__platSearchActive = false; window.__platSearchText = ''; if (searchInput) searchInput.value = ''; renderPlat(); updatePlatFilterUI(); });
-          } else {
-            filterBanner.style.display = 'none';
-          }
-        }
-      }
-
-      if (!container.__platHandlersInited) {
-        container.__platHandlersInited = '1';
-
-        var addBtn = formBody.querySelector('#plat-add-btn');
-        var editBtn = formBody.querySelector('#plat-edit-btn');
-        var delBtn = formBody.querySelector('#plat-del-btn');
-        var refreshBtn = formBody.querySelector('#plat-refresh-btn');
-
-        if (addBtn) addBtn.addEventListener('click', function() {
-          openPlatForm(this.getAttribute('data-plat-url'));
-        });
-        if (editBtn) editBtn.addEventListener('click', function() {
-          if (window.__platSelectedId > 0) openPlatForm('plat_form.php?mode=edit&id=' + window.__platSelectedId);
-        });
-        if (delBtn) delBtn.addEventListener('click', function() {
-          if (window.__platSelectedId > 0) openPlatForm('plat_form.php?mode=delete&id=' + window.__platSelectedId);
-        });
-        if (refreshBtn) refreshBtn.addEventListener('click', refreshPlatTable);
-
-        if (searchBtn) searchBtn.addEventListener('click', function() { window.__platSearchActive = true; window.__platSearchText = (searchInput ? searchInput.value.trim() : ''); renderPlat(); updatePlatFilterUI(); });
-        if (searchInput) searchInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); window.__platSearchActive = true; window.__platSearchText = searchInput.value.trim(); renderPlat(); updatePlatFilterUI(); } });
-        if (clearBtn) clearBtn.addEventListener('click', function() { window.__platSearchActive = false; window.__platSearchText = ''; if (searchInput) searchInput.value = ''; renderPlat(); updatePlatFilterUI(); });
-      }
-
-      renderPlat();
-      if (window.__platSelectedId === 0 && window.__platData && window.__platData.length > 0) {
-        window.__platSelectedId = window.__platData[0].id;
-        renderPlat();
-      }
-      window.updatePlatButtons();
-    }
+    <?php $platTable->renderScripts(); ?>
 
     // Init on page load for direct access (will be a no-op if modal not open)
-    if (document.querySelector('.tab-container')) { try { initDocum2Table(); } catch(e) { console.error('initDocum2Table', e); } initSaleForm(); try { initPlatTable(); } catch(e) { console.error('initPlatTable', e); } }
+    if (document.querySelector('.tab-container')) { try { initD2Table(); } catch(e) { console.error('initD2Table', e); } initSaleForm(); try { initPlatTable(); } catch(e) { console.error('initPlatTable', e); } }
   </script>
   <script>
     // Lookup data for form modal
@@ -2500,24 +1229,6 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
           try { bindLookup({ root: el, data: data, readonly: false }); el.dataset.lookupInited = '1'; } catch(e) {}
         });
       }
-    }
-    function initFormTabs() {
-      var container = formBody.querySelector('.tab-container');
-      if (!container) return;
-      var headers = container.querySelectorAll('.tab-header');
-      var panes = container.querySelectorAll('.tab-pane');
-      headers.forEach(function (hdr) {
-        hdr.addEventListener('click', function () {
-          var idx = parseInt(hdr.dataset.tabIndex, 10);
-          headers.forEach(function (h) { h.classList.remove('active'); });
-          panes.forEach(function (p) { p.classList.remove('active'); });
-          hdr.classList.add('active');
-          var pane = container.querySelector('.tab-pane[data-tab-index="' + idx + '"]');
-          if (pane) pane.classList.add('active');
-          if (idx === 1) tryInitD2ColResize();
-        });
-      });
-      setTimeout(tryInitD2ColResize, 100);
     }
   </script>
   <script>

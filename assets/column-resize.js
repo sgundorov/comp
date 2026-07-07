@@ -105,6 +105,7 @@
           var name = cn[0].replace('col-', '');
           var def = (global.__columnDefaultWidths || {})[name];
           if (def == null) return;
+          if (!SAVE_URL) return;
           if (def === 'auto') {
             var colEl = table.querySelector('colgroup col.' + cn[0]);
             if (colEl) colEl.style.width = 'auto';
@@ -135,6 +136,7 @@
       var cn = th.className.match(/col-\S+/);
       if (!cn) return;
       var name = cn[0].replace('col-', '');
+      if (!SAVE_URL) return;
       var xhr = new XMLHttpRequest();
       xhr.open('POST', SAVE_URL, true);
       xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');

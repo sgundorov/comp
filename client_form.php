@@ -2,7 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/table-helper.php';
-require_once __DIR__ . '/lib/embedded-subtable-template.php';
+require_once __DIR__ . '/lib/TablePage.php';
 
 $isAjax = (
     (string)($_GET['ajax'] ?? '') === '1' ||
@@ -350,6 +350,41 @@ if ($RegcodeFlag && $id > 0 && ($mode === 'edit' || $mode === 'delete')) {
     $rcs->close();
 }
 
+$embedConfig = [
+    'prefix'       => 'rc',
+    'colWidths'    => ['product' => '200px', 'regcod' => '120px', 'quant' => '60px', 'date' => '90px', 'signat' => '120px', 'days' => '50px', 'note' => '150px'],
+    'saveUrl'      => 'regcod_field_save.php',
+    'parentField'  => 'client_id',
+    'childFormUrl' => 'regcod_form.php',
+    'childFormName'=> 'regcod',
+    'hasExport'    => true,
+    'hasPrint'     => true,
+    'exportUrl'    => 'regcod_export.php',
+    'printUrl'     => 'regcod_print.php',
+    'parentParam'  => 'client_id=',
+    'hasSearch'    => false,
+    'lookupData'   => [],
+];
+$embeddedTable = $RegcodeFlag && $id > 0 && ($mode === 'edit' || $mode === 'delete')
+    ? new TablePage($conn, [
+        'table'       => 'regcod',
+        'key'         => 'id',
+        'search_cols' => [],
+        'column_visibility_tbl' => '',
+        'columns'     => [
+            ['name' => 'product', 'label' => 'Товар'],
+            ['name' => 'regcod',  'label' => 'Рег. код'],
+            ['name' => 'quant',   'label' => 'Кол-во'],
+            ['name' => 'date',    'label' => 'Дата'],
+            ['name' => 'signat',  'label' => 'Сигнатура'],
+            ['name' => 'days',    'label' => 'Дней',    'hideZero' => true],
+            ['name' => 'note',    'label' => 'Примечание'],
+        ],
+        'defaultColumnWidths' => ['product' => '200px', 'regcod' => '120px', 'quant' => '60px', 'date' => '90px', 'signat' => '120px', 'days' => '50px', 'note' => '150px'],
+        'lookupData' => [],
+    ])
+    : null;
+
 $productList = [];
 $prs = $conn->query("SELECT product_id, product_name FROM product WHERE hide_flag = 0 ORDER BY product_name");
 if ($prs) while ($pr = $prs->fetch_assoc()) $productList[] = ['id' => (int)$pr['product_id'], 'name' => (string)$pr['product_name']];
@@ -484,23 +519,7 @@ ob_start();
   <?php if ($RegcodeFlag): ?>
   <div class="tab-pane" data-tab-index="3">
     <?php if ($id > 0 && ($mode === 'edit' || $mode === 'delete')): ?>
-    <?= render_embedded_subtable([
-        'prefix'     => 'rc',
-        'columns'    => [
-            ['key' => 'product',    'label' => 'Товар'],
-            ['key' => 'regcod',     'label' => 'Рег. код'],
-            ['key' => 'quant',      'label' => 'Кол-во', 'align' => 'right'],
-            ['key' => 'date',       'label' => 'Дата'],
-            ['key' => 'signat',     'label' => 'Сигнатура'],
-            ['key' => 'days',       'label' => 'Дней', 'align' => 'right'],
-            ['key' => 'note',       'label' => 'Примечание'],
-        ],
-        'colWidths'  => ['product' => '200px', 'regcod' => '120px', 'quant' => '60px', 'date' => '90px', 'signat' => '120px', 'days' => '50px', 'note' => 'auto'],
-        'data'       => $regcodList,
-        'hasExport'  => false,
-        'hasPrint'   => false,
-        'hasSearch'  => false,
-    ]) ?>
+    <?= $embeddedTable->renderEmbedded($regcodList, $embedConfig) ?>
     <?php else: ?>
     <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">Сохраните контрагента, чтобы добавить регистрационные коды</div>
     <?php endif; ?>
@@ -742,29 +761,11 @@ input.full, textarea.full { width: 100%; box-sizing: border-box; }
   });
 })();
 </script>
-<?php if ($RegcodeFlag && $id > 0 && ($mode === 'edit' || $mode === 'delete')): ?>
+<?php if ($embeddedTable): ?>
 <script>
-<?php render_embedded_subtable_scripts([
-    'prefix'           => 'rc',
-    'columns'          => [
-        ['key' => 'product',  'label' => 'Товар'],
-        ['key' => 'regcod',   'label' => 'Рег. код'],
-        ['key' => 'quant',    'label' => 'Кол-во', 'align' => 'right'],
-        ['key' => 'date',     'label' => 'Дата'],
-        ['key' => 'signat',   'label' => 'Сигнатура'],
-        ['key' => 'days',     'label' => 'Дней', 'align' => 'right'],
-        ['key' => 'note',     'label' => 'Примечание'],
-    ],
-    'saveUrl'          => 'regcod_field_save.php',
-    'parentField'      => 'client_id',
-    'childFormUrl'     => 'regcod_form.php',
-    'childFormName'    => 'regcod',
-    'hasExport'        => false,
-    'hasPrint'         => false,
-    'hasSearch'        => false,
-    'lookupData'       => [],
-]); ?>
+<?php $embeddedTable->renderEmbeddedScripts($embedConfig); ?>
 initRcTable();
+window.__columnDefaultWidths = <?= json_encode($embedConfig['colWidths'], JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <?php endif; ?>
 <?php

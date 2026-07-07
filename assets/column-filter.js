@@ -80,6 +80,12 @@
       function toggle() { panel.classList.contains('open') ? close() : open(); }
 
       function loadOptions() {
+        if (config.options) {
+          allOptions = config.options;
+          loaded = true;
+          renderList(searchInput.value);
+          return;
+        }
         var sep = location.search ? '&' : '?';
         var url = pageUrl + location.search + sep + 'action=columnFilterOptions&col=' + encodeURIComponent(col);
         fetch(url).then(function (r) { return r.json(); }).then(function (items) {

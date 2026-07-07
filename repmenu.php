@@ -76,7 +76,11 @@ foreach ($rows as $r) { if (isset($marks[(int)$r['rp_id']])) $rowsMarkedCount++;
 $rowsTotalCount  = count($rows);
 $allRowsMarked   = $rowsTotalCount > 0 && $rowsMarkedCount === $rowsTotalCount;
 
-$exportQs = $tp->buildExportQs();
+$activeGrId = count($grFilterIds) > 0 ? $grFilterIds[0] : $defaultGrId;
+
+$extraExportParams = [];
+if ($activeGrId > 0) $extraExportParams['gr_id'] = $activeGrId;
+$exportQs = $tp->buildExportQs($extraExportParams);
 
 $exportDropdownHtml = '';
 foreach ([
@@ -87,8 +91,6 @@ foreach ([
     $exportDropdownHtml .= '<a class="dropdown-item" href="#" data-export-url="' . h($fullUrl) . '" data-export-filename="' . h($item['filename']) . '" data-export-format="' . h($item['format']) . '">' . h($item['format'] === 'CSV' ? 'Экспорт в CSV' : 'Экспорт в Excel') . '</a>';
 }
 $printDropdownHtml = render_print_dropdown_items('repmenu', $exportQs, (int)$page, $marksCount > 0);
-
-$activeGrId = count($grFilterIds) > 0 ? $grFilterIds[0] : $defaultGrId;
 
 $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs, $PAGE_URL, $activeGrId) {
     $qs = ['page' => $p];

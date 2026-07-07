@@ -25,7 +25,7 @@ $isActive = function(string $href) use ($activeMenu): string {
   <div class="menu-item">
     <span class="menu-link">Документы</span>
     <div class="submenu">
-      <a href="invo.php"<?= $isActive('invo.php') ?>>Счета</a>
+      <a href="invoice.php"<?= $isActive('invoice.php') ?>>Счета</a>
       <a href="invoice.php?kind=offer"<?= $isActive('invoice.php?kind=offer') ?>>Коммерческие предложения</a>
       <a href="plat.php"<?= $isActive('plat.php') ?>>Кассовая книга</a>
     </div>
