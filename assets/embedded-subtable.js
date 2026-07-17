@@ -66,6 +66,13 @@
     this.childFormName = config.childFormName || '';
     this.totalsCallback = config.totalsCallback || '';
 
+    this._docType = 0;
+    try {
+      var _u = new URL(this.childFormUrl, location.href);
+      var _dt = _u.searchParams.get('doc_type');
+      if (_dt) this._docType = parseInt(_dt, 10) || 0;
+    } catch(e) {}
+
     this._bindEvents();
     this._bindKeyboard();
     this._bindFilterUI();
@@ -266,9 +273,11 @@
 
   EmbeddedSubTable.prototype._updateButtons = function () {
     var hasSelection = this.selectedId > 0;
-    if (this.btnEdit) this.btnEdit.disabled = !hasSelection;
-    if (this.btnCopy) this.btnCopy.disabled = !hasSelection;
-    if (this.btnDelete) this.btnDelete.disabled = !hasSelection;
+    var af = window.__accessFlags || {};
+    if (this.btnAdd) this.btnAdd.disabled = !!(af.insert_flag);
+    if (this.btnEdit) this.btnEdit.disabled = !hasSelection || !!(af.change_flag);
+    if (this.btnCopy) this.btnCopy.disabled = !hasSelection || !!(af.insert_flag);
+    if (this.btnDelete) this.btnDelete.disabled = !hasSelection || !!(af.delete_flag);
   };
 
   EmbeddedSubTable.prototype._updateCheckedUI = function () {
@@ -360,15 +369,16 @@
         if (parseInt(rows[k].dataset.id, 10) === self.selectedId) { curIdx = k; break; }
       }
       var handled = true;
+      var af = window.__accessFlags || {};
       switch (e.key) {
         case 'Insert':
-          if (self.btnAdd) self.btnAdd.click();
+          if (!af.insert_flag && self.btnAdd) self.btnAdd.click();
           break;
         case 'Enter':
-          if (self.selectedId && self.btnEdit) self.btnEdit.click();
+          if (!af.change_flag && self.selectedId && self.btnEdit) self.btnEdit.click();
           break;
         case 'Delete':
-          if (self.selectedId && self.btnDelete) self.btnDelete.click();
+          if (!af.delete_flag && self.selectedId && self.btnDelete) self.btnDelete.click();
           break;
         case 'ArrowDown':
           if (curIdx < rows.length - 1) self.selectById(parseInt(rows[curIdx + 1].dataset.id, 10));
@@ -417,75 +427,77 @@
     scope.addEventListener('click', function () { scope.focus(); });
   };
 
-  EmbeddedSubTable.prototype.refresh = function (opts) {
-    var self = this;
-    if (!this.saveUrl || !this.parentId) return;
-    var fd = new FormData();
-    fd.set('field', '_list');
-    fd.set(this.parentField, String(this.parentId));
-    fetch(this.saveUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
-      .then(function (data) {
-        if (Array.isArray(data)) {
-          self.data = data;
-          if (opts) {
-            if (opts.desiredIdx !== undefined) {
-              var cp = opts.currentPage || self.currentPage;
-              var tp = opts.totalPages || Math.ceil(self.data.length / self.pageSize) || 1;
-              if (opts.desiredIdx >= 0 && opts.desiredIdx < self.data.length) {
-                self.selectedId = Number(self.data[opts.desiredIdx].id);
-                self.currentPage = Math.floor(opts.desiredIdx / self.pageSize) + 1;
-              } else if (cp < tp) {
-                self.currentPage = cp + 1;
-                self.selectedId = 0;
-                var firstOnPage = (self.currentPage - 1) * self.pageSize;
-                if (firstOnPage < self.data.length) self.selectedId = Number(self.data[firstOnPage].id);
-              } else if (opts.desiredIdx - 1 >= 0) {
-                self.selectedId = Number(self.data[opts.desiredIdx - 1].id);
-                self.currentPage = Math.floor((opts.desiredIdx - 1) / self.pageSize) + 1;
-              } else if (cp > 1) {
-                self.currentPage = cp - 1;
-                self.selectedId = 0;
-              } else {
-                self.selectedId = 0;
-              }
-            } else if (opts.focusId) {
-              var found = false;
-              for (var i = 0; i < self.data.length; i++) {
-                if (self.data[i].id == opts.focusId) {
-                  self.currentPage = Math.floor(i / self.pageSize) + 1;
-                  self.selectedId = Number(opts.focusId);
-                  found = true;
-                  break;
-                }
-              }
-              if (!found && self.selectedId > 0 && !self.data.some(function (item) { return Number(item.id) === Number(self.selectedId); })) {
-                var pages = Math.ceil(self.data.length / self.pageSize) || 1;
-                if (self.currentPage > pages) self.currentPage = pages;
-                self.selectedId = 0;
-              }
-            }
-          }
-          self.render();
-          if (self.onDataChange) self.onDataChange(self.data);
-          if (self.totalsCallback && typeof global[self.totalsCallback] === 'function') {
-            var tf = new FormData();
-            tf.set('field', '_recalc_totals');
-            tf.set(self.parentField, String(self.parentId));
-            fetch(self.saveUrl, { method: 'POST', body: tf, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-              .then(function (r) { return r.json(); })
-              .then(function (td) { if (td && td.ok) global[self.totalsCallback](td); })
-              .catch(function () {});
-          }
-        }
-      })
-      .catch(function (e) { console.error('[EST] refresh() error', e); });
-  };
+   EmbeddedSubTable.prototype.refresh = function (opts) {
+     var self = this;
+     if (!this.saveUrl || !this.parentId) return;
+     var fd = new FormData();
+     fd.set('field', '_list');
+     fd.set(this.parentField, String(this.parentId));
+     if (this._docType) fd.set('doc_type', String(this._docType));
+     fetch(this.saveUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+       .then(function (r) {
+         if (!r.ok) throw new Error('HTTP ' + r.status);
+         return r.json();
+       })
+       .then(function (data) {
+         if (Array.isArray(data)) {
+           self.data = data;
+           if (opts) {
+             if (opts.desiredIdx !== undefined) {
+               var cp = opts.currentPage || self.currentPage;
+               var tp = opts.totalPages || Math.ceil(self.data.length / self.pageSize) || 1;
+               if (opts.desiredIdx >= 0 && opts.desiredIdx < self.data.length) {
+                 self.selectedId = Number(self.data[opts.desiredIdx].id);
+                 self.currentPage = Math.floor(opts.desiredIdx / self.pageSize) + 1;
+               } else if (cp < tp) {
+                 self.currentPage = cp + 1;
+                 self.selectedId = 0;
+                 var firstOnPage = (self.currentPage - 1) * self.pageSize;
+                 if (firstOnPage < self.data.length) self.selectedId = Number(self.data[firstOnPage].id);
+               } else if (opts.desiredIdx - 1 >= 0) {
+                 self.selectedId = Number(self.data[opts.desiredIdx - 1].id);
+                 self.currentPage = Math.floor((opts.desiredIdx - 1) / self.pageSize) + 1;
+               } else if (cp > 1) {
+                 self.currentPage = cp - 1;
+                 self.selectedId = 0;
+               } else {
+                 self.selectedId = 0;
+               }
+             } else if (opts.focusId) {
+               var found = false;
+               for (var i = 0; i < self.data.length; i++) {
+                 if (self.data[i].id == opts.focusId) {
+                   self.currentPage = Math.floor(i / self.pageSize) + 1;
+                   self.selectedId = Number(opts.focusId);
+                   found = true;
+                   break;
+                 }
+               }
+               if (!found && self.selectedId > 0 && !self.data.some(function (item) { return Number(item.id) === Number(self.selectedId); })) {
+                 var pages = Math.ceil(self.data.length / self.pageSize) || 1;
+                 if (self.currentPage > pages) self.currentPage = pages;
+                 self.selectedId = 0;
+               }
+             }
+           }
+           self.render();
+           if (self.onDataChange) self.onDataChange(self.data);
+           if (self.totalsCallback && typeof global[self.totalsCallback] === 'function') {
+             var tf = new FormData();
+             tf.set('field', '_recalc_totals');
+             tf.set(self.parentField, String(self.parentId));
+             fetch(self.saveUrl, { method: 'POST', body: tf, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+               .then(function (r) { return r.json(); })
+               .then(function (td) { if (td && td.ok) global[self.totalsCallback](td); })
+               .catch(function () {});
+           }
+         }
+       })
+       .catch(function (e) { console.error('[EST] refresh() error', e); });
+   };
 
   EmbeddedSubTable.prototype.deleteById = function (id) {
+    if (window.__accessFlags && window.__accessFlags.delete_flag) return;
     var self = this;
     id = Number(id);
     var fd = new FormData();
@@ -519,21 +531,28 @@
           }
           self.render();
           if (self.onDataChange) self.onDataChange(self.data);
+          if (self.totalsCallback && typeof global[self.totalsCallback] === 'function') {
+            global[self.totalsCallback](d);
+          }
         }
       });
   };
 
   EmbeddedSubTable.prototype.batchDeleteChecked = function () {
+    if (window.__accessFlags && window.__accessFlags.delete_flag) return;
     var self = this;
     var ids = Array.from(this.checkedIds);
     if (ids.length === 0) return;
     if (!confirm('Удалить ' + ids.length + ' отмеченных записей?')) return;
-    (function next(i) {
+    (function next(i, lastResp) {
       if (i >= ids.length) {
         self.checkedIds = new Set();
         self.selectedId = 0;
         self.render();
         if (self.onDataChange) self.onDataChange(self.data);
+        if (lastResp && self.totalsCallback && typeof global[self.totalsCallback] === 'function') {
+          global[self.totalsCallback](lastResp);
+        }
         return;
       }
       var fd = new FormData();
@@ -541,22 +560,33 @@
       fd.set('id', String(ids[i]));
       fetch(self.saveUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
-        .then(function () {
+        .then(function (d) {
           self.data = self.data.filter(function (item) { return Number(item.id) !== ids[i]; });
-          next(i + 1);
+          next(i + 1, d && d.ok ? d : lastResp);
         })
-        .catch(function () { next(i + 1); });
-    })(0);
+        .catch(function () { next(i + 1, lastResp); });
+    })(0, null);
   };
 
   EmbeddedSubTable.prototype.openChildForm = function (mode, id) {
     var self = this;
+    var af = window.__accessFlags || {};
+    if (mode === 'new' || mode === 'copy') {
+      if (af.insert_flag) return;
+    } else if (mode === 'edit') {
+      if (af.change_flag) return;
+    } else if (mode === 'delete') {
+      if (af.delete_flag) return;
+    }
     var proceed = function () {
       var url = self.childFormUrl + (self.childFormUrl.indexOf('?') >= 0 ? '&' : '?') + 'mode=' + mode;
       if (id) url += '&id=' + id;
       url += '&' + self.parentField + '=' + self.parentId;
       var openFn = window.openFormModal || window.__openFormModal;
       if (typeof openFn === 'function') {
+        if (self.tableEl && self.data) {
+          try { self.tableEl.dataset.items = JSON.stringify(self.data); } catch (e) {}
+        }
         openFn(url, {
           onRestore: function (data) {
             if (data && data.ok) {
@@ -574,7 +604,8 @@
               }
             }
           },
-          activeId: ''
+          activeId: String(self.selectedId || ''),
+          _estSelectedId: self.selectedId || 0
         });
       }
     };

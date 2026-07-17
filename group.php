@@ -8,6 +8,8 @@ require_once __DIR__ . '/lib/form-modal-handler.php';
 require_once __DIR__ . '/lib/EmbeddedTable.php';
 require_once __DIR__ . '/lib/table-page-scripts.php';
 
+$accessFlags = render_access_control($conn, 'Group');
+
 $TBL = 'group';
 $PAGE_TITLE = 'Группы товаров';
 $PAGE_URL   = 'group.php';
@@ -100,7 +102,7 @@ $tp->renderFilterBanner();
 <?php $tp->renderPageEnd(); ?>
 
 <?php
-    render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded-subtable.js', 'assets/inline-edit.js']]);
+    render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.js', 'assets/embedded-subtable.js', 'assets/inline-edit.js']]);
 ?>
   <script>
     window.__columnWidths = <?= json_encode($tp->columnWidths, JSON_NUMERIC_CHECK) ?>;
@@ -115,13 +117,15 @@ $tp->renderFilterBanner();
       'columnResizeUrl' => 'group_column_width_save.php',
       'visibleColumns'  => $tp->columnsConfig,
       'defaultColumns'  => $tp->columns,
+      'accessFlags'     => $accessFlags,
       'exportUrl'       => 'group_export.php',
       'printUrl'        => 'group_print.php',
       'preserveParams'  => ['sort'],
       'marksTbl'        => $TBL,
       'formModalConfig' => [
+          'autoInitTables' => ['sg'],
           'extra_open' => 'if (typeof initSgTable === "function") initSgTable();',
-          'extra_restore' => 'var _sg = window.__sgTable; var _sgPage = _sg ? _sg.currentPage : 1; var _sgData = _sg ? _sg.data : []; var _sgPS = _sg ? _sg.pageSize : 15; initSgTable(); if (window.__sgTable) { window.__sgTable.parentId = parseInt((document.querySelector("input[name=id]") || {}).value || "0", 10); if (data && data._deleted) { var _sgIdx = -1; for (var _sgi = 0; _sgi < _sgData.length; _sgi++) { if (_sgData[_sgi].id == data.id) { _sgIdx = _sgi; break; } } window.__sgTable.refresh({ desiredIdx: _sgIdx, currentPage: _sgPage, totalPages: Math.ceil(_sgData.length / _sgPS) || 1 }); } else { window.__sgTable.refresh({ focusId: data && data.id ? data.id : 0 }); } } if (data && data.pos !== undefined) { var posEl = document.querySelector("[name=pos]"); if (posEl) posEl.value = data.pos; }',
+          'extra_restore' => 'var _sg = window.__sgTable; var _sgPage = _sg ? _sg.currentPage : 1; var _sgData = _sg ? _sg.data : []; var _sgPS = _sg ? _sg.pageSize : 15; initSgTable(); if (window.__sgTable) { window.__sgTable.parentId = parseInt((document.querySelector("input[name=id]") || {}).value || "0", 10); if (data && data._deleted) { var _sgIdx = -1; for (var _sgi = 0; _sgi < _sgData.length; _sgi++) { if (_sgData[_sgi].id == data.id) { _sgIdx = _sgi; break; } } window.__sgTable.refresh({ desiredIdx: _sgIdx, currentPage: _sgPage, totalPages: Math.ceil(_sgData.length / _sgPS) || 1 }); } else if (data && data.id) { window.__sgTable.refresh({ focusId: data.id }); } } if (data && data.pos !== undefined) { var posEl = document.querySelector("[name=pos]"); if (posEl) posEl.value = data.pos; }',
       ],
   ]); ?>
 <?php
@@ -140,6 +144,7 @@ $sgTable = new EmbeddedTable([
     'exportUrl'        => 'sgroup_export.php',
     'printUrl'         => 'sgroup_print.php',
     'parentParam'      => 'group_id=',
+    'accessFlags'     => $accessFlags,
 ]);
 ?>
   <script>

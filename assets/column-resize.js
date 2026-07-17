@@ -12,6 +12,8 @@
       if (!table) return;
       if (table.dataset.colResizeInited) return;
       table.dataset.colResizeInited = '1';
+      if (SAVE_URL) table.dataset.colResizeUrl = SAVE_URL;
+      if (tbl) table.dataset.colResizeTbl = tbl;
 
       var ths = table.querySelectorAll('thead tr:first-child th:not(.col-check)');
       if (!ths.length) return;
@@ -23,6 +25,25 @@
         table.style.width = rw + 'px';
         table.style.minWidth = rw + 'px';
         table.style.maxWidth = rw + 'px';
+      }
+
+      // Apply colgroup widths immediately so saved pixel widths
+      // take effect without requiring a handle click (fixes embedded
+      // tables in hidden tabs where browser distributes 100% width
+      // differently than the colgroup pixel values).
+      var allCols = table.querySelectorAll('colgroup col');
+      var totalW = 0;
+      allCols.forEach(function (col) {
+        var w = parseInt(col.style.width, 10);
+        if (!isNaN(w) && w > 0) { totalW += w; }
+      });
+      if (totalW > 0) {
+        // Don't lock to a width smaller than the CSS min-width
+        // (1200px for .data-table). Embedded subtables have
+        // min-width:auto so this clamp is a no-op for them.
+        var minW = parseInt(getComputedStyle(table).minWidth, 10);
+        if (!isNaN(minW) && totalW < minW) totalW = minW;
+        setTableWidth(totalW);
       }
 
       ths.forEach(function (th) {

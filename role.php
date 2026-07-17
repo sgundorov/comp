@@ -9,6 +9,12 @@ $TBL = 'role';
 
 ensure_marks_table($conn);
 
+$accessFlags = get_access_flags($conn, 'role');
+if ($accessFlags['dostup_flag']) {
+    header('Location: index.php');
+    exit;
+}
+
 $tp = new TablePage($conn, $rolePageConfig);
 
 $page         = $tp->page;
@@ -114,6 +120,7 @@ render_form_modal(); ?>
 
       $printQs = $exportQs !== '' ? '?' . $exportQs : '';
       $printDropdownHtml = render_print_dropdown_items('role', $exportQs, (int)$page, $marksCount > 0);
+    $extraBtnHtml = '<button class="menu-btn" id="rowAccessBtn" title="Доступ" type="button" disabled><img src="img/dostup.png" alt="" /> Доступ</button>';
     ?>
     <?php
     render_toolbar_wrapper_open([
@@ -125,7 +132,7 @@ render_form_modal(); ?>
         'pages'        => (int)$pages,
         'focus'        => (string)($_GET['focus'] ?? '0'),
     ]);
-    render_toolbar_left('role_form', $marksCount, $exportDropdownHtml, $printDropdownHtml);
+    render_toolbar_left('role_form', $marksCount, $exportDropdownHtml, $printDropdownHtml, '', $extraBtnHtml);
     render_toolbar_right($search, $searchActive, $urlCols, $searchCond, $clearQs, 'role.php');
     render_toolbar_wrapper_close();
     ?>
@@ -158,83 +165,30 @@ render_form_modal(); ?>
   </div>
 
 <?php
-render_script_includes(['scripts' => ['assets/export-modal.js']]);
+render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/access.js']]);
 ?>
   <script>
     window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
     window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'role' => 250, 'note' => 500], JSON_UNESCAPED_UNICODE) ?>;
+    window.__accessFlags = <?= json_encode($accessFlags) ?>;
   </script>
   <script>
     function closeAllPanels() {
       document.querySelectorAll('.search-cond-panel.open, .search-cond-pop.open, .columns-panel.open, .col-filter-panel.open').forEach(function (p) { p.classList.remove('open'); if (p.style) p.style.display = ''; });
     }
     (function () {
-      const checkAll  = document.getElementById('checkAll');
-      const rowChecks = document.querySelectorAll('.row-check');
-      const selWrap   = document.getElementById('selectedActions');
-      const selCount  = document.getElementById('selectedCount');
-      const toolbar   = document.querySelector('.toolbar');
-      const search    = toolbar.getAttribute('data-search') || '';
-      const markedSet = new Set(Array.from(rowChecks).filter(cb => cb.checked).map(cb => parseInt(cb.value, 10)));
-      let globalCount = parseInt(toolbar.getAttribute('data-marks-count') || '0', 10);
+      if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
 
-      document.querySelectorAll('.submenu a').forEach(function (a) {
-        a.addEventListener('click', function () {
-          var item = a.closest('.menu-item');
-          if (item) item.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-        });
-      });
-
-      function refreshCounter() {
-        selCount.textContent = 'Выбрано: ' + globalCount;
-        selWrap.classList.toggle('visible', globalCount > 0);
-        const rowTotal = rowChecks.length;
-        let rowOn = 0;
-        rowChecks.forEach(cb => { if (cb.checked) rowOn++; });
-        if (rowTotal === 0) {
-          checkAll.checked = false;
-          checkAll.indeterminate = false;
-        } else {
-          checkAll.checked = rowOn === rowTotal;
-          checkAll.indeterminate = rowOn > 0 && rowOn < rowTotal;
-        }
-      }
-
-      checkAll.addEventListener('change', function () {
-        location.href = 'role.php?action=toggleSelectAll' + (search ? '&q=' + encodeURIComponent(search) : '');
-      });
-
-      rowChecks.forEach(cb => cb.addEventListener('change', function () {
-        const id  = parseInt(cb.value, 10);
-        const to  = cb.checked;
-        cb.disabled = true;
-        fetch('role.php?action=toggleSelect', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: 'id=' + encodeURIComponent(id) + '&to=' + (to ? '1' : '0')
-        })
-        .then(r => r.json())
-        .then(function (j) {
-          cb.disabled = false;
-          if (j.ok) {
-            if (to) markedSet.add(id); else markedSet.delete(id);
-            globalCount = (typeof j.count === 'number') ? j.count : globalCount;
-            refreshCounter();
-          }
-        })
-        .catch(function () { cb.disabled = false; });
-      }));
+      SelectionToolbar.initTableSelection('role.php', document.querySelector('.toolbar').getAttribute('data-search') || '');
 
       SelectionToolbar.init({
         pageUrl: 'role.php',
-        search: search,
+        search: document.querySelector('.toolbar').getAttribute('data-search') || '',
         getExportUrl: function () {
-          if (markedSet.size === 0) return null;
-          return 'role_export.php?format=csv&all=1';
+          return null;
         },
         getPrintUrl: function () {
-          if (markedSet.size === 0) return null;
-          return 'role_print.php?all=1';
+          return null;
         }
       });
 
@@ -297,9 +251,10 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
       const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
       const initialFocus = parseInt(toolbar.dataset.focus || '0', 10);
 
-      const openBtn   = document.getElementById('rowOpenBtn');
-      const copyBtn   = document.getElementById('rowCopyBtn');
-      const deleteBtn = document.getElementById('rowDeleteBtn');
+      const openBtn     = document.getElementById('rowOpenBtn');
+      const copyBtn     = document.getElementById('rowCopyBtn');
+      const deleteBtn   = document.getElementById('rowDeleteBtn');
+      const accessBtn   = document.getElementById('rowAccessBtn');
 
       const tableWrapEl = document.querySelector('.table-wrap');
 
@@ -308,9 +263,11 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
         rowClass: 'selected',
         onChange: function (id) {
           const enabled = id > 0;
-          if (openBtn)   openBtn.disabled   = !enabled;
-          if (copyBtn)   copyBtn.disabled   = !enabled;
-          if (deleteBtn) deleteBtn.disabled = !enabled;
+          const af = window.__accessFlags || {};
+          if (openBtn)   openBtn.disabled   = !enabled || !!af.change_flag;
+          if (copyBtn)   copyBtn.disabled   = !enabled || !!af.insert_flag;
+          if (deleteBtn) deleteBtn.disabled = !enabled || !!af.delete_flag;
+          if (accessBtn) accessBtn.disabled = !enabled;
         },
         currentPage: currentPage,
         totalPages: currentPages,
@@ -331,6 +288,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
       if (tbody) {
         tbody.addEventListener('dblclick', function (e) {
           if (e.target.closest('input[type="checkbox"]')) return;
+          if (window.__accessFlags && window.__accessFlags.change_flag) return;
           const tr = e.target.closest('tr[data-row-id]');
           if (!tr) return;
           const id = parseInt(tr.dataset.rowId, 10) || 0;
@@ -352,6 +310,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
       if (openBtn)   openBtn  .addEventListener('click', function (e) { e.stopPropagation(); openForm('edit'); });
       if (copyBtn)   copyBtn  .addEventListener('click', function (e) { e.stopPropagation(); openForm('copy'); });
       if (deleteBtn) deleteBtn.addEventListener('click', function (e) { e.stopPropagation(); openForm('delete'); });
+      if (accessBtn) accessBtn.addEventListener('click', function (e) { e.stopPropagation(); var id = rowSel.getSelectedId(); if (id) location.href = 'dostup.php?role_id=' + id; });
 
       function navigate(apply) {
         const p = new URLSearchParams(location.search);
@@ -365,11 +324,13 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
         currentPage: currentPage,
         currentPages: currentPages,
         navigate: navigate,
-        tableWrapEl: tableWrapEl
+        tableWrapEl: tableWrapEl,
+        accessFlags: window.__accessFlags
       });
     })();
 
     (function () {
+      if (window.__accessFlags && (window.__accessFlags.save_flag || window.__accessFlags.change_flag)) return;
       const tbody = document.querySelector('table tbody');
       if (!tbody) return;
 

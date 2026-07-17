@@ -2,7 +2,11 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/config/client_columns.php';
 require_once __DIR__ . '/config/client_page.php';
+require_once __DIR__ . '/lib/table-template.php';
+require_once __DIR__ . '/lib/form-modal-handler.php';
 require_once __DIR__ . '/lib/marks-actions.php';
+
+$accessFlags = render_access_control($conn, 'Client');
 
 ensure_marks_table($conn);
 ensure_client_tag_table($conn);
@@ -20,58 +24,10 @@ handle_marks_actions($conn, $tp, 'client', function($action) use ($conn, $tp) {
     return null;
 });
 
-function loadFilterNames(mysqli $conn, string $table, string $idCol, string $labelExpr, array $ids): array {
-    if (empty($ids)) return [];
-    $ph = implode(',', array_fill(0, count($ids), '?'));
-    $sql = "SELECT $idCol AS id, $labelExpr AS name FROM $table WHERE $idCol IN ($ph) ORDER BY $labelExpr";
-    $stmt = @$conn->prepare($sql);
-    if (!$stmt) return [];
-    stmt_bind($stmt, str_repeat('i', count($ids)), $ids);
-    $stmt->execute();
-    $r = $stmt->get_result();
-    $out = [];
-    while ($row = $r->fetch_assoc()) $out[(int)$row['id']] = (string)$row['name'];
-    $stmt->close();
-    return $out;
-}
+// --- Column filters ---
+$tp->processColumnFilters($conn);
 
-// --- Extra filters ---
-$cliCategFilter = (string)($_GET['cli_categ_id'] ?? '');
-$cliCategFilterIds = [];
-$cliCategFilterNames = [];
-if ($cliCategFilter !== '') {
-    $cliCategFilterIds = array_values(array_filter(array_map('intval', explode(',', $cliCategFilter)), fn($v) => $v > 0));
-}
-if (count($cliCategFilterIds) > 0) {
-    $ph = implode(',', array_fill(0, count($cliCategFilterIds), '?'));
-    $cliCategFilterNames = loadFilterNames($conn, 'cli_categ', 'cli_categ_id', 'categ', $cliCategFilterIds);
-    $tp->appendWhere("c.cli_categ_id IN ($ph)", $cliCategFilterIds, str_repeat('i', count($cliCategFilterIds)));
-}
-
-$cityFilter = (string)($_GET['city_id'] ?? '');
-$cityFilterIds = [];
-$cityFilterNames = [];
-if ($cityFilter !== '') {
-    $cityFilterIds = array_values(array_filter(array_map('intval', explode(',', $cityFilter)), fn($v) => $v > 0));
-}
-if (count($cityFilterIds) > 0) {
-    $ph = implode(',', array_fill(0, count($cityFilterIds), '?'));
-    $cityFilterNames = loadFilterNames($conn, 'city', 'city_id', 'city', $cityFilterIds);
-    $tp->appendWhere("c.city_id IN ($ph)", $cityFilterIds, str_repeat('i', count($cityFilterIds)));
-}
-
-$countryFilter = (string)($_GET['country_id'] ?? '');
-$countryFilterIds = [];
-$countryFilterNames = [];
-if ($countryFilter !== '') {
-    $countryFilterIds = array_values(array_filter(array_map('intval', explode(',', $countryFilter)), fn($v) => $v > 0));
-}
-if (count($countryFilterIds) > 0) {
-    $ph = implode(',', array_fill(0, count($countryFilterIds), '?'));
-    $countryFilterNames = loadFilterNames($conn, 'country', 'country_id', 'country', $countryFilterIds);
-    $tp->appendWhere("c.country_id IN ($ph)", $countryFilterIds, str_repeat('i', count($countryFilterIds)));
-}
-
+// --- Tags filter (subquery — not handled by processColumnFilters) ---
 $tagFilter = (string)($_GET['tag_id'] ?? '');
 $tagFilterIds = [];
 $tagFilterNames = [];
@@ -79,8 +35,15 @@ if ($tagFilter !== '') {
     $tagFilterIds = array_values(array_filter(array_map('intval', explode(',', $tagFilter)), fn($v) => $v > 0));
 }
 if (count($tagFilterIds) > 0) {
-    $tagFilterNames = loadFilterNames($conn, 'tag', 'tag_id', 'tag', $tagFilterIds);
     $ph = implode(',', array_fill(0, count($tagFilterIds), '?'));
+    $stmt = @$conn->prepare("SELECT tag_id, tag AS name FROM tag WHERE tag_id IN ($ph)");
+    if ($stmt) {
+        stmt_bind($stmt, str_repeat('i', count($tagFilterIds)), $tagFilterIds);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($res) while ($r = $res->fetch_assoc()) $tagFilterNames[] = (string)$r['name'];
+        $stmt->close();
+    }
     $tp->appendWhere("c.client_id IN (SELECT client_id FROM client_tag WHERE tag_id IN ($ph))", $tagFilterIds, str_repeat('i', count($tagFilterIds)));
 }
 
@@ -104,42 +67,42 @@ if ($crs) while ($cr = $crs->fetch_assoc()) $promoLookup[] = ['id' => (int)$cr['
 $tp->getTotalCount($conn);
 $rows = $tp->getRows($conn);
 
+$visibleColumns   = $tp->visibleColumns;
+$COLUMN_DEFAULTS  = $tp->columns;
+$COL_META         = $tp->colMeta;
+$columnWidths     = load_columns_widths($conn, 'client');
+$search           = $tp->search;
+$searchActive     = $tp->searchActive;
+$searchCols       = $tp->searchCols;
+$searchCond       = $tp->searchCond;
+$sortLevels       = $tp->sortLevels;
+$sortQs           = $tp->sortQs;
+$showOnly         = $tp->showOnly;
+$marks            = $tp->marks;
+$marksCount       = $tp->marksCount;
+$page             = $tp->page;
+$pages            = $tp->pages;
+$total            = $tp->total;
+
+$rowsMarkedCount = 0;
+foreach ($rows as $r) { if (isset($marks[(int)$r['client_id']])) $rowsMarkedCount++; }
+$rowsTotalCount  = count($rows);
+$allRowsMarked   = $rowsTotalCount > 0 && $rowsMarkedCount === $rowsTotalCount;
+
+$urlCols = $searchCols;
+
 // --- Build filters ---
 $tp->buildFilters();
 $filters = $tp->filters;
 
-if (count($cliCategFilterNames) > 0) {
-    $filters[] = ['kind' => 'cli_categ', 'text' => 'Категория = ' . implode(', ', $cliCategFilterNames), 'clear' => 'cli_categ_id'];
-}
-if (count($cityFilterNames) > 0) {
-    $filters[] = ['kind' => 'city', 'text' => 'Город = ' . implode(', ', $cityFilterNames), 'clear' => 'city_id'];
-}
-if (count($countryFilterNames) > 0) {
-    $filters[] = ['kind' => 'country', 'text' => 'Страна = ' . implode(', ', $countryFilterNames), 'clear' => 'country_id'];
-}
 if (count($tagFilterNames) > 0) {
     $filters[] = ['kind' => 'tag', 'text' => 'Вид деятельности = ' . implode(', ', $tagFilterNames), 'clear' => 'tag_id'];
 }
 
-// --- clearQs (preserves extra filter params) ---
-$preservedExtraParams = ['cli_categ_id', 'city_id', 'country_id', 'tag_id'];
-$clearQs = function($drop) use ($tp, $preservedExtraParams) {
-    $drop = is_array($drop) ? $drop : [$drop];
-    $qs = [];
-    if (!in_array('q', $drop, true) && $tp->searchActive && $tp->search !== '') $qs['q'] = $tp->search;
-    if (!in_array('cols', $drop, true) && $tp->searchActive && count($tp->searchCols) > 0) $qs['cols'] = implode(',', $tp->searchCols);
-    if (!in_array('cond', $drop, true) && $tp->searchActive) $qs['cond'] = $tp->searchCond;
-    if (!in_array('sf', $drop, true) && $tp->searchActive) $qs['sf'] = '1';
-    if (!in_array('sort', $drop, true) && $tp->sortQs !== '') $qs['sort'] = $tp->sortQs;
-    foreach ($preservedExtraParams as $ep) {
-        if (!in_array($ep, $drop, true) && !empty($_GET[$ep])) $qs[$ep] = $_GET[$ep];
-    }
-    return 'client.php' . ($qs ? '?' . http_build_query($qs) : '');
-};
+$clearQs = $tp->buildClearQs();
 
 // --- Render ---
-$tp->renderHead('Контрагенты');
-?>
+render_head_start('Контрагенты'); ?>
   <style>
     .data-table tbody tr:hover td.col-name { background: #2c3a4d; }
     .data-table tbody tr.selected td.col-name { background: #3a5a8a; }
@@ -157,23 +120,18 @@ $tp->renderHead('Контрагенты');
     .data-table tbody td.col-disc_goods { text-align: right; }
   </style>
 <?php
-$tp->renderHeadEnd();
-$tp->renderPageStart();
-$activeMenu = 'client.php'; include 'menu.php';
-$tp->renderTitle('customer.png', 'Контрагенты');
+render_head_end();
+render_export_modal();
+render_form_modal(); ?>
+  <div class="page">
+    <?php $activeMenu = 'client.php'; include 'menu.php'; ?>
 
-// Export formats (with extra filter params)
-$exportQs = http_build_query(array_filter([
-    'q'    => $tp->searchActive && $tp->search !== '' ? $tp->search : null,
-    'cols' => $tp->searchActive && count($tp->searchCols) > 0 ? implode(',', $tp->searchCols) : null,
-    'cond' => $tp->searchActive ? $tp->searchCond : null,
-    'sf'   => $tp->searchActive ? '1' : null,
-    'sort' => $tp->sortQs !== '' ? $tp->sortQs : null,
-    'cli_categ_id' => $cliCategFilter !== '' ? $cliCategFilter : null,
-    'city_id' => $cityFilter !== '' ? $cityFilter : null,
-    'country_id' => $countryFilter !== '' ? $countryFilter : null,
-    'tag_id' => $tagFilter !== '' ? $tagFilter : null,
-], function ($v) { return $v !== null && $v !== ''; }));
+    <h1 class="page-title"><img src="img/customer.png" alt="" /> Контрагенты</h1>
+
+<?php
+$exportExtra = [];
+if ($tagFilter !== '') $exportExtra['tag_id'] = $tagFilter;
+$exportQs = $tp->buildExportQs($exportExtra);
 
 $extraBtnHtml =
   '<button class="icon-btn" id="rowContactsBtn" title="Контакты" disabled><img src="img/contact.png" alt="" /></button>' .
@@ -189,18 +147,38 @@ foreach ([
     $exportFormats[] = $item + ['url' => $fullUrl];
 }
 
-$tp->renderToolbar([
-    'formPrefix' => 'client_form',
-    'extraLeftHtml' => $extraBtnHtml,
-    'exportFormats' => $exportFormats,
-    'extraExportParams' => array_filter([
-        'cli_categ_id' => $cliCategFilter !== '' ? $cliCategFilter : null,
-        'city_id' => $cityFilter !== '' ? $cityFilter : null,
-        'country_id' => $countryFilter !== '' ? $countryFilter : null,
-        'tag_id' => $tagFilter !== '' ? $tagFilter : null,
-    ]),
-]);
+?>
+    <?php
+      $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs) {
+          $qs = ['page' => (int)$p];
+          if ($searchActive) {
+              if ($search !== '') $qs['q'] = $search;
+              if (count($searchCols) > 0) $qs['cols'] = implode(',', $searchCols);
+              $qs['cond'] = $searchCond;
+              $qs['sf'] = '1';
+          }
+          if ($sortQs !== '') $qs['sort'] = $sortQs;
+          return 'client.php?' . http_build_query($qs);
+      };
+      $paginationHtml = render_pagination($page, $pages, $baseQs);
 
+      $exportDropdownHtml = render_export_dropdown_items($exportFormats, $exportQs);
+      $printDropdownHtml = render_print_dropdown_items('client', $exportQs, (int)$page, $marksCount > 0);
+    ?>
+    <?php render_toolbar_wrapper_open([
+        'total'        => (int)$total,
+        'show-only'    => $showOnly ? '1' : '0',
+        'marks-count'  => (int)$marksCount,
+        'search'       => $search,
+        'page'         => (int)$page,
+        'pages'        => (int)$pages,
+        'focus'        => (string)($_GET['focus'] ?? '0'),
+    ]);
+    render_toolbar_left('client_form', $marksCount, $exportDropdownHtml, $printDropdownHtml, $extraBtnHtml);
+    render_toolbar_right($search, $searchActive, $urlCols, $searchCond, $clearQs, 'client.php');
+    render_toolbar_wrapper_close(); ?>
+
+<?php
 // Filter banner (custom, with extra filters)
 if (count($filters) > 0) {
 ?>
@@ -223,11 +201,25 @@ if (count($filters) > 0) {
 ?>
 <div class="table-wrap">
   <table class="data-table">
-<?php
-$tp->renderTable(function($r, $cn, $vc) use ($tp) {
-    $search = $tp->search;
-    $searchCond = $tp->searchCond;
-    $searchCols = $tp->searchCols;
+<?php render_table_colgroup($visibleColumns, $columnWidths, [
+    'id' => 60, 'name' => 200, 'last_name' => 120, 'first_name' => 150,
+    'title' => 120, 'cli_categ_id' => 120,
+    'supplier_flag' => 60, 'problem_flag' => 60,
+    'juridical_flag' => 60, 'hide_flag' => 60,
+    'phone' => 120, 'cphone' => 120, 'email' => 160, 'site' => 160,
+    'city_id' => 120, 'country_id' => 120, 'postindex' => 80,
+    'address_jur' => 200, 'address' => 200,
+    'pasport' => 140, 'pasp_date' => 100, 'pasp_vydan' => 200, 'birthday' => 100,
+    'promo_id' => 120,
+    'inn' => 120, 'kpp' => 100, 'ogrn' => 120, 'jur_name' => 200,
+    'director' => 150, 'glavbuh' => 150,
+    'bank' => 200, 'bik' => 80, 'schet' => 140, 'kschet' => 140,
+    'okonh' => 100, 'okpo' => 100,
+    'disc_goods' => 60, 'sum_nach' => 80, 'sum_plat' => 80, 'sum_balans' => 80,
+    'bdate' => 100, 'dop1' => 200, 'tags' => 200, 'note' => 500,
+]); ?>
+        <?php render_table_thead($visibleColumns, $COL_META, $sortLevels, $allRowsMarked, $rowsTotalCount === 0, []); ?>
+        <?php render_table_tbody($visibleColumns, $rows, $marks, $search, 'client_id', function($r, $cn, $vc) use ($search, $searchCols, $searchCond) {
     $doHilight = in_array($cn, $searchCols, true);
     switch ($cn) {
         case 'id':
@@ -388,31 +380,18 @@ $tp->renderTable(function($r, $cn, $vc) use ($tp) {
         }
         return $classes ? 'class="' . implode(' ', $classes) . '"' : '';
     },
-    'defaultWidths' => [
-        'id' => 60, 'name' => 200, 'last_name' => 120, 'first_name' => 150,
-        'title' => 120, 'cli_categ_id' => 120,
-        'supplier_flag' => 60, 'problem_flag' => 60,
-        'juridical_flag' => 60, 'hide_flag' => 60,
-        'phone' => 120, 'cphone' => 120, 'email' => 160, 'site' => 160,
-        'city_id' => 120, 'country_id' => 120, 'postindex' => 80,
-        'address_jur' => 200, 'address' => 200,
-        'pasport' => 140, 'pasp_date' => 100, 'pasp_vydan' => 200, 'birthday' => 100,
-        'promo_id' => 120,
-        'inn' => 120, 'kpp' => 100, 'ogrn' => 120, 'jur_name' => 200,
-        'director' => 150, 'glavbuh' => 150,
-        'bank' => 200, 'bik' => 80, 'schet' => 140, 'kschet' => 140,
-        'okonh' => 100, 'okpo' => 100,
-        'disc_goods' => 60, 'sum_nach' => 80, 'sum_plat' => 80, 'sum_balans' => 80,
-        'bdate' => 100, 'dop1' => 200, 'tags' => 200, 'note' => 500,
-    ],
-]);
-?>
-  </table>
-</div>
-<?php
-$tp->renderPagination();
-$tp->renderPageEnd();
+    'tdExtraAttrs' => function($cn, $vc, $r, $i) {
+        return ' data-col-idx="' . (int)$i . '"';
+    },
+]); ?>
+      </table>
+    </div>
 
+    <?= $paginationHtml ?>
+
+  </div>
+
+<?php
 // --- Build inline fields for custom InlineEdit ---
 $inlineFields = [];
 $valCases = '';
@@ -473,32 +452,254 @@ $cityLookupJson = json_encode($cityLookup, JSON_UNESCAPED_UNICODE);
 $countryLookupJson = json_encode($countryLookup, JSON_UNESCAPED_UNICODE);
 $promoLookupJson = json_encode($promoLookup, JSON_UNESCAPED_UNICODE);
 
-$extraCode = <<<JS
+render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.js', 'assets/column-filter.js', 'assets/embedded-subtable.js']]);
+?>
+  <script>
+  (function () {
+    const toolbar = document.querySelector('.toolbar');
+    const tbody   = document.querySelector('table tbody');
+    const rowOpenBtn   = document.getElementById('rowOpenBtn');
+    const rowCopyBtn   = document.getElementById('rowCopyBtn');
+    const rowDeleteBtn = document.getElementById('rowDeleteBtn');
+    const sortBtn   = document.getElementById('sortBtn');
+    const columnsBtn = document.getElementById('columnsBtn');
+    const searchForm  = document.getElementById('searchForm');
+    const searchCondBtn  = document.getElementById('searchCondBtn');
+    const searchToggleBtn= document.getElementById('searchToggleBtn');
+
+    const currentPage  = parseInt(toolbar.dataset.page  || '1', 10);
+    const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
+
+    SelectionToolbar.initTableSelection('client.php', document.querySelector('.toolbar').getAttribute('data-search') || '');
+
+    function closeAllPanels() {
+      document.querySelectorAll('.col-filter-panel.open').forEach(function (p) { p.classList.remove('open'); });
+      document.querySelectorAll('.search-cond-panel, .search-cond-pop, .columns-panel').forEach(function (p) { p.remove(); });
+      document.querySelectorAll('.sort-modal-backdrop.open').forEach(function (p) { p.classList.remove('open'); });
+    }
+
+    const SORT_COLS = <?= json_encode($allLabeledColumns, JSON_UNESCAPED_UNICODE) ?>;
+    const SEARCH_COLS = <?= json_encode($allLabeledColumns, JSON_UNESCAPED_UNICODE) ?>;
+    const currentSortLevels = <?= json_encode($sortLevels, JSON_UNESCAPED_UNICODE) ?>;
+
+    SelectionToolbar.init({
+      pageUrl: 'client.php',
+      getInvertUrl: function () {
+        var other = new URLSearchParams(location.search);
+        other.delete('ids');
+        return 'client.php?action=invertSelection&' + other.toString();
+      },
+      getExportUrl: function () {
+        return null;
+      },
+      getPrintUrl: function () {
+        return null;
+      }
+    });
+
+    document.querySelectorAll('.row-check').forEach(function (cb) {
+      cb.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    SearchPanel.init({
+      form: searchForm,
+      condBtn: searchCondBtn,
+      toggleBtn: searchToggleBtn,
+      columns: SEARCH_COLS,
+      pageUrl: 'client.php',
+      popupCheckboxes: true,
+      emptyClass: 'search-cond-placeholder',
+      labels: { cols: 'Столбцы', cond: 'Условие', emptyCols: 'Выберите столбцы…' },
+      closeAllPanels: closeAllPanels,
+      preserveParams: ['sort'],
+      onApply: function (state) {
+        var p = new URLSearchParams(location.search);
+        if (state.cols.size > 0) p.set('cols', Array.from(state.cols).join(','));
+        else p.delete('cols');
+        p.set('cond', state.cond);
+        p.set('sf', '1');
+        var q = (searchForm.querySelector('input[name="q"]') || { value: '' }).value.trim();
+        if (q !== '') p.set('q', q); else p.delete('q');
+        p.delete('page');
+        location.href = 'client.php?' + p.toString();
+      },
+      onToggle: function (state) {
+        var p = new URLSearchParams(location.search);
+        var q = searchForm.querySelector('input[name="q"]').value.trim();
+        if (q !== '') {
+          p.set('q', q);
+          if (state.cols.size > 0) p.set('cols', Array.from(state.cols).join(','));
+          p.set('cond', state.cond);
+          p.set('sf', '1');
+        } else {
+          p.delete('q');
+          p.delete('cols');
+          p.delete('cond');
+          p.delete('sf');
+        }
+        p.delete('page');
+        location.href = 'client.php?' + p.toString();
+      },
+      onSubmit: function () { searchToggleBtn.click(); }
+    });
+
+    SortPanel.init({
+      btn: sortBtn,
+      columns: SORT_COLS,
+      pageUrl: 'client.php',
+      mode: 'modal',
+      currentSort: currentSortLevels,
+      directions: [
+        { key: 'asc',  label: 'По возрастанию' },
+        { key: 'desc', label: 'По убыванию' },
+      ],
+    });
+
+    ColumnsPanel.init({
+      btn: columnsBtn,
+      saveUrl: 'client_columns_save.php',
+      tbl: 'client',
+      closeAllPanels: closeAllPanels,
+      initialColumns: <?= json_encode($defaultColumnsForPanel, JSON_UNESCAPED_UNICODE) ?>,
+      defaultColumns: <?= json_encode(array_map(function ($c) {
+        return ['name' => $c['name'], 'label' => $c['label'], 'visible' => true];
+      }, $COLUMN_DEFAULTS), JSON_UNESCAPED_UNICODE) ?>
+    });
+
+    window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
+    window.__columnDefaultWidths = <?= $columnDefaultWidthsJson ?>;
+
+    ExportModal.init();
+  })();
+  </script>
+  <?php render_form_modal_script([
+    'form_prefix'   => 'client_form',
+    'base_url'      => 'client.php',
+    'autoInitTables' => ['rc'],
+    'extra_open'    => 'initFormLookups(); initTagPicker(); window.initFormTabs(); (function(){var j=document.getElementById("jur-name"),l=document.getElementById("last-name"),f=document.getElementById("first-name"),d=document.getElementById("name-display"),g=document.getElementById("juridical-flag");function u(){var jv=j?j.value:"",lv=l?l.value:"",fv=f?f.value:"";if(d)d.value=jv||(lv+" "+fv).trim();if(g)g.checked=!!jv;}if(j)j.addEventListener("input",u);if(l)l.addEventListener("input",u);if(f)f.addEventListener("input",u);u();})();',
+    'extra_restore' => 'initFormLookups();',
+  ]); ?>
+  <script>
     window.closeAllPanels = function () {
       document.querySelectorAll('.col-filter-panel.open').forEach(function (p) { p.classList.remove('open'); });
       document.querySelectorAll('.search-cond-panel, .search-cond-pop, .columns-panel').forEach(function (p) { p.remove(); });
       document.querySelectorAll('.sort-modal-backdrop.open').forEach(function (p) { p.classList.remove('open'); });
     };
 
+    window.__columnWidths = <?= $columnWidthsJson ?>;
+    window.__columnDefaultWidths = <?= $columnDefaultWidthsJson ?>;
+
+    window.__accessFlags = <?= json_encode($accessFlags) ?>;
+    if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
+
     (function () {
-      var contactsBtn = document.getElementById('rowContactsBtn');
-      var invoiceBtn = document.getElementById('rowInvoiceBtn');
-      var platBtn = document.getElementById('rowPlatBtn');
-      contactsBtn.addEventListener('click', function () { var id = window.rowSel.getSelectedId(); if (id !== 0) window.open('contact.php?client_id=' + id, '_blank'); });
-      invoiceBtn.addEventListener('click', function () { var id = window.rowSel.getSelectedId(); if (id !== 0) window.open('invoice.php?client_id=' + id, '_blank'); });
-      platBtn.addEventListener('click', function () { var id = window.rowSel.getSelectedId(); if (id !== 0) window.open('plat.php?client_id=' + id, '_blank'); });
+      const toolbar = document.querySelector('.toolbar');
+      const tbody   = document.querySelector('table tbody');
+      const rowOpenBtn   = document.getElementById('rowOpenBtn');
+      const rowCopyBtn   = document.getElementById('rowCopyBtn');
+      const rowDeleteBtn = document.getElementById('rowDeleteBtn');
+      const contactsBtn = document.getElementById('rowContactsBtn');
+      const invoiceBtn = document.getElementById('rowInvoiceBtn');
+      const platBtn = document.getElementById('rowPlatBtn');
+
+      const currentPage  = parseInt(toolbar.dataset.page  || '1', 10);
+      const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
+
+      const rowSel = RowSelect.init({
+        tbody: tbody,
+        rowClass: 'selected',
+        onChange: function (id) {
+          const enabled = id > 0;
+          const af = window.__accessFlags || {};
+          if (rowOpenBtn)   rowOpenBtn.disabled   = !enabled || !!af.change_flag;
+          if (rowCopyBtn)   rowCopyBtn.disabled   = !enabled || !!af.insert_flag;
+          if (rowDeleteBtn) rowDeleteBtn.disabled = !enabled || !!af.delete_flag;
+          if (contactsBtn)  contactsBtn.disabled  = !enabled;
+          if (invoiceBtn)   invoiceBtn.disabled   = !enabled;
+          if (platBtn)      platBtn.disabled      = !enabled;
+        },
+        currentPage: currentPage,
+        totalPages: currentPages,
+        navigate: navigate
+      });
+      window.rowSel = rowSel;
+
+      function selectRow(rowId) { rowSel.selectById(rowId, true); }
+
+      function navigate(apply) {
+        const p = new URLSearchParams(location.search);
+        apply(p);
+        location.href = 'client.php?' + p.toString();
+      }
+
+      document.querySelectorAll('tbody tr').forEach(function (tr) {
+        const id = parseInt(tr.dataset.rowId, 10);
+        tr.addEventListener('click', function (e) {
+          if (e.target.closest('input.row-check')) return;
+          selectRow(id);
+        });
+        tr.addEventListener('dblclick', function () {
+          if (window.__accessFlags && window.__accessFlags.change_flag) return;
+          window.__openFormModal('client_form.php?mode=edit&id=' + id);
+        });
+      });
+
+      rowOpenBtn.addEventListener('click', function () {
+        const id = rowSel.getSelectedId();
+        if (id !== 0) window.__openFormModal('client_form.php?mode=edit&id=' + id);
+      });
+      rowCopyBtn.addEventListener('click', function () {
+        const id = rowSel.getSelectedId();
+        if (id !== 0) window.__openFormModal('client_form.php?mode=copy&id=' + id);
+      });
+      rowDeleteBtn.addEventListener('click', function () {
+        const id = rowSel.getSelectedId();
+        if (id !== 0) window.__openFormModal('client_form.php?mode=delete&id=' + id);
+      });
+
+      if (contactsBtn) {
+        contactsBtn.addEventListener('click', function () { var id = window.rowSel.getSelectedId(); if (id !== 0) window.open('contact.php?client_id=' + id, '_blank'); });
+      }
+      if (invoiceBtn) {
+        invoiceBtn.addEventListener('click', function () { var id = window.rowSel.getSelectedId(); if (id !== 0) window.open('invoice.php?client_id=' + id, '_blank'); });
+      }
+      if (platBtn) {
+        platBtn.addEventListener('click', function () { var id = window.rowSel.getSelectedId(); if (id !== 0) window.open('plat.php?client_id=' + id, '_blank'); });
+      }
+
+      const tableWrapEl = document.querySelector('.table-wrap');
+
+      (function applyInitialFocus() {
+        const rows = rowSel.getRows();
+        if (rows.length === 0) return;
+        const raw = (toolbar.dataset.focus || '').toString();
+        if (raw === 'first') { rowSel.selectByIndex(0); return; }
+        if (raw === 'last')  { rowSel.selectByIndex(rows.length - 1); return; }
+        const id = parseInt(raw, 10);
+        if (id > 0 && rowSel.selectById(id, false)) return;
+        rowSel.selectByIndex(0);
+      })();
+
+      bindTableKeyboardShortcuts({
+        formPrefix: 'client_form',
+        rowSel: rowSel,
+        currentPage: currentPage,
+        currentPages: currentPages,
+        navigate: navigate,
+        tableWrapEl: tableWrapEl,
+        onOpenForm: window.__openFormModal,
+        accessFlags: window.__accessFlags
+      });
     })();
 
-    window.__columnWidths = {$columnWidthsJson};
-    window.__columnDefaultWidths = {$columnDefaultWidthsJson};
-
+    if (window.__accessFlags && (window.__accessFlags.save_flag || window.__accessFlags.change_flag)) { /* skip */ } else {
     InlineEdit.init({
         tbody: document.querySelector('table tbody'),
         saveUrl: 'client_field_save.php',
-        fields: {$inlineFieldsJson},
+        fields: <?= $inlineFieldsJson ?>,
         validate: function (field, value) {
           switch (field) {
-{$valCases}
+<?= $valCases ?>
           }
           return null;
         },
@@ -525,11 +726,12 @@ $extraCode = <<<JS
             return [];
         }
     });
+    }
 
-    var __cliCategLookup = {$cliCategLookupJson};
-    var __cityLookup = {$cityLookupJson};
-    var __countryLookup = {$countryLookupJson};
-    var __promoLookup = {$promoLookupJson};
+    var __cliCategLookup = <?= $cliCategLookupJson ?>;
+    var __cityLookup = <?= $cityLookupJson ?>;
+    var __countryLookup = <?= $countryLookupJson ?>;
+    var __promoLookup = <?= $promoLookupJson ?>;
 
     window.initFormTabs = function () {
       var container = document.querySelector('.tab-container');
@@ -697,41 +899,12 @@ $extraCode = <<<JS
       });
       renderChips();
     }
-JS;
-$tp->renderScripts([
-    'extraScripts' => ['assets/embedded-subtable.js'],
-    'formPrefix' => 'client_form',
-    'lookupData' => [
-        'cli_categ_id' => $cliCategLookup,
-        'city_id' => $cityLookup,
-        'country_id' => $countryLookup,
-        'promo_id' => $promoLookup,
-    ],
-    'colFilters' => [
-        ['thSelector' => '.col-cli_categ_id', 'pageUrl' => 'client.php'],
-        ['thSelector' => '.col-city_id', 'pageUrl' => 'client.php'],
-        ['thSelector' => '.col-country_id', 'pageUrl' => 'client.php'],
-        ['thSelector' => '.col-tags', 'pageUrl' => 'client.php'],
-    ],
-    'searchPanelConfig' => [
-        'popupCheckboxes' => true,
-        'emptyClass' => 'search-cond-placeholder',
-        'labels' => ['cols' => 'Столбцы', 'cond' => 'Условие', 'emptyCols' => 'Выберите столбцы…'],
-        'onApply' => 'function(state) { var p = new URLSearchParams(location.search); if (state.cols.size > 0) p.set("cols", Array.from(state.cols).join(",")); else p.delete("cols"); p.set("cond", state.cond); p.set("sf", "1"); var q = (document.getElementById("searchForm").querySelector("input[name=\'q\']") || { value: "" }).value.trim(); if (q !== "") p.set("q", q); else p.delete("q"); p.delete("page"); location.href = "client.php?" + p.toString(); }',
-        'onToggle' => 'function(state) { var p = new URLSearchParams(location.search); var q = document.getElementById("searchForm").querySelector("input[name=\'q\']").value.trim(); if (q !== "") { p.set("q", q); if (state.cols.size > 0) p.set("cols", Array.from(state.cols).join(",")); p.set("cond", state.cond); p.set("sf", "1"); } else { p.delete("q"); p.delete("cols"); p.delete("cond"); p.delete("sf"); } p.delete("page"); location.href = "client.php?" + p.toString(); }',
-        'onSubmit' => 'function() { document.getElementById("searchToggleBtn").click(); }',
-    ],
-    'currentSort' => $tp->sortLevels,
-    'searchColumns' => $allLabeledColumns,
-    'sortColumns' => $allLabeledColumns,
-    'defaultColumns' => $defaultColumnsForPanel,
-    'skipInlineEdit' => true,
-    'extraRowSelectBtns' => ['rowContactsBtn', 'rowInvoiceBtn', 'rowPlatBtn'],
-    'formModalConfig' => [
-        'autoInitTables' => ['rc'],
-        'extra_open' => 'initFormLookups(); initTagPicker(); window.initFormTabs(); (function(){var j=document.getElementById("jur-name"),l=document.getElementById("last-name"),f=document.getElementById("first-name"),d=document.getElementById("name-display"),g=document.getElementById("juridical-flag");function u(){var jv=j?j.value:"",lv=l?l.value:"",fv=f?f.value:"";if(d)d.value=jv||(lv+" "+fv).trim();if(g)g.checked=!!jv;}if(j)j.addEventListener("input",u);if(l)l.addEventListener("input",u);if(f)f.addEventListener("input",u);u();})();',
-        'extra_restore' => 'initFormLookups();',
-    ],
-    'extraCode' => $extraCode,
-]);
-$tp->renderFooter();
+
+    ColumnResize.init({ saveUrl: 'client_column_width_save.php', tbl: 'client' });
+
+    ColumnFilter.init({"thSelector":".col-cli_categ_id","pageUrl":"client.php"});
+    ColumnFilter.init({"thSelector":".col-city_id","pageUrl":"client.php"});
+    ColumnFilter.init({"thSelector":".col-country_id","pageUrl":"client.php"});
+    ColumnFilter.init({"thSelector":".col-tags","pageUrl":"client.php"});
+  </script>
+<?php render_page_footer();

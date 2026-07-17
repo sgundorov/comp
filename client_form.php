@@ -1,4 +1,5 @@
 <?php
+ob_start();
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/table-helper.php';
@@ -19,6 +20,7 @@ if (!in_array($mode, ['new', 'edit', 'copy', 'delete'], true)) {
 $errors = [];
 $focusField = '';
 $appSettings = load_app_settings($conn);
+$accessFlags = [];
 $RegcodeFlag = (int)($appSettings['regcode_flag'] ?? 0);
 $values = [
     'last_name'      => '',
@@ -62,6 +64,7 @@ $values = [
 ];
 
 try {
+    $accessFlags = get_access_flags($conn, 'Client');
     ensure_client_tag_table($conn);
 
 if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
@@ -364,6 +367,9 @@ $embedConfig = [
     'parentParam'  => 'client_id=',
     'hasSearch'    => false,
     'lookupData'   => [],
+    'columnResizeUrl' => 'regcod_column_width_save.php',
+    'columnResizeTbl' => 'regcod',
+    'readonly' => $embedReadonly,
 ];
 $embeddedTable = $RegcodeFlag && $id > 0 && ($mode === 'edit' || $mode === 'delete')
     ? new TablePage($conn, [
@@ -398,6 +404,7 @@ $titles = [
 $pageTitle = $titles[$mode] ?? 'Контрагент';
 
 $isReadonly = ($mode === 'delete');
+$embedReadonly = ($mode === 'delete');
 
 ob_start();
 ?>
@@ -777,6 +784,7 @@ $formHtml = ob_get_clean();
 }
 
 if ($isAjax) {
+    while (ob_get_level() > 0) ob_end_clean();
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['ok' => empty($errors), 'html' => $formHtml, 'mode' => $mode, 'focusField' => $focusField]);
     exit;

@@ -326,8 +326,8 @@ $platTable = new EmbeddedTable([
 ]);
 $stateOptions = ['Черновик', 'Выставлен', 'Оплачен', 'Отменен'];
 
-function dv($v) { return ((float)str_replace(',', '.', $v)) == 0 ? '' : (string)$v; }
-function fmt_qty($v) { $n = (float)str_replace(',', '.', $v); if ($n == 0) return ''; $s = number_format($n, 3, '.', ''); $s = rtrim(rtrim($s, '0'), '.'); return $n == (int)$n ? (string)(int)$n : str_replace('.', ',', $s); }
+function dv($v) { return fmt_num($v, 2); }
+function fmt_qty($v) { return fmt_num($v, 3); }
 
 ob_start();
 ?>

@@ -6,6 +6,8 @@ require_once __DIR__ . '/lib/TablePage.php';
 require_once __DIR__ . '/lib/table-template.php';
 require_once __DIR__ . '/lib/form-modal-handler.php';
 
+$accessFlags = render_access_control($conn, 'Izgot');
+
 ensure_marks_table($conn);
 
 $tp = new TablePage($conn, $izgotPageConfig);
@@ -234,7 +236,7 @@ render_head_end(); ?>
   </div>
 
 <?php
-render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-filter.js']]);
+render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.js', 'assets/column-filter.js']]);
 ?>
   <script>
     const toolbar = document.querySelector('.toolbar');
@@ -254,24 +256,15 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
     const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
     const currentTotal = parseInt(toolbar.dataset.total || '0', 10);
 
-    const initialMarks = [];
-    document.querySelectorAll('.row-check').forEach(function (cb) {
-      if (cb.checked) initialMarks.push(parseInt(cb.dataset.id, 10));
-    });
-    const selected = new Set(initialMarks);
-
-    function updateSelectionUI() {
-      const any = selected.size > 0;
-      selWrap.classList.toggle('visible', any);
-      selCount.textContent = 'Выбрано: ' + selected.size;
-    }
+    SelectionToolbar.initTableSelection('izgot.php', document.querySelector('.toolbar').getAttribute('data-search') || '');
 
     function updateRowActionButtons() {
       const id = rowSel.getSelectedId();
       const enabled = id !== 0;
-      rowOpenBtn.disabled = !enabled;
-      rowCopyBtn.disabled = !enabled;
-      rowDeleteBtn.disabled = !enabled;
+      const af = window.__accessFlags || {};
+      rowOpenBtn.disabled = !enabled || !!af.change_flag;
+      rowCopyBtn.disabled = !enabled || !!af.insert_flag;
+      rowDeleteBtn.disabled = !enabled || !!af.delete_flag;
     }
 
     const rowSel = RowSelect.init({
@@ -303,41 +296,14 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
         return 'izgot.php?action=invertSelection&' + other.toString();
       },
       getExportUrl: function () {
-        if (selected.size === 0) return null;
-        var ids = Array.from(selected);
-        var other = new URLSearchParams(location.search);
-        if (ids.length > 0) other.set('ids', ids.join(','));
-        return 'izgot_export.php?format=csv' + (other.toString() ? '&' + other.toString() : '');
+        return null;
       },
       getPrintUrl: function () {
-        if (selected.size === 0) return null;
-        var ids = Array.from(selected);
-        var other = new URLSearchParams(location.search);
-        if (ids.length > 0) other.set('ids', ids.join(','));
-        return 'izgot_print.php?all=1' + (other.toString() ? '&' + other.toString() : '');
+        return null;
       }
     });
 
-    function toggleMark(id, to) {
-      fetch('izgot.php?action=toggleSelect', {
-        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
-        body: 'id=' + id + '&to=' + (to ? '1' : '0')
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d.ok) {
-          selCount.textContent = 'Выбрано: ' + d.count;
-          selWrap.classList.toggle('visible', d.count > 0);
-          toolbar.dataset.marksCount = d.count;
-        }
-      });
-    }
-
     document.querySelectorAll('.row-check').forEach(function (cb) {
-      cb.addEventListener('change', function () {
-        const id = parseInt(cb.dataset.id, 10);
-        if (cb.checked) selected.add(id); else selected.delete(id);
-        updateSelectionUI();
-        toggleMark(id, cb.checked);
-      });
       cb.addEventListener('click', function (e) { e.stopPropagation(); });
     });
 
@@ -421,6 +387,8 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
     window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
     window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'izgot' => 200, 'country' => 150, 'note' => 500], JSON_UNESCAPED_UNICODE) ?>;
     window.__countryList = <?= json_encode($countryList, JSON_UNESCAPED_UNICODE) ?>;
+    window.__accessFlags = <?= json_encode($accessFlags) ?>;
+    if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
 
     document.addEventListener('click', function (e) {
       let a = e.target.closest('a[href*="izgot_form.php"]');
@@ -446,6 +414,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
         selectRow(id);
       });
       tr.addEventListener('dblclick', function () {
+        if (window.__accessFlags && window.__accessFlags.change_flag) return;
         window.__openFormModal('izgot_form.php?mode=edit&id=' + id);
       });
     });
@@ -484,10 +453,11 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
       currentPage: currentPage,
       currentPages: currentPages,
       navigate: navigate,
-      tableWrapEl: tableWrapEl
+      tableWrapEl: tableWrapEl,
+      accessFlags: window.__accessFlags
     });
 
-    updateSelectionUI();
+    __refreshSelectionUI();
   </script>
     <?php render_form_modal_script([
       'form_prefix'   => 'izgot_form',
@@ -495,6 +465,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
       'lookup_tables' => [],
     ]); ?>
   <script>
+    if (window.__accessFlags && (window.__accessFlags.save_flag || window.__accessFlags.change_flag)) { /* skip */ } else {
     InlineEdit.init({
       tbody: document.querySelector('table tbody'),
       saveUrl: 'izgot_field_save.php',
@@ -529,7 +500,8 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
       },
       onOpenForm: window.__openFormModal
     });
-
+    }
+    
     ColumnResize.init({ saveUrl: 'izgot_column_width_save.php', tbl: 'izgot' });
   </script>
 <?php render_page_footer();

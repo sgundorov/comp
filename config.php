@@ -8,10 +8,14 @@ $localFile = __DIR__ . '/config.local.php';
 if (file_exists($localFile)) {
     $dbConfig = (array)include $localFile;
 }
-define('DB_HOST', $dbConfig['DB_HOST'] ?? 'localhost');
-define('DB_USER', $dbConfig['DB_USER'] ?? 'root');
-define('DB_PASS', $dbConfig['DB_PASS'] ?? '1439');
-define('DB_NAME', $dbConfig['DB_NAME'] ?? 'comp');
+foreach ([
+    'DB_HOST' => $dbConfig['DB_HOST'] ?? 'localhost',
+    'DB_USER' => $dbConfig['DB_USER'] ?? 'root',
+    'DB_PASS' => $dbConfig['DB_PASS'] ?? '1439',
+    'DB_NAME' => $dbConfig['DB_NAME'] ?? 'comp',
+] as $const => $val) {
+    defined($const) or define($const, $val);
+}
 
 $isAjax = (
     (string)($_GET['ajax'] ?? '') === '1' ||
@@ -30,7 +34,7 @@ mysqli_report(MYSQLI_REPORT_OFF);
 ensure_app_settings_table($conn);
 ensure_plat_doc_type($conn);
 $appSettings = load_app_settings($conn);
-define('PAGE_SIZE', max(1, (int)($appSettings['page_size'] ?? 20)));
+defined('PAGE_SIZE') or define('PAGE_SIZE', max(1, (int)($appSettings['page_size'] ?? 20)));
 $GLOBALS['pageWidth'] = max(800, (int)($appSettings['page_width'] ?? 1100));
 
 function h($s) {
@@ -51,7 +55,10 @@ function bind_auto(mysqli_stmt $stmt, array $params): void {
         elseif (is_float($v)) $types .= 'd';
         else $types .= 's';
     }
-    $stmt->bind_param($types, ...$params);
+    if ($types === '') return;
+    $refs = [];
+    foreach ($params as $k => $v) { $refs[$k] = &$params[$k]; }
+    $stmt->bind_param($types, ...$refs);
 }
 
 function hilight(string $text, string $search, string $cond = 'contains'): string {
@@ -95,6 +102,7 @@ if ($r4 && $r4->num_rows === 0) {
 
 $CurStoreID = 1;
 $CurSotrID  = 0;
+$CurRoleID  = 0;
 $inactivityTimeout = 60 * 60; // 60 minutes
 
 if (isset($_SESSION['sotr_id']) && (int)$_SESSION['sotr_id'] > 0) {
@@ -108,7 +116,13 @@ if (isset($_SESSION['sotr_id']) && (int)$_SESSION['sotr_id'] > 0) {
 }
 if ($CurSotrID > 0) {
     $_SESSION['last_activity'] = time();
+    $rRole = @$conn->query("SELECT role_id FROM sotr WHERE sotr_id = $CurSotrID");
+    if ($rRole && ($rr = $rRole->fetch_assoc())) {
+        $CurRoleID = (int)$rr['role_id'];
+    }
 }
+
+ensure_dostup_table($conn);
 
 require_once __DIR__ . '/lib/TablePage.php';
 
@@ -342,4 +356,95 @@ function save_column_width(mysqli $conn, string $tbl, string $column_name, ?int 
     if (!$stmt) return false;
     $stmt->bind_param('ssi', $tbl, $column_name, $width);
     return $stmt->execute();
+}
+
+function ensure_dostup_table(mysqli $conn): void {
+    static $done = [];
+    $key = $conn->thread_id ?? 0;
+    if (!empty($done[$key])) return;
+    $done[$key] = true;
+    @mysqli_query($conn, "CREATE TABLE IF NOT EXISTS dostup (
+        dostup_id INT NOT NULL AUTO_INCREMENT,
+        object_id INT NOT NULL DEFAULT 0,
+        catsotr_id INT NOT NULL DEFAULT 0,
+        dostup_flag TINYINT(1) NOT NULL DEFAULT 0,
+        insert_flag TINYINT(1) NOT NULL DEFAULT 0,
+        change_flag TINYINT(1) NOT NULL DEFAULT 0,
+        delete_flag TINYINT(1) NOT NULL DEFAULT 0,
+        save_flag TINYINT(1) NOT NULL DEFAULT 0,
+        print_flag TINYINT(1) NOT NULL DEFAULT 0,
+        PRIMARY KEY (dostup_id),
+        KEY catsotr_id_key (catsotr_id, object_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // Ensure unique constraint on (object_id, catsotr_id) for ON DUPLICATE KEY UPDATE
+    $r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dostup'
+          AND CONSTRAINT_TYPE = 'UNIQUE'
+          AND (CONSTRAINT_NAME = 'uk_object_catsotr' OR CONSTRAINT_NAME = 'catsotr_id_key')");
+    $hasUnique = $r && ($row = $r->fetch_assoc()) && (int)$row['cnt'] > 0;
+    if (!$hasUnique) {
+        @mysqli_query($conn, "UPDATE dostup d1
+            JOIN (
+                SELECT MAX(dostup_id) AS keep_id, object_id, catsotr_id,
+                       MAX(dostup_flag) AS mf, MAX(insert_flag) AS mi,
+                       MAX(change_flag) AS mc, MAX(delete_flag) AS md,
+                       MAX(save_flag) AS ms,
+                       MAX(print_flag) AS mpr
+                FROM dostup
+                GROUP BY object_id, catsotr_id
+                HAVING COUNT(*) > 1
+            ) agg ON d1.dostup_id = agg.keep_id
+            SET d1.dostup_flag = agg.mf, d1.insert_flag = agg.mi,
+                d1.change_flag = agg.mc, d1.delete_flag = agg.md,
+                d1.save_flag = agg.ms, d1.print_flag = agg.mpr");
+        @mysqli_query($conn, "DELETE d1 FROM dostup d1
+            INNER JOIN dostup d2
+            WHERE d1.dostup_id < d2.dostup_id
+              AND d1.object_id = d2.object_id
+              AND d1.catsotr_id = d2.catsotr_id");
+        @mysqli_query($conn, "ALTER TABLE dostup ADD UNIQUE KEY uk_object_catsotr (object_id, catsotr_id)");
+    }
+}
+
+function render_access_control(mysqli $conn, string $object_name): array {
+    $flags = get_access_flags($conn, $object_name);
+    if (!empty($flags['dostup_flag'])) {
+        header('Location: index.php');
+        exit;
+    }
+    return $flags;
+}
+
+function get_access_flags(mysqli $conn, string $object_name): array {
+    $flags = ['dostup_flag' => 0, 'insert_flag' => 0, 'change_flag' => 0, 'delete_flag' => 0, 'save_flag' => 0, 'print_flag' => 0];
+    $roleId = $GLOBALS['CurRoleID'] ?? 0;
+    if ($roleId <= 0) return $flags;
+    $stmt = @mysqli_prepare($conn,
+        "SELECT d.dostup_flag, d.insert_flag, d.change_flag, d.delete_flag, d.save_flag, d.print_flag
+         FROM object o
+         JOIN dostup d ON d.object_id = o.object_id AND d.catsotr_id = ?
+         WHERE o.object = ?");
+    if (!$stmt) return $flags;
+    $stmt->bind_param('is', $roleId, $object_name);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($res && ($r = $res->fetch_assoc())) {
+        $flags['dostup_flag']  = (int)$r['dostup_flag'];
+        $flags['insert_flag']  = (int)$r['insert_flag'];
+        $flags['change_flag']  = (int)$r['change_flag'];
+        $flags['delete_flag']  = (int)$r['delete_flag'];
+        $flags['save_flag']    = (int)$r['save_flag'];
+        $flags['print_flag']   = (int)$r['print_flag'];
+    }
+    $stmt->close();
+    return $flags;
+}
+
+function fmt_num($v, int $dec = 2): string {
+    $n = (float)str_replace(',', '.', $v);
+    if ($n == 0) return '';
+    $s = number_format($n, $dec, '.', '');
+    $s = rtrim(rtrim($s, '0'), '.');
+    if ($s === '') return '';
+    return strpos($s, '.') === false ? $s : str_replace('.', ',', $s);
 }

@@ -5,6 +5,8 @@ require_once __DIR__ . '/lib/table-helper.php';
 require_once __DIR__ . '/config/invoice_columns.php';
 require_once __DIR__ . '/lib/EmbeddedTable.php';
 
+$accessFlags = get_access_flags($conn, 'Invoice');
+
 $isAjax = (
     (string)($_GET['ajax'] ?? '') === '1' ||
     (string)($_POST['ajax'] ?? '') === '1' ||
@@ -14,6 +16,13 @@ $isAjax = (
 $mode = (string)($_GET['mode'] ?? $_POST['mode'] ?? 'edit');
 $id   = (int)($_GET['id']   ?? $_POST['id']   ?? 0);
 if (!in_array($mode, ['new', 'edit', 'copy', 'delete'], true)) $mode = 'edit';
+
+$invoiceKind = (string)($_GET['kind'] ?? $_POST['kind'] ?? $_SESSION['invoice_kind'] ?? '');
+$invoiceIsOffer = ($invoiceKind === 'offer');
+$invoiceDoctypeId = $invoiceIsOffer ? 5 : 10;
+$formCancelUrl = $invoiceIsOffer ? 'invoice.php?kind=offer' : 'invoice.php';
+$pageTitleLabel = $invoiceIsOffer ? 'Коммерческое предложение' : 'Счет';
+$pageIcon = $invoiceIsOffer ? 'img/invoice.png' : 'img/schet.png';
 
 $errors = [];
 $focusField = '';
@@ -71,7 +80,7 @@ if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
 }
 
 if ($mode === 'new' || $mode === 'copy') {
-    $nr = $conn->query("SELECT COALESCE(MAX(number), 0) + 1 AS next_num FROM invoice WHERE doctype_id = 10");
+    $nr = $conn->query("SELECT COALESCE(MAX(number), 0) + 1 AS next_num FROM invoice WHERE doctype_id = $invoiceDoctypeId");
     if ($nr && ($nrow = $nr->fetch_assoc())) $values['number'] = (int)$nrow['next_num'];
 }
 if ($mode === 'new') {
@@ -120,7 +129,7 @@ $zatIdForPlat = 0;
 $zr = $conn->query("SELECT zat_id FROM zat WHERE name = 'Оплата счета' LIMIT 1");
 if ($zr && ($zrow = $zr->fetch_assoc())) $zatIdForPlat = (int)$zrow['zat_id'];
 if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
-    $docType = 10;
+    $docType = $invoiceDoctypeId;
     $stmtP = $conn->prepare("SELECT p.plat_id, p.datetime, p.sum_in, p.sum_out, p.sum, p.out_flag, p.plat_type, p.doc_id, p.note, c.name AS client_name, z.name AS zat_name FROM plat p LEFT JOIN client c ON c.client_id = p.client_id LEFT JOIN zat z ON z.zat_id = p.zat_id WHERE p.doc_id = ? AND p.doc_type = ? ORDER BY p.plat_id DESC");
     bind_auto($stmtP, [$id, $docType]);
     $stmtP->execute();
@@ -146,26 +155,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['pos']          = (int)($_POST['pos'] ?? 0);
     $values['note']         = trim((string)($_POST['note'] ?? ''));
 
-    if ($values['date'] === '') {
-        $errors[] = 'Поле «Дата» обязательно для заполнения.';
-        $focusField = 'inv-date';
-    }
-    if ($values['client_id'] <= 0) {
-        $errors[] = 'Поле «Контрагент» обязательно для заполнения.';
-        $focusField = $focusField ?: 'client-id';
-    }
-    if ($values['store_id'] <= 0) {
-        $errors[] = 'Поле «Участок» обязательно для заполнения.';
-        $focusField = $focusField ?: 'store-id';
-    }
-    if ($values['sotr_id'] <= 0) {
-        $errors[] = 'Поле «Сотрудник» обязательно для заполнения.';
-        $focusField = $focusField ?: 'sotr-id';
-    }
+    if ($mode !== 'delete') {
+        if ($values['date'] === '') {
+            $errors[] = 'Поле «Дата» обязательно для заполнения.';
+            $focusField = 'inv-date';
+        }
+        if ($values['client_id'] <= 0) {
+            $errors[] = 'Поле «Контрагент» обязательно для заполнения.';
+            $focusField = $focusField ?: 'client-id';
+        }
+        if ($values['store_id'] <= 0) {
+            $errors[] = 'Поле «Участок» обязательно для заполнения.';
+            $focusField = $focusField ?: 'store-id';
+        }
+        if ($values['sotr_id'] <= 0) {
+            $errors[] = 'Поле «Сотрудник» обязательно для заполнения.';
+            $focusField = $focusField ?: 'sotr-id';
+        }
 
-    $allowedStates = ['Черновик', 'Выставлен', 'Оплачен', 'Отменен'];
-    if (!in_array($values['state'], $allowedStates, true)) {
-        $errors[] = 'Некорректное состояние.';
+        $allowedStates = ['Черновик', 'Выставлен', 'Оплачен', 'Отменен'];
+        if (!in_array($values['state'], $allowedStates, true)) {
+            $errors[] = 'Некорректное состояние.';
+        }
     }
     if (empty($errors)) {
         $numVal = $values['number'] > 0 ? $values['number'] : 0;
@@ -180,23 +191,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param('i', $id);
             $stmt->execute();
             $stmt->close();
-            $conn->query("DELETE FROM marks WHERE tbl = 'invoice' AND row_id = " . (int)$id);
+            $marksTblForDelete = $invoiceIsOffer ? 'kom' : 'invoice';
+            $conn->query("DELETE FROM marks WHERE tbl = '$marksTblForDelete' AND row_id = " . (int)$id);
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $id, 'name' => '#' . $id]);
                 exit;
             }
-            header('Location: invoice.php');
-            exit;
-        }
+        header('Location: ' . $formCancelUrl);
+        exit;
+    }
+    $formRedirectUrl = $formCancelUrl;
 
-        $maxRetries = 10;
+    $maxRetries = 10;
         $saved = false;
 
         for ($attempt = 0; $attempt < $maxRetries; $attempt++) {
             if ($mode === 'new' || $mode === 'copy') {
-                $stmt = $conn->prepare("INSERT INTO invoice (doctype_id, number, date, time, client_id, state, store_id, payment_type, discount, sum_discount, sum, sum_nds, sum_plat, date_plat, sotr_id, pos, note) VALUES (10, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                bind_auto($stmt, [$numVal, $values['date'], $values['time'], $values['client_id'], $values['state'], $values['store_id'], $values['payment_type'], $disc, $sumDisc, $sumVal, $sumNds, $sumPlat, $values['date_plat'], $values['sotr_id'], $values['pos'], $values['note']]);
+                $stmt = $conn->prepare("INSERT INTO invoice (doctype_id, number, date, time, client_id, state, store_id, payment_type, discount, sum_discount, sum, sum_nds, sum_plat, date_plat, sotr_id, pos, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                bind_auto($stmt, [$invoiceDoctypeId, $numVal, $values['date'], $values['time'], $values['client_id'], $values['state'], $values['store_id'], $values['payment_type'], $disc, $sumDisc, $sumVal, $sumNds, $sumPlat, $values['date_plat'], $values['sotr_id'], $values['pos'], $values['note']]);
             } else {
                 $stmt = $conn->prepare("UPDATE invoice SET number = ?, date = ?, time = ?, client_id = ?, state = ?, store_id = ?, payment_type = ?, discount = ?, sum_discount = ?, sum = ?, sum_nds = ?, sum_plat = ?, date_plat = ?, sotr_id = ?, pos = ?, note = ? WHERE invoice_id = ?");
                 bind_auto($stmt, [$numVal, $values['date'], $values['time'], $values['client_id'], $values['state'], $values['store_id'], $values['payment_type'], $disc, $sumDisc, $sumVal, $sumNds, $sumPlat, $values['date_plat'], $values['sotr_id'], $values['pos'], $values['note'], $id]);
@@ -209,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($stmt->errno === 1062) {
                 $stmt->close();
-                $nr = $conn->query("SELECT COALESCE(MAX(number),0)+1 AS next_num FROM invoice WHERE doctype_id = 10");
+                $nr = $conn->query("SELECT COALESCE(MAX(number),0)+1 AS next_num FROM invoice WHERE doctype_id = $invoiceDoctypeId");
                 if ($nr && ($nrow = $nr->fetch_assoc())) {
                     $values['number'] = $numVal = (int)$nrow['next_num'];
                 }
@@ -229,6 +242,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $newId = ($mode === 'new' || $mode === 'copy') ? $conn->insert_id : $id;
         $stmt->close();
+
+        if ($newId > 0 && ($mode === 'new' || $mode === 'copy')) {
+            $id = $newId;
+            $mode = 'edit';
+        }
 
         if ($mode === 'copy' && $newId > 0 && !empty($itemsList)) {
             $cols = ['invoice_id', 'product_id', 'code', 'product_name', 'quant', 'price', 'discount', 'sum', 'sum_discount', 'sum_nds', 'note', 'guarantee', 'guarant_unit'];
@@ -269,7 +287,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($isAjax) {
             $pageOfNew = 0;
             if (defined('PAGE_SIZE') && PAGE_SIZE > 0 && ($mode === 'new' || $mode === 'copy') && $newId > 0) {
-                $pageOfNew = computePageOfNew($conn, 'invoice', 'invoice_id', 'number', 'desc', $numVal, $newId, 'doctype_id = 10');
+                $pageOfNew = computePageOfNew($conn, 'invoice', 'invoice_id', 'number', 'desc', $numVal, $newId, "doctype_id = $invoiceDoctypeId");
             }
             $resp = ['ok' => true, 'mode' => $mode, 'id' => $newId, 'name' => '#' . $newId, 'page' => $pageOfNew];
             if ($mode !== 'delete' && $newId > 0) {
@@ -282,7 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode($resp);
             exit;
         }
-        header('Location: invoice.php');
+        header('Location: ' . $formRedirectUrl);
         exit;
     }
 }
@@ -308,22 +326,24 @@ $currentSotrName = '';
 foreach ($sotrList as $so) { if ($so['id'] === $values['sotr_id']) { $currentSotrName = $so['name']; break; } }
 
 $titleNum = $values['number'] > 0 ? '№ ' . $values['number'] : '(новый)';
+$formActionUrl = $invoiceIsOffer ? 'invoice_form.php?kind=offer' : 'invoice_form.php';
+
 if ($mode === 'edit') {
-    $pageTitle = 'Счет ' . $titleNum . ' (' . $currentClientName . ')';
+    $pageTitle = $pageTitleLabel . ' ' . $titleNum . ' (' . $currentClientName . ')';
 } elseif ($mode === 'delete') {
-    $pageTitle = 'Счет ' . $titleNum . ' (удаление)';
+    $pageTitle = $pageTitleLabel . ' ' . $titleNum . ' (удаление)';
 } elseif ($mode === 'new') {
-    $pageTitle = 'Счет: новый';
+    $pageTitle = $pageTitleLabel . ': новый';
 } elseif ($mode === 'copy') {
-    $pageTitle = 'Счет ' . $titleNum . ' (копия)';
+    $pageTitle = $pageTitleLabel . ' ' . $titleNum . ' (копия)';
 } else {
-    $pageTitle = 'Счёт';
+    $pageTitle = $pageTitleLabel;
 }
 $isReadonly = ($mode === 'delete');
 
 $stateOptions = ['Черновик', 'Выставлен', 'Оплачен', 'Отменен'];
 
-function dv($v) { return ((float)str_replace(',', '.', $v)) == 0 ? '' : (string)$v; }
+function dv($v) { return fmt_num($v, 3); }
 
 $inv2ProductList = [];
 $pr = $conn->query("SELECT product_id, product_name, code FROM product ORDER BY product_name");
@@ -335,7 +355,10 @@ $inv2Table = new EmbeddedTable([
     'prefix' => 'inv2',
     'saveUrl' => 'invoice2_field_save.php',
     'parentField' => 'invoice_id',
-    'childFormUrl' => 'invoice2_form.php',
+    'childFormUrl' => 'invoice2_form.php' . ($invoiceIsOffer ? '?kind=offer' : ''),
+    'columnResizeUrl' => 'invoice_column_width_save.php',
+    'columnResizeTbl' => 'invoice2',
+    'colWidths' => array_merge(['quant' => '100px', 'price' => '100px', 'discount' => '100px', 'sum' => '100px'], load_columns_widths($conn, 'invoice2')),
     'childFormName' => 'Invoice2Form',
     'pageSize' => 15,
     'hasExport' => true,
@@ -361,13 +384,14 @@ $inv2Table = new EmbeddedTable([
         'note' => 'Примечание',
     ],
     'lookupData' => ['product_id' => $inv2ProductList],
+    'accessFlags' => $accessFlags,
 ]);
 
 $platTable = new EmbeddedTable([
     'prefix' => 'plat',
     'saveUrl' => 'plat_field_save.php',
     'parentField' => 'doc_id',
-    'childFormUrl' => 'plat_form.php?doc_type=10',
+    'childFormUrl' => 'plat_form.php?doc_type=' . $invoiceDoctypeId,
     'childFormName' => 'PlatForm',
     'pageSize' => 15,
     'hasExport' => true,
@@ -391,14 +415,16 @@ $platTable = new EmbeddedTable([
         'out_flag' => 'Тип',
         'note' => 'Примечание',
     ],
+    'accessFlags' => $accessFlags,
 ]);
 
 ob_start();
 ?>
-<h2 class="page-title<?= $mode === 'delete' ? ' page-title--delete' : '' ?>"><img src="img/schet.png" alt="" /> <?= h($pageTitle) ?></h2>
-<form class="form<?= $mode === 'delete' ? ' form--delete' : '' ?>" method="post" action="invoice_form.php" autocomplete="off" data-form-modal>
+<h2 class="page-title<?= $mode === 'delete' ? ' page-title--delete' : '' ?>"><img src="<?= $pageIcon ?>" alt="" /> <?= h($pageTitle) ?></h2>
+<form class="form<?= $mode === 'delete' ? ' form--delete' : '' ?>" method="post" action="<?= h($formActionUrl) ?>" autocomplete="off" data-form-modal>
 <?= render_input('hidden', 'mode', $mode) ?>
 <?= render_input('hidden', 'id', $id) ?>
+<?= render_input('hidden', 'kind', $invoiceKind) ?>
 <?= render_input('hidden', 'cli_name', '', ['id' => 'cli-name']) ?>
 <?= render_input('hidden', 'store_name', '', ['id' => 'store-name']) ?>
 <?= render_input('hidden', 'sotr_name', '', ['id' => 'sotr-name']) ?>
@@ -417,7 +443,7 @@ ob_start();
   <div class="tab-pane active" data-tab-index="0">
     <table class="form-table">
       <tr>
-        <td class="form-label">Счет №</td>
+        <td class="form-label"><?= h($pageTitleLabel) ?> №</td>
         <td class="form-label">Дата<span class="required">*</span></td>
         <td class="form-label">&nbsp;</td>
       </tr>
@@ -425,7 +451,7 @@ ob_start();
         <td><?= render_input('number', 'number', $values['number'] > 0 ? $values['number'] : '', [
                 'id' => 'inv-number',
                 'readonly' => $isReadonly,
-                'tabindex' => $isReadonly ? '-1' : null,
+                'tabindex' => '-1',
                 'style' => 'max-width:120px',
             ]) ?></td>
         <td><div style="display:flex;gap:10px"><?= render_input('date', 'date', $values['date'] ?: date('Y-m-d'), [
@@ -583,8 +609,8 @@ $itemsData = array_map(function($item) {
 }, $itemsList);
 echo $inv2Table->render($itemsData);
 ?>
-<?php elseif ($mode === 'new'): ?>
-    <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">Сохраните счёт, чтобы добавить товары</div>
+<?php else: ?>
+    <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px" data-tab-placeholder="1">Сохраните документ, чтобы добавить товары</div>
 <?php endif; ?>
   </div><!-- /.tab-pane (Товары) -->
 
@@ -598,14 +624,14 @@ $platData = array_map(function($p) {
         'client_name' => (string)($p['client_name'] ?? '-'),
         'zat_name' => (string)($p['zat_name'] ?? '-'),
         'sum' => (float)$p['sum'],
-        'out_flag' => (int)$p['out_flag'],
+        'out_flag' => (int)$p['out_flag'] ? 'Расход' : 'Приход',
         'note' => (string)$p['note'],
     ];
 }, $platList);
 echo $platTable->render($platData);
 ?>
 <?php else: ?>
-    <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">Сохраните счёт, чтобы добавить платежи</div>
+    <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px" data-tab-placeholder="2">Сохраните документ, чтобы добавить платежи</div>
 <?php endif; ?>
   </div><!-- /.tab-pane (Оплата) -->
 </div><!-- /.tab-container -->
@@ -637,11 +663,11 @@ textarea.full { width: 100%; box-sizing: border-box; }
 
 <?= render_form_actions(
     $mode === 'delete'
-        ? [render_btn_danger('img/delete.png', 'Удалить', ['type'=>'submit','formnovalidate'=>true]),
-           render_btn_link_icon_text('img/cancel.png', 'Отменить', 'invoice.php', ['class'=>'btn-secondary'])]
+    ? [render_btn_danger('img/delete.png', 'Удалить', ['type'=>'submit','formnovalidate'=>true]),
+       render_btn_link_icon_text('img/cancel.png', 'Отменить', $formCancelUrl, ['class'=>'btn-secondary'])]
         : [render_btn_icon_text('img/accept.png', 'Применить', ['type'=>'submit','name'=>'action','value'=>'apply','formnovalidate'=>true,'class'=>'btn-secondary']),
            render_btn_primary('img/save.png', 'Сохранить', ['type'=>'submit','formnovalidate'=>true]),
-           render_btn_link_icon_text('img/cancel.png', 'Отменить', 'invoice.php', ['class'=>'btn-secondary'])]
+           render_btn_link_icon_text('img/cancel.png', 'Отменить', $formCancelUrl, ['class'=>'btn-secondary'])]
 ) ?>
 </form>
 <?php
@@ -649,7 +675,7 @@ $formHtml = ob_get_clean();
 
 if ($isAjax) {
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['ok' => empty($errors), 'html' => $formHtml, 'mode' => $mode, 'focusField' => $focusField]);
+    echo json_encode(['ok' => empty($errors), 'id' => (int)($newId ?? $id), 'html' => $formHtml, 'mode' => $mode, 'focusField' => $focusField]);
     exit;
 }
 ?><!DOCTYPE html>

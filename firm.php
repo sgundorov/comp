@@ -310,17 +310,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
     const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
     const currentTotal = parseInt(toolbar.dataset.total || '0', 10);
 
-    const initialMarks = [];
-    document.querySelectorAll('.row-check').forEach(function (cb) {
-      if (cb.checked) initialMarks.push(parseInt(cb.dataset.id, 10));
-    });
-    const selected = new Set(initialMarks);
-
-    function updateSelectionUI() {
-      const any = selected.size > 0;
-      selWrap.classList.toggle('visible', any);
-      selCount.textContent = 'Выбрано: ' + selected.size;
-    }
+    SelectionToolbar.initTableSelection('firm.php', document.querySelector('.toolbar').getAttribute('data-search') || '');
 
     function updateRowActionButtons() {
       const id = rowSel.getSelectedId();
@@ -359,41 +349,14 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
         return 'firm.php?action=invertSelection&' + other.toString();
       },
       getExportUrl: function () {
-        if (selected.size === 0) return null;
-        var ids = Array.from(selected);
-        var other = new URLSearchParams(location.search);
-        if (ids.length > 0) other.set('ids', ids.join(','));
         return null;
       },
       getPrintUrl: function () {
-        if (selected.size === 0) return null;
-        var ids = Array.from(selected);
-        var other = new URLSearchParams(location.search);
-        if (ids.length > 0) other.set('ids', ids.join(','));
         return null;
       }
     });
 
-    function toggleMark(id, to) {
-      fetch('firm.php?action=toggleSelect', {
-        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
-        body: 'id=' + id + '&to=' + (to ? '1' : '0')
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d.ok) {
-          selCount.textContent = 'Выбрано: ' + d.count;
-          selWrap.classList.toggle('visible', d.count > 0);
-          toolbar.dataset.marksCount = d.count;
-        }
-      });
-    }
-
     document.querySelectorAll('.row-check').forEach(function (cb) {
-      cb.addEventListener('change', function () {
-        const id = parseInt(cb.dataset.id, 10);
-        if (cb.checked) selected.add(id); else selected.delete(id);
-        updateSelectionUI();
-        toggleMark(id, cb.checked);
-      });
       cb.addEventListener('click', function (e) { e.stopPropagation(); });
     });
 
@@ -545,7 +508,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/column-f
       tableWrapEl: tableWrapEl
     });
 
-    updateSelectionUI();
+    __refreshSelectionUI();
   </script>
     <?php render_form_modal_script([
       'form_prefix'   => 'firm_form',

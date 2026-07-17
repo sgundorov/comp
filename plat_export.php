@@ -93,7 +93,9 @@ $sql = "SELECT p.plat_id, p.datetime, p.client_id, p.zat_id, p.sum, p.out_flag, 
 
 $stmt = $conn->prepare($sql);
 if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
+    $refs4 = [];
+    foreach ($params as $k => $v) { $refs4[$k] = &$params[$k]; }
+    $stmt->bind_param($types, ...$refs4);
 }
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

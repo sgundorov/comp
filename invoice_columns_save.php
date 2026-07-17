@@ -7,6 +7,9 @@ if (!$isAjax) { header('HTTP/1.0 400 Bad Request'); exit; }
 $columns = isset($_POST['columns']) ? (array)$_POST['columns'] : [];
 $defaults = invoice_columns_defaults();
 
+$invoiceKind = (string)($_GET['kind'] ?? $_POST['kind'] ?? $_SESSION['invoice_kind'] ?? '');
+$invoiceMarksTbl = ($invoiceKind === 'offer') ? 'kom' : 'invoice';
+
 $clean = [];
 $order = 0;
 foreach ($columns as $col) {
@@ -40,7 +43,7 @@ usort($clean, function ($a, $b) {
     return $ao - $bo;
 });
 
-save_columns_config($conn, 'invoice', $clean);
+save_columns_config($conn, $invoiceMarksTbl, $clean);
 
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode(['ok' => true]);

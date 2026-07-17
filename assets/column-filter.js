@@ -12,7 +12,7 @@
       var pageUrl = config.pageUrl || (th.closest('form') ? location.pathname : 'city.php');
 
       var initial = (th.getAttribute('data-values') || '')
-        .split(',').map(function (s) { return parseInt(s, 10); }).filter(function (n) { return n > 0; });
+        .split(',').map(function (s) { return parseInt(s, 10); }).filter(function (n) { return !isNaN(n); });
       var selected = new Set(initial);
       var baseQs = config.preserveQuery || function () {
         var u = new URLSearchParams(location.search);
@@ -86,8 +86,7 @@
           renderList(searchInput.value);
           return;
         }
-        var sep = location.search ? '&' : '?';
-        var url = pageUrl + location.search + sep + 'action=columnFilterOptions&col=' + encodeURIComponent(col);
+        var url = pageUrl.split('?')[0] + location.search + (location.search ? '&' : '?') + 'action=columnFilterOptions&col=' + encodeURIComponent(col);
         fetch(url).then(function (r) { return r.json(); }).then(function (items) {
           allOptions = items;
           loaded = true;
@@ -131,7 +130,8 @@
         if (selected.size > 0) u.set(param, Array.from(selected).join(','));
         if (extra) for (var k in extra) u.set(k, extra[k]);
         var qs = u.toString();
-        location.href = pageUrl + (qs ? '?' + qs : '');
+        var base = pageUrl.split('?')[0];
+        location.href = base + (qs ? '?' + qs : '');
       }
 
       btn.addEventListener('click', function (e) {

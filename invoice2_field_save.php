@@ -18,8 +18,8 @@ function recalc_invoice_totals(mysqli $conn, int $invoiceId): array {
     $sd    = (float)$row[1];
     $snds  = (float)$row[2];
     $pos   = (int)$row[3];
-    $ps = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = 10");
-    $ps->bind_param('i', $invoiceId);
+    $ps = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = (SELECT doctype_id FROM invoice WHERE invoice_id = ?)");
+    $ps->bind_param('ii', $invoiceId, $invoiceId);
     $ps->execute();
     $sumPlat = (float)$ps->get_result()->fetch_row()[0];
     $ps->close();
@@ -203,8 +203,9 @@ if (!isset($ALLOWED[$field])) {
     exit;
 }
 
-$displayValue = null;
-$actualInvId = $invoiceId;
+    $displayValue = null;
+    $itemData = null;
+    $actualInvId = $invoiceId;
 
 if ($invoice2Id > 0) {
     switch ($ALLOWED[$field]['type']) {
@@ -268,6 +269,17 @@ if ($invoice2Id > 0) {
     }
     $q2 = $conn->query("SELECT invoice2_id as id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note FROM invoice2 WHERE invoice2_id = $invoice2Id");
     $itemData = $q2 ? $q2->fetch_assoc() : null;
+    if ($itemData) {
+        $zeroFields = ['quant', 'price', 'discount', 'sum', 'sum_discount', 'sum_nds'];
+        foreach ($zeroFields as $f) {
+            if (isset($itemData[$f]) && ((float)$itemData[$f]) == 0) $itemData[$f] = '';
+        }
+        foreach ($zeroFields as $f) {
+            if (isset($itemData[$f]) && $itemData[$f] !== '') {
+                $itemData[$f] = rtrim(rtrim($itemData[$f], '0'), '.');
+            }
+        }
+    }
 } else {
     $stmt = $conn->prepare("INSERT INTO invoice2 (invoice_id, $field) VALUES (?, ?)");
     $val = ($ALLOWED[$field]['type'] === 'text') ? $value : (float)str_replace(',', '.', $value);
@@ -276,6 +288,16 @@ if ($invoice2Id > 0) {
     $stmt->execute();
     $newId = $conn->insert_id;
     $stmt->close();
+    if ($field === 'product_id' && $newId > 0) {
+        $q = $conn->query("SELECT product_name, code, price_out FROM product WHERE product_id = " . (int)$val);
+        if ($q && ($r = $q->fetch_assoc())) {
+            $stmt = $conn->prepare("UPDATE invoice2 SET product_name = ?, code = ?, price = ? WHERE invoice2_id = ?");
+            bind_auto($stmt, [$r['product_name'], $r['code'], $r['price_out'], $newId]);
+            $stmt->execute();
+            $stmt->close();
+            $displayValue = $r['product_name'];
+        }
+    }
 }
 
 $totals = $actualInvId > 0 ? recalc_invoice_totals($conn, $actualInvId) : [];

@@ -82,5 +82,79 @@
     };
   }
 
-  global.SelectionToolbar = { init: init };
+  /**
+   * Инициализация чекбоксов отметок в таблице:
+   * - #checkAll — отметка всех на странице
+   * - .row-check — поштучная отметка через AJAX
+   *
+   * pageUrl — URL страницы для формирования action-ссылок
+   * search  — текущий поисковый запрос (для проброса)
+   */
+  function initTableSelection(pageUrl, search) {
+    var checkAll  = document.getElementById('checkAll');
+    if (!checkAll) return;
+    var rowChecks = document.querySelectorAll('.row-check');
+    var selWrap   = document.getElementById('selectedActions');
+    var selCount  = document.getElementById('selectedCount');
+    var toolbar   = document.querySelector('.toolbar');
+    var theSearch = search || (toolbar ? toolbar.getAttribute('data-search') || '' : '');
+    var markedSet = new Set(Array.from(rowChecks).filter(function(cb) { return cb.checked; }).map(function(cb) { return parseInt(cb.value || cb.dataset.id, 10); }));
+    var globalCount = parseInt(toolbar ? toolbar.getAttribute('data-marks-count') || '0' : '0', 10);
+
+    window.__marksUrl = function (action) {
+      var _u = new URLSearchParams(location.search);
+      _u.set('action', action);
+      if (theSearch) _u.set('q', theSearch);
+      var base = pageUrl.split('?')[0];
+      return base + '?' + _u.toString();
+    };
+
+    function refreshCounter() {
+      if (selCount) selCount.textContent = 'Выбрано: ' + globalCount;
+      if (selWrap) selWrap.classList.toggle('visible', globalCount > 0);
+      var rowTotal = rowChecks.length;
+      var rowOn = 0;
+      rowChecks.forEach(function(cb) { if (cb.checked) rowOn++; });
+      if (rowTotal === 0) {
+        checkAll.checked = false;
+        checkAll.indeterminate = false;
+      } else {
+        checkAll.checked = rowOn === rowTotal;
+        checkAll.indeterminate = rowOn > 0 && rowOn < rowTotal;
+      }
+    }
+
+    checkAll.addEventListener('change', function () {
+      location.href = window.__marksUrl('toggleSelectAll');
+    });
+
+    rowChecks.forEach(function(cb) {
+      cb.addEventListener('change', function () {
+        var id  = parseInt(cb.value || cb.dataset.id, 10);
+        var to  = cb.checked;
+        cb.disabled = true;
+        fetch(window.__marksUrl('toggleSelect'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'id=' + encodeURIComponent(id) + '&to=' + (to ? '1' : '0')
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(j) {
+          cb.disabled = false;
+          if (j.ok) {
+            if (to) markedSet.add(id); else markedSet.delete(id);
+            globalCount = (typeof j.count === 'number') ? j.count : globalCount;
+            refreshCounter();
+          }
+        })
+        .catch(function() { cb.disabled = false; });
+      });
+    });
+
+    refreshCounter();
+
+    global.__refreshSelectionUI = refreshCounter;
+  }
+
+  global.SelectionToolbar = { init: init, initTableSelection: initTableSelection };
 })(window);

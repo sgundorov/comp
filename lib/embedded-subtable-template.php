@@ -7,6 +7,7 @@ function render_embedded_subtable(array $cfg): string {
     $columns    = $cfg['columns'] ?? [];
     $data       = $cfg['data'] ?? [];
     $colWidths  = $cfg['colWidths'] ?? [];
+    array_walk($colWidths, function(&$v) { if (is_numeric($v)) $v .= 'px'; });
     $readonly   = $cfg['readonly'] ?? false;
     $hasExport  = $cfg['hasExport'] ?? false;
     $hasImport  = $cfg['hasImport'] ?? false;
@@ -121,6 +122,7 @@ function render_embedded_subtable_scripts(array $cfg): void {
     $onSaveSuccessExtra = $cfg['onSaveSuccessExtra'] ?? '';
     $columnLabels = $cfg['columnLabels'] ?? [];
     $colWidths  = $cfg['colWidths'] ?? [];
+    array_walk($colWidths, function(&$v) { if (is_numeric($v)) $v .= 'px'; });
     if (empty($columnLabels)) {
         foreach ($columns as $col) $columnLabels[$col['key']] = $col['label'];
     }

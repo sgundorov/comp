@@ -4,6 +4,8 @@ require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/table-helper.php';
 require_once __DIR__ . '/lib/EmbeddedTable.php';
 
+$accessFlags = get_access_flags($conn, 'Group');
+
 $isAjax = (
     (string)($_GET['ajax'] ?? '') === '1' ||
     (string)($_POST['ajax'] ?? '') === '1' ||
@@ -133,6 +135,7 @@ $titles = [
 $pageTitle = $titles[$mode] ?? 'Группа товаров';
 
 $isReadonly = ($mode === 'delete');
+$embedReadonly = ($mode === 'delete');
 
 $sgroupData = [];
 if ($id > 0 && $mode !== 'new') {
@@ -159,6 +162,8 @@ $sgTable = new EmbeddedTable([
     'exportUrl'        => 'sgroup_export.php',
     'printUrl'         => 'sgroup_print.php',
     'parentParam'      => 'group_id=',
+    'readonly'         => $embedReadonly,
+    'accessFlags'      => $accessFlags,
 ]);
 
 ob_start();

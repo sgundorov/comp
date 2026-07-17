@@ -16,6 +16,7 @@ class EmbeddedTable extends TableComponent {
     public $hasPrint = false;
     public $hasSearch = true;
     public $readonly = false;
+    public $accessFlags = null;
     public $exportUrl = '';
     public $printUrl = '';
     public $parentParam = '';
@@ -40,6 +41,7 @@ class EmbeddedTable extends TableComponent {
         $this->hasPrint     = $config['hasPrint'] ?? false;
         $this->hasSearch    = $config['hasSearch'] ?? true;
         $this->readonly     = $config['readonly'] ?? false;
+        $this->accessFlags  = $config['accessFlags'] ?? null;
         $this->exportUrl    = $config['exportUrl'] ?? '';
         $this->printUrl     = $config['printUrl'] ?? '';
         $this->parentParam  = $config['parentParam'] ?? ($this->parentField . '=');
@@ -57,7 +59,12 @@ class EmbeddedTable extends TableComponent {
         }
 
         if (!empty($config['lookupData'])) $this->lookupData = $config['lookupData'];
-        if (!empty($config['colWidths'])) $this->defaultColumnWidths = $config['colWidths'];
+        if (!empty($config['colWidths'])) {
+            $this->defaultColumnWidths = [];
+            foreach ($config['colWidths'] as $k => $v) {
+                $this->defaultColumnWidths[$k] = is_numeric($v) ? $v . 'px' : $v;
+            }
+        }
         if (!empty($config['data'])) {
             // data is stored for later use in render()
         }
@@ -74,16 +81,33 @@ class EmbeddedTable extends TableComponent {
 
         ob_start();
         ?>
-    <div class="toolbar" style="margin-top:0;padding-top:0;margin-bottom:8px" id="<?= h($p) ?>-toolbar">
+<?php
+$af = $this->accessFlags;
+$_readonly = $this->readonly;
+$_addOk = !$_readonly && (!$af || !$af['insert_flag']);
+$_editOk = !$_readonly && (!$af || !$af['change_flag']);
+$_delOk = !$_readonly && (!$af || !$af['delete_flag']);
+$_copyOk = !$_readonly && (!$af || !$af['insert_flag']);
+$_batchDelOk = !$_readonly && (!$af || (!$af['delete_flag'] && !$af['save_flag']));
+$_actionsOk = !$_readonly && (!$af || true);
+?>
+      <div class="toolbar" style="margin-top:0;padding-top:0;margin-bottom:8px" id="<?= h($p) ?>-toolbar">
       <div class="toolbar-left">
-        <?php if (!$this->readonly): ?>
+        <?php if ($_addOk): ?>
         <button type="button" class="icon-btn" title="Добавить" id="<?= h($p) ?>-add-btn"><img src="img/add.png" alt="" /></button>
+        <?php endif; ?>
+        <?php if ($_editOk): ?>
         <button type="button" class="icon-btn" title="Изменить" id="<?= h($p) ?>-edit-btn" disabled><img src="img/edit.png" alt="" /></button>
+        <?php endif; ?>
+        <?php if ($_delOk): ?>
         <button type="button" class="icon-btn" title="Удалить" id="<?= h($p) ?>-del-btn" disabled><img src="img/delete.png" alt="" /></button>
+        <?php endif; ?>
+        <?php if ($_copyOk): ?>
         <button type="button" class="icon-btn" title="Копировать" id="<?= h($p) ?>-copy-btn" disabled><img src="img/copy.png" alt="" /></button>
         <?php endif; ?>
+        <?php if (!$_readonly): ?>
         <button type="button" class="icon-btn" title="Обновить" id="<?= h($p) ?>-refresh-btn"><img src="img/refresh.png" alt="" /></button>
-        <?php if ($this->hasImport && !$this->readonly): ?>
+        <?php if ($this->hasImport && $_addOk): ?>
         <button type="button" class="icon-btn" title="Импорт отмеченных" id="<?= h($p) ?>-import-btn"><img src="img/import.png" alt="" /></button>
         <?php endif; ?>
         <?php if ($this->hasExport): ?>
@@ -104,18 +128,21 @@ class EmbeddedTable extends TableComponent {
           </div>
         </div>
         <?php endif; ?>
-        <?php if (!$this->readonly): ?>
+        <?php if ($_actionsOk): ?>
         <div class="dropdown selected-actions" id="<?= h($p) ?>-sel-wrap">
           <button type="button" class="menu-btn" id="<?= h($p) ?>-sel-btn">Выбрано <b><span id="<?= h($p) ?>-sel-count">0</span></b> <span class="btn-caret">&#9660;</span></button>
           <div class="dropdown-menu" style="min-width:180px">
             <a class="dropdown-item" href="#" id="<?= h($p) ?>-sel-clear">Очистить выбор</a>
             <a class="dropdown-item" href="#" id="<?= h($p) ?>-sel-invert">Инвертировать выбор</a>
             <a class="dropdown-item" href="#" id="<?= h($p) ?>-sel-show">Показать выбранные</a>
+            <?php if ($_batchDelOk): ?>
             <a class="dropdown-item" href="#" id="<?= h($p) ?>-sel-delete">Удалить отмеченные</a>
+            <?php endif; ?>
             <a class="dropdown-item" href="#" id="<?= h($p) ?>-sel-export">Экспорт выбранных</a>
             <a class="dropdown-item" href="#" id="<?= h($p) ?>-sel-print">Печать выбранных</a>
           </div>
         </div>
+        <?php endif; ?>
         <?php endif; ?>
       </div>
       <?php if ($this->hasSearch): ?>
@@ -222,14 +249,14 @@ class EmbeddedTable extends TableComponent {
         childFormUrl: '<?= $this->childFormUrl ?>',
         childFormName: '<?= $this->childFormName ?>',
         totalsCallback: <?= json_encode($totalsCallbackName, JSON_UNESCAPED_UNICODE) ?>,
-        readonly: <?= json_encode($this->readonly) ?>,
-        onRowDoubleClick: <?= $this->readonly ? 'null' : 'function (id) { window[\'__' . $p . 'Table\'].openChildForm(\'edit\', id); }' ?>,
+        readonly: <?= json_encode($this->readonly || ($this->accessFlags && (($this->accessFlags['change_flag'] ?? false) || ($this->accessFlags['save_flag'] ?? false)))) ?>,
+        onRowDoubleClick: <?= ($this->readonly || ($this->accessFlags && ($this->accessFlags['change_flag'] ?? false))) ? 'null' : 'function (id) { window[\'__' . $p . 'Table\'].openChildForm(\'edit\', id); }' ?>,
         filterBannerEl: '#<?= $p ?>-filter-banner',
         filterChipsEl: '#<?= $p ?>-filter-chips',
         clearSearchBtnEl: '#<?= $p ?>-clear-search'
       });
 
-      <?php if (!$this->readonly): ?>
+      <?php if (!$this->readonly && !($this->accessFlags && (($this->accessFlags['change_flag'] ?? false) || ($this->accessFlags['save_flag'] ?? false)))): ?>
       if (typeof InlineEdit !== 'undefined') {
         var ieFields = {};
         <?php foreach ($visibleCols as $col):
@@ -511,6 +538,11 @@ class EmbeddedTable extends TableComponent {
           }
         });
       });
+<?php if ($this->columnResizeUrl): ?>
+      if (typeof window.ColumnResize !== 'undefined') {
+        window.ColumnResize.init({ saveUrl: '<?= h($this->columnResizeUrl) ?>', tbl: '<?= h($this->columnResizeTbl) ?>', selector: '#<?= $p ?>-table' });
+      }
+<?php endif; ?>
     }
     <?php
     }

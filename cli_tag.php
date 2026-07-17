@@ -201,63 +201,11 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
     const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
     const currentTotal = parseInt(toolbar.dataset.total || '0', 10);
 
-    const initialMarks = [];
+    SelectionToolbar.initTableSelection('cli_tag.php', document.querySelector('.toolbar').getAttribute('data-search') || '');
+
     document.querySelectorAll('.row-check').forEach(function (cb) {
-      if (cb.checked) initialMarks.push(parseInt(cb.dataset.id, 10));
-    });
-    const selected = new Set(initialMarks);
-    let globalCount = parseInt(toolbar.getAttribute('data-marks-count') || '0', 10);
-
-    function refreshCounter() {
-      selCount.textContent = 'Выбрано: ' + globalCount;
-      selWrap.classList.toggle('visible', globalCount > 0);
-      if (checkAll) {
-        const rowTotal = rowChecks.length;
-        let rowOn = 0;
-        rowChecks.forEach(function(cb) { if (cb.checked) rowOn++; });
-        if (rowTotal === 0) {
-          checkAll.checked = false;
-          checkAll.indeterminate = false;
-        } else {
-          checkAll.checked = rowOn === rowTotal;
-          checkAll.indeterminate = rowOn > 0 && rowOn < rowTotal;
-        }
-      }
-    }
-
-    if (checkAll) {
-      checkAll.addEventListener('change', function () {
-        location.href = 'cli_tag.php?action=toggleSelectAll' + (search ? '&q=' + encodeURIComponent(search) : '');
-      });
-    }
-
-    rowChecks.forEach(function (cb) {
-      cb.addEventListener('change', function () {
-        const id  = parseInt(cb.dataset.id, 10);
-        const to  = cb.checked;
-        cb.disabled = true;
-        fetch('cli_tag.php?action=toggleSelect', {
-          method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest'}, credentials: 'same-origin',
-          body: 'id=' + encodeURIComponent(id) + '&to=' + (to ? '1' : '0')
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (j) {
-          cb.disabled = false;
-          if (j.ok) {
-            if (to) selected.add(id); else selected.delete(id);
-            globalCount = (typeof j.count === 'number') ? j.count : globalCount;
-            toolbar.dataset.marksCount = globalCount;
-            refreshCounter();
-          }
-        })
-        .catch(function () { cb.disabled = false; });
-      });
       cb.addEventListener('click', function (e) { e.stopPropagation(); });
     });
-
-    function updateSelectionUI() {
-      refreshCounter();
-    }
 
     function updateRowActionButtons() {
       const id = rowSel.getSelectedId();
@@ -290,18 +238,17 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
 
     SelectionToolbar.init({
       pageUrl: 'cli_tag.php',
+      search: document.querySelector('.toolbar').getAttribute('data-search') || '',
       getInvertUrl: function () {
         var other = new URLSearchParams(location.search);
         other.delete('ids');
         return 'cli_tag.php?action=invertSelection&' + other.toString();
       },
       getExportUrl: function () {
-        if (selected.size === 0) return null;
-        return 'cli_tag_export.php?format=csv&all=1';
+        return null;
       },
       getPrintUrl: function () {
-        if (selected.size === 0) return null;
-        return 'cli_tag_print.php?all=1';
+        return null;
       }
     });
 
@@ -431,7 +378,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
       tableWrapEl: tableWrapEl
     });
 
-    updateSelectionUI();
+    __refreshSelectionUI();
   })();
 
   ExportModal.init();

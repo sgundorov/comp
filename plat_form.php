@@ -52,9 +52,10 @@ if ($mode === 'new') {
     if (!empty($_GET['zat_id'])) $values['zat_id'] = (int)$_GET['zat_id'];
     $docIdVal = (int)$values['doc_id'];
     $docTypeVal = (int)$values['doc_type'];
-    if ($docIdVal > 0 && $values['client_id'] <= 0 && in_array($docTypeVal, [10, 20, 110, 120, 127], true)) {
-        $parentTable = $docTypeVal === 10 ? 'invoice' : 'docum';
-        $pStmt = $conn->prepare("SELECT client_id FROM $parentTable WHERE " . ($docTypeVal === 10 ? 'invoice_id' : 'docum_id') . " = ?");
+    if ($docIdVal > 0 && $values['client_id'] <= 0 && in_array($docTypeVal, [5, 10, 20, 110, 120, 127], true)) {
+        $parentTable = in_array($docTypeVal, [5, 10], true) ? 'invoice' : 'docum';
+        $parentKey = in_array($docTypeVal, [5, 10], true) ? 'invoice_id' : 'docum_id';
+        $pStmt = $conn->prepare("SELECT client_id FROM $parentTable WHERE $parentKey = ?");
         $pStmt->bind_param('i', $docIdVal);
         $pStmt->execute();
         $pRow = $pStmt->get_result()->fetch_assoc();
@@ -211,15 +212,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $saveSumPlat = 0;
         $saveDocType = (int)$values['doc_type'];
-        if ($docIdVal > 0 && in_array($saveDocType, [10, 20, 110, 120, 127], true)) {
-            $parentTable = $saveDocType === 10 ? 'invoice' : 'docum';
-            $parentKey = $saveDocType === 10 ? 'invoice_id' : 'docum_id';
+        if ($docIdVal > 0 && in_array($saveDocType, [5, 10, 20, 110, 120, 127], true)) {
+            $parentTable = in_array($saveDocType, [5, 10], true) ? 'invoice' : 'docum';
+            $parentKey = in_array($saveDocType, [5, 10], true) ? 'invoice_id' : 'docum_id';
             $sp = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
             $sp->bind_param('ii', $docIdVal, $saveDocType);
             $sp->execute();
             $saveSumPlat = (float)$sp->get_result()->fetch_row()[0];
             $sp->close();
-            if ($saveDocType === 10) {
+            if (in_array($saveDocType, [5, 10], true)) {
                 $upd = $conn->prepare("UPDATE $parentTable SET sum_plat = ? WHERE $parentKey = ?");
                 bind_auto($upd, [$saveSumPlat, $docIdVal]);
             } else {
@@ -233,15 +234,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($isAjax) {
             $pageOfNew = computePageOfNew($conn, 'plat', 'id', 'id', 'desc', $newId, $newId, '');
-            $spRedStmt = $conn->prepare("SELECT d.sum_plat, d.sum, COALESCE(tp.prihod_flag,0) AS prihod_flag FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = ?");
-            $spRedStmt->bind_param('i', $docIdVal);
-            $spRedStmt->execute();
-            $spRedRow = $spRedStmt->get_result()->fetch_assoc();
-            $spRedStmt->close();
-            $spSumPlat = (float)($spRedRow['sum_plat'] ?? $saveSumPlat);
-            $spSum = (float)($spRedRow['sum'] ?? 0);
-            $prihodFlag = (int)($spRedRow['prihod_flag'] ?? 0);
-            $sumPlatRed = $prihodFlag ? ($spSum > -$spSumPlat) : ($spSumPlat < $spSum);
+            if (in_array($saveDocType, [5, 10], true)) {
+                $spRedStmt = $conn->prepare("SELECT sum_plat, sum FROM invoice WHERE invoice_id = ?");
+                $spRedStmt->bind_param('i', $docIdVal);
+                $spRedStmt->execute();
+                $spRedRow = $spRedStmt->get_result()->fetch_assoc();
+                $spRedStmt->close();
+                $spSumPlat = (float)($spRedRow['sum_plat'] ?? $saveSumPlat);
+                $spSum = (float)($spRedRow['sum'] ?? 0);
+                $sumPlatRed = $spSumPlat < $spSum;
+            } else {
+                $spRedStmt = $conn->prepare("SELECT d.sum_plat, d.sum, COALESCE(tp.prihod_flag,0) AS prihod_flag FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = ?");
+                $spRedStmt->bind_param('i', $docIdVal);
+                $spRedStmt->execute();
+                $spRedRow = $spRedStmt->get_result()->fetch_assoc();
+                $spRedStmt->close();
+                $spSumPlat = (float)($spRedRow['sum_plat'] ?? $saveSumPlat);
+                $spSum = (float)($spRedRow['sum'] ?? 0);
+                $prihodFlag = (int)($spRedRow['prihod_flag'] ?? 0);
+                $sumPlatRed = $prihodFlag ? ($spSum > -$spSumPlat) : ($spSumPlat < $spSum);
+            }
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $newId, 'name' => '#' . $newId, 'page' => $pageOfNew, 'sum_plat' => number_format($saveSumPlat, 2, '.', ''), 'sum_plat_red' => $sumPlatRed]);
             exit;

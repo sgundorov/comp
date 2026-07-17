@@ -8,6 +8,8 @@ require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/form-modal-handler.php';
 require_once __DIR__ . '/lib/EmbeddedTable.php';
 
+$accessFlags = render_access_control($conn, 'Docum');
+
 $typeop = (int)($_GET['typeop'] ?? 120);
 if (!in_array($typeop, [10, 20, 100, 110, 120, 127], true)) $typeop = 120;
 
@@ -206,54 +208,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_GET['action'] ?? '') ===
 }
 
 // ---- column filters ----
-$clientFilter = (string)($_GET['client_id'] ?? '');
-$clientFilterIds = []; $clientFilterNames = [];
-$storeFilter = (string)($_GET['store_id'] ?? '');
-$storeFilterIds = []; $storeFilterNames = [];
-$store2Filter = (string)($_GET['store2_id'] ?? '');
-$store2FilterIds = []; $store2FilterNames = [];
-
-function loadFilterNames(mysqli $conn, string $table, string $idCol, string $labelExpr, array $ids): array {
-    if (empty($ids)) return [];
-    $ph = implode(',', array_fill(0, count($ids), '?'));
-    $sql = "SELECT $idCol AS id, $labelExpr AS name FROM $table WHERE $idCol IN ($ph) ORDER BY $labelExpr";
-    $stmt = @$conn->prepare($sql);
-    if (!$stmt) return [];
-    stmt_bind($stmt, str_repeat('i', count($ids)), $ids);
-    $stmt->execute();
-    $r = $stmt->get_result();
-    $out = [];
-    while ($row = $r->fetch_assoc()) $out[(int)$row['id']] = (string)$row['name'];
-    $stmt->close();
-    return $out;
-}
-
-if ($clientFilter !== '') {
-    $clientFilterIds = array_values(array_filter(array_map('intval', explode(',', $clientFilter)), fn($v) => $v > 0));
-}
-if (count($clientFilterIds) > 0) {
-    $clientFilterNames = loadFilterNames($conn, 'client', 'client_id', 'name', $clientFilterIds);
-    $ph = implode(',', array_fill(0, count($clientFilterIds), '?'));
-    $tp->appendWhere("d.client_id IN ($ph)", $clientFilterIds, str_repeat('i', count($clientFilterIds)));
-}
-
-if ($storeFilter !== '') {
-    $storeFilterIds = array_values(array_filter(array_map('intval', explode(',', $storeFilter)), fn($v) => $v > 0));
-}
-if (count($storeFilterIds) > 0) {
-    $storeFilterNames = loadFilterNames($conn, 'store', 'store_id', 'name', $storeFilterIds);
-    $ph = implode(',', array_fill(0, count($storeFilterIds), '?'));
-    $tp->appendWhere("d.store_id IN ($ph)", $storeFilterIds, str_repeat('i', count($storeFilterIds)));
-}
-
-if ($store2Filter !== '') {
-    $store2FilterIds = array_values(array_filter(array_map('intval', explode(',', $store2Filter)), fn($v) => $v > 0));
-}
-if (count($store2FilterIds) > 0) {
-    $store2FilterNames = loadFilterNames($conn, 'store', 'store_id', 'name', $store2FilterIds);
-    $ph = implode(',', array_fill(0, count($store2FilterIds), '?'));
-    $tp->appendWhere("d.store2_id IN ($ph)", $store2FilterIds, str_repeat('i', count($store2FilterIds)));
-}
+$tp->processColumnFilters($conn);
 
 $tp->getTotalCount($conn);
 $rows = $tp->getRows($conn);
@@ -280,73 +235,14 @@ if ($sotrs) while ($sr = $sotrs->fetch_assoc()) $sotrList[] = ['id' => (int)$sr[
 
 $urlCols = $searchCols;
 
-$clearQs = function($drop) use ($search, $searchActive, $searchCols, $searchCond, $sortQs, $typeop) {
-    $drop = is_array($drop) ? $drop : [$drop];
-    $qs = [];
-    if ($typeop) $qs['typeop'] = $typeop;
-    if (!in_array('q', $drop, true) && $searchActive && $search !== '') $qs['q'] = $search;
-    if (!in_array('cols', $drop, true) && $searchActive && count($searchCols) > 0) $qs['cols'] = implode(',', $searchCols);
-    if (!in_array('cond', $drop, true) && $searchActive) $qs['cond'] = $searchCond;
-    if (!in_array('sf', $drop, true) && $searchActive) $qs['sf'] = '1';
-    if (!in_array('sort', $drop, true) && $sortQs !== '') $qs['sort'] = $sortQs;
-    if (!in_array('client_id', $drop, true) && !empty($_GET['client_id'])) $qs['client_id'] = $_GET['client_id'];
-    if (!in_array('store_id', $drop, true) && !empty($_GET['store_id'])) $qs['store_id'] = $_GET['store_id'];
-    if (!in_array('store2_id', $drop, true) && !empty($_GET['store2_id'])) $qs['store2_id'] = $_GET['store2_id'];
-    return 'sale.php' . ($qs ? '?' . http_build_query($qs) : '');
-};
+$clearQs = $tp->buildClearQs();
 
 $tp->buildFilters();
 $filters = $tp->filters;
-if (count($clientFilterIds) > 0) {
-    $names = [];
-    foreach ($clientFilterIds as $cid) {
-        $names[] = $clientFilterNames[$cid] ?? ('#' . $cid);
-    }
-    $filters[] = ['kind' => 'client', 'text' => 'Контрагент = ' . implode(', ', $names), 'clear' => 'client_id'];
-}
-if (count($storeFilterIds) > 0) {
-    $names = [];
-    foreach ($storeFilterIds as $sid) {
-        $names[] = $storeFilterNames[$sid] ?? ('#' . $sid);
-    }
-    $filters[] = ['kind' => 'store', 'text' => 'Участок = ' . implode(', ', $names), 'clear' => 'store_id'];
-}
-if (count($store2FilterIds) > 0) {
-    $names = [];
-    foreach ($store2FilterIds as $sid) {
-        $names[] = $store2FilterNames[$sid] ?? ('#' . $sid);
-    }
-    $filters[] = ['kind' => 'store2', 'text' => 'Склад-получатель = ' . implode(', ', $names), 'clear' => 'store2_id'];
-}
 
-$exportQs = http_build_query(array_filter([
-    'typeop'   => $typeop,
-    'q'    => $searchActive && $search !== '' ? $search : null,
-    'cols' => $searchActive && count($searchCols) > 0 ? implode(',', $searchCols) : null,
-    'cond' => $searchActive ? $searchCond : null,
-    'sf'   => $searchActive ? '1' : null,
-    'sort' => $sortQs !== '' ? $sortQs : null,
-    'client_id' => $clientFilter !== '' ? $clientFilter : null,
-    'store_id' => $storeFilter !== '' ? $storeFilter : null,
-    'store2_id' => $store2Filter !== '' ? $store2Filter : null,
-], function ($v) { return $v !== null && $v !== ''; }));
+$exportQs = $tp->buildExportQs(['typeop' => $typeop]);
 
-$baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs, $typeop) {
-    $qs = ['page' => (int)$p];
-    if ($typeop) $qs['typeop'] = $typeop;
-    if ($searchActive) {
-        if ($search !== '') $qs['q'] = $search;
-        if (count($searchCols) > 0) $qs['cols'] = implode(',', $searchCols);
-        $qs['cond'] = $searchCond;
-        $qs['sf'] = '1';
-    }
-    if ($sortQs !== '') $qs['sort'] = $sortQs;
-    if (!empty($_GET['client_id'])) $qs['client_id'] = $_GET['client_id'];
-    if (!empty($_GET['store_id'])) $qs['store_id'] = $_GET['store_id'];
-    if (!empty($_GET['store2_id'])) $qs['store2_id'] = $_GET['store2_id'];
-    return 'sale.php?' . http_build_query($qs);
-};
-$paginationHtml = render_pagination($page, $pages, $baseQs, true);
+$paginationHtml = '';
 
 $exportDropdownHtml = '';
 $exportTimestamp = date('d.m.Y_H.i');
@@ -393,6 +289,7 @@ $d2Table = new EmbeddedTable([
     'hasPrint'     => true,
     'hasSearch'    => true,
     'totalsCallback' => 'applyDocum2Totals',
+    'accessFlags'  => $accessFlags,
 ]);
 
 // ---- plat (Оплата) columns ----
@@ -418,6 +315,7 @@ $platTable = new EmbeddedTable([
     'hasPrint'     => false,
     'hasSearch'    => true,
     'totalsCallback' => 'applyDocum2Totals',
+    'accessFlags'  => $accessFlags,
 ]);
 
 render_head_start($PAGE_TITLE);
@@ -519,12 +417,11 @@ render_head_end(); ?>
       <?php render_table_thead(
           $visibleColumns, $COL_META, $sortLevels, $allRowsMarked, $rowsTotalCount === 0,
           [
-              'thAttrsCallback' => function($cn, $cm, $i) use ($clientFilterIds, $storeFilterIds) {
+              'thAttrsCallback' => function($cn, $cm, $i) {
                   if ($cm && !empty($cm['filter'])) {
                       $param = $cm['param'] ?? ($cn . '_id');
-                      $values = [];
-                      if ($cn === 'client') $values = $clientFilterIds;
-                      if ($cn === 'store') $values = $storeFilterIds;
+                      $raw = (string)($_GET[$param] ?? '');
+                      $values = $raw !== '' ? array_values(array_filter(array_map('intval', explode(',', $raw)), fn($v) => $v > 0)) : [];
                       return ' data-col="' . h($cn) . '" data-param="' . h($param) . '" data-values="' . h(implode(',', $values)) . '"';
                   }
                   return '';
@@ -567,17 +464,21 @@ render_head_end(); ?>
     </table>
     </div>
 
-    <?= $paginationHtml ?>
+    <?php $tp->renderPagination(['typeop' => $typeop]); ?>
 
     <?php render_form_modal(); ?>
   </div>
 
 <?php
-render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded-subtable.js', 'assets/column-filter.js', 'assets/embedded-table.js']]);
+render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.js', 'assets/embedded-subtable.js', 'assets/column-filter.js', 'assets/embedded-table.js']]);
 ?>
   <script>
     window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
     window.__columnDefaultWidths = <?= json_encode(sale_columns_widths_print(), JSON_UNESCAPED_UNICODE) ?>;
+  </script>
+  <script>
+    window.__accessFlags = <?= json_encode($accessFlags) ?>;
+    if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
   </script>
   <script>
     window.printSaleTemplate = function (rpId, fname) {
@@ -594,53 +495,12 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
     }
     window.__openFormModal = window.__openFormModal || function(url){ window.location.href = url; };
     (function () {
-      const checkAll  = document.getElementById('checkAll');
-      const rowChecks = document.querySelectorAll('.row-check');
-      const selWrap   = document.getElementById('selectedActions');
-      const selCount  = document.getElementById('selectedCount');
-      const toolbar   = document.querySelector('.toolbar');
-      const search    = toolbar.getAttribute('data-search') || '';
-      const markedSet = new Set(Array.from(rowChecks).filter(cb => cb.checked).map(cb => parseInt(cb.value, 10)));
-      let globalCount = parseInt(toolbar.getAttribute('data-marks-count') || '0', 10);
-
-      function refreshCounter() {
-        selCount.textContent = 'Выбрано: ' + globalCount;
-        selWrap.classList.toggle('visible', globalCount > 0);
-        const rowTotal = rowChecks.length;
-        let rowOn = 0;
-        rowChecks.forEach(cb => { if (cb.checked) rowOn++; });
-        if (rowTotal === 0) { checkAll.checked = false; checkAll.indeterminate = false; }
-        else { checkAll.checked = rowOn === rowTotal; checkAll.indeterminate = rowOn > 0 && rowOn < rowTotal; }
-      }
-
-      checkAll.addEventListener('change', function () {
-        var qs = new URLSearchParams(location.search);
-        qs.set('action', 'toggleSelectAll');
-        location.href = 'sale.php?' + qs.toString();
-      });
-
-      rowChecks.forEach(cb => cb.addEventListener('change', function () {
-        const id = parseInt(cb.value, 10);
-        const to = cb.checked;
-        cb.disabled = true;
-        var qs = new URLSearchParams(location.search);
-        qs.set('action', 'toggleSelect');
-        fetch('sale.php?' + qs.toString(), {
-          method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest'},
-          body: 'id=' + id + '&to=' + (to ? '1' : '0')
-        }).then(r => r.json()).then(function (j) {
-          cb.disabled = false;
-          if (j.ok) {
-            if (to) markedSet.add(id); else markedSet.delete(id);
-            globalCount = (typeof j.count === 'number') ? j.count : globalCount;
-            refreshCounter();
-          }
-        }).catch(function () { cb.disabled = false; });
-      }));
+      var _tb = document.querySelector('.toolbar');
+      SelectionToolbar.initTableSelection('sale.php', _tb.getAttribute('data-search') || '');
 
       SelectionToolbar.init({
         pageUrl: 'sale.php?typeop=<?= $typeop ?>',
-        search: search,
+        search: _tb.getAttribute('data-search') || '',
         getInvertUrl: function () {
           var other = new URLSearchParams(location.search);
           other.delete('ids');
@@ -711,7 +571,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
         ],
       });
 
-      refreshCounter();
+      __refreshSelectionUI();
     })();
 
     ExportModal.init();
@@ -746,9 +606,10 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
         rowClass: 'selected',
         onChange: function (id) {
           const enabled = id > 0;
-          if (openBtn)   openBtn.disabled   = !enabled;
-          if (copyBtn)   copyBtn.disabled   = !enabled;
-          if (deleteBtn) deleteBtn.disabled = !enabled;
+          const af = window.__accessFlags || {};
+          if (openBtn)   openBtn.disabled   = !enabled || !!af.change_flag;
+          if (copyBtn)   copyBtn.disabled   = !enabled || !!af.insert_flag;
+          if (deleteBtn) deleteBtn.disabled = !enabled || !!af.delete_flag;
         },
         currentPage: currentPage,
         totalPages: currentPages,
@@ -783,6 +644,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
           if (!tr) return;
           const id = parseInt(tr.dataset.rowId, 10) || 0;
           if (!id) return;
+          if (window.__accessFlags && window.__accessFlags.change_flag) return;
           rowSel.selectById(id, true);
           window.__openFormModal('sale_form.php?typeop=<?= $typeop ?>&mode=edit&id=' + id);
         });
@@ -811,32 +673,35 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
         navigate: navigate,
         tableWrapEl: document.querySelector('.table-wrap'),
         onOpenForm: window.__openFormModal,
-        formExtraParams: '&typeop=<?= $typeop ?>'
+        formExtraParams: '&typeop=<?= $typeop ?>',
+        accessFlags: window.__accessFlags
       });
     })();
 
-    InlineEdit.init({
-      tbody: document.querySelector('table tbody'),
-      saveUrl: 'sale_field_save.php',
-      fields: <?php
-        $inlineFields = [];
-        foreach ($COLUMN_DEFAULTS as $c) {
-            if (!empty($c['readonly']) || $c['name'] === 'accept') continue;
-            $inlineFields[$c['name']] = [
-                'dbField' => $c['param'] ?: $c['name'],
-                'type'    => !empty($c['param']) ? 'lookup' : 'text',
-                'label'   => $c['label'],
-            ];
-        }
-        $inlineFields['note'] = ['dbField' => 'note', 'type' => 'textarea', 'label' => 'Примечание'];
-        echo json_encode($inlineFields, JSON_UNESCAPED_UNICODE);
-      ?>,
-      getLookupData: function (field) {
-        var map = { client: window.__clientLookupData, store: window.__storeLookupData, store2: window.__storeLookupData };
-        return map[field] || [];
-      },
-      onOpenForm: window.__openFormModal
-    });
+    if (!window.__accessFlags || !window.__accessFlags.change_flag) {
+      InlineEdit.init({
+        tbody: document.querySelector('table tbody'),
+        saveUrl: 'sale_field_save.php',
+        fields: <?php
+          $inlineFields = [];
+          foreach ($COLUMN_DEFAULTS as $c) {
+              if (!empty($c['readonly']) || $c['name'] === 'accept') continue;
+              $inlineFields[$c['name']] = [
+                  'dbField' => $c['param'] ?: $c['name'],
+                  'type'    => !empty($c['param']) ? 'lookup' : 'text',
+                  'label'   => $c['label'],
+              ];
+          }
+          $inlineFields['note'] = ['dbField' => 'note', 'type' => 'textarea', 'label' => 'Примечание'];
+          echo json_encode($inlineFields, JSON_UNESCAPED_UNICODE);
+        ?>,
+        getLookupData: function (field) {
+          var map = { client: window.__clientLookupData, store: window.__storeLookupData, store2: window.__storeLookupData };
+          return map[field] || [];
+        },
+        onOpenForm: window.__openFormModal
+      });
+    }
 
     ColumnResize.init({ saveUrl: 'sale_column_width_save.php', tbl: 'sale', selector: 'table.data-table' });
 
@@ -884,6 +749,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
 
     function restoreStashedForm(data) {
       if (!stashed) return;
+      var savedTableSelections = stashed._tableSelections || {};
       formBody.innerHTML = stashed.html;
       initFormLookups();
       try { initD2Table(); } catch(e) { console.error('initD2Table', e); }
@@ -892,13 +758,31 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
       evalFormScripts();
       var old = stashed;
       stashed = null;
+      if (savedTableSelections) {
+        Object.keys(savedTableSelections).forEach(function(k) {
+          var tbl = window[k];
+          if (tbl && typeof tbl.selectedId === 'number' && savedTableSelections[k]) {
+            var id = savedTableSelections[k];
+            var found = false;
+            if (tbl.data) { for (var i = 0; i < tbl.data.length; i++) { if (tbl.data[i].id == id) { found = true; break; } } }
+            if (found) {
+              tbl.selectedId = id;
+              tbl.render();
+              if (tbl.tbody) {
+                var row = tbl.tbody.querySelector('tr[data-id="' + id + '"]');
+                if (row) row.scrollIntoView({ block: 'nearest' });
+              }
+            }
+          }
+        });
+      }
       if (old.tabIndex && old.tabIndex !== 0 && typeof window.__switchSaleTab === 'function') { window.__switchSaleTab(old.tabIndex); }
       var f = formBody.querySelector('form[data-form-modal]');
       bindForm(f);
       FormModalCore.bindFormTabTrap(f);
       if (data) try { old.onRestore(data, formBody); } catch (e) {}
       if (old.activeId) {
-        var el = formBody.querySelector('#' + old.activeId);
+        var el = formBody.querySelector('[id="' + old.activeId.replace(/"/g, '\\"') + '"]');
         if (el && !el.readOnly) { el.focus(); if (el.select) el.select(); }
       } else {
         FormModalCore.focusFirstField(formBody);
@@ -937,7 +821,13 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
         syncFormValues();
         var activeTabEl = document.querySelector('.tab-header.active');
         var activeTabIndex = activeTabEl ? parseInt(activeTabEl.getAttribute('data-tab-index'), 10) : 0;
-        stashed = { html: formBody.innerHTML, onRestore: stash.onRestore || null, activeId: stash.activeId || null, tabIndex: activeTabIndex };
+        var savedTableSelections = {};
+        Object.keys(window).forEach(function(k) {
+          if (k.indexOf('__') === 0 && k.indexOf('Table') === k.length - 5 && window[k] && typeof window[k].selectedId === 'number') {
+            savedTableSelections[k] = window[k].selectedId;
+          }
+        });
+        stashed = { html: formBody.innerHTML, onRestore: stash.onRestore || null, activeId: stash.activeId || null, tabIndex: activeTabIndex, _tableSelections: savedTableSelections };
       } else if (!formBody.innerHTML) { stashed = null; }
       formModal.classList.add('open');
       document.body.style.overflow = 'hidden';
@@ -979,6 +869,11 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
     }
     function bindForm(form) {
       if (!form) return;
+      var _mode = form.querySelector('input[name="mode"]');
+      var _isDelete = _mode && _mode.value === 'delete';
+      if (window.__accessFlags && window.__accessFlags.save_flag && !_isDelete) {
+        form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; });
+      }
       form.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
           if (document.activeElement && document.activeElement.closest('[data-row-id]')) return;
@@ -987,6 +882,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
         }
       });
       form.addEventListener('submit', function (e) {
+        if (window.__accessFlags && window.__accessFlags.save_flag && !_isDelete) return;
         e.preventDefault();
         const fd = new FormData(form);
         fd.set('ajax', '1');
@@ -1232,32 +1128,34 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/embedded
     }
   </script>
   <script>
-    InlineEdit.init({
-      tbody: document.querySelector('table tbody'),
-      saveUrl: 'sale_field_save.php',
-      fields: <?php
-        $inlineFields = [];
-        $valCases = '';
-        foreach ($visibleColumns as $vc) {
-          $cn = $vc['name'];
-          if (!empty($vc['readonly']) || $cn === 'id' || $cn === 'number' || $cn === 'sum') continue;
-          $isLookup = !empty($vc['param']);
-          $inlineFields[$cn] = ['dbField' => $isLookup ? $vc['param'] : $cn, 'type' => $isLookup ? 'lookup' : 'text', 'label' => $vc['label']];
-          if ($isLookup) $valCases .= "    case " . json_encode($cn, JSON_UNESCAPED_UNICODE) . ": if (parseInt(value,10)<=0) return 'Выберите значение из списка'; break;\n";
-        }
-      ?><?= json_encode($inlineFields, JSON_UNESCAPED_UNICODE) ?>,
-      getLookupData: function (field) {
-        var map = { client: window.__clientLookupData, store: window.__storeLookupData, store2: window.__storeLookupData };
-        return map[field] || [];
-      },
-      validate: function (field, value) {
-        switch (field) {
-<?= $valCases ?>
-        }
-        return null;
-      },
-      onOpenForm: window.__openFormModal
-    });
+    if (!window.__accessFlags || !window.__accessFlags.change_flag) {
+      InlineEdit.init({
+        tbody: document.querySelector('table tbody'),
+        saveUrl: 'sale_field_save.php',
+        fields: <?php
+          $inlineFields = [];
+          $valCases = '';
+          foreach ($visibleColumns as $vc) {
+            $cn = $vc['name'];
+            if (!empty($vc['readonly']) || $cn === 'id' || $cn === 'number' || $cn === 'sum') continue;
+            $isLookup = !empty($vc['param']);
+            $inlineFields[$cn] = ['dbField' => $isLookup ? $vc['param'] : $cn, 'type' => $isLookup ? 'lookup' : 'text', 'label' => $vc['label']];
+            if ($isLookup) $valCases .= "    case " . json_encode($cn, JSON_UNESCAPED_UNICODE) . ": if (parseInt(value,10)<=0) return 'Выберите значение из списка'; break;\n";
+          }
+        ?><?= json_encode($inlineFields, JSON_UNESCAPED_UNICODE) ?>,
+        getLookupData: function (field) {
+          var map = { client: window.__clientLookupData, store: window.__storeLookupData, store2: window.__storeLookupData };
+          return map[field] || [];
+        },
+        validate: function (field, value) {
+          switch (field) {
+  <?= $valCases ?>
+          }
+          return null;
+        },
+        onOpenForm: window.__openFormModal
+      });
+    }
 
     ColumnResize.init({ saveUrl: 'sale_column_width_save.php', tbl: 'sale' });
     ExportModal.init();

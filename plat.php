@@ -8,6 +8,8 @@ require_once __DIR__ . '/lib/marks-actions.php';
 require_once __DIR__ . '/lib/form-modal-handler.php';
 require_once __DIR__ . '/lib/controls.php';
 
+$accessFlags = render_access_control($conn, 'Plat');
+
 ensure_marks_table($conn);
 
 $tp = new TablePage($conn, $platPageConfig);
@@ -66,21 +68,7 @@ handle_marks_actions($conn, $tp, 'plat', function($action) use ($conn, $tp, $COL
     if ($action === 'columnFilterOptions') {
         $col = (string)($_GET['col'] ?? '');
         header('Content-Type: application/json; charset=utf-8');
-        if ($col === 'plat_type') {
-            echo json_encode([
-                ['id' => 1, 'name' => 'Наличные'],
-                ['id' => 2, 'name' => 'Безнал.'],
-                ['id' => 3, 'name' => 'Карта'],
-                ['id' => 4, 'name' => 'Прочее'],
-            ], JSON_UNESCAPED_UNICODE);
-        } elseif ($col === 'out_flag') {
-            echo json_encode([
-                ['id' => 1, 'name' => 'Приход'],
-                ['id' => 2, 'name' => 'Расход'],
-            ], JSON_UNESCAPED_UNICODE);
-        } else {
-            echo json_encode($tp->colFilterOptions($conn, $col), JSON_UNESCAPED_UNICODE);
-        }
+        echo json_encode($tp->colFilterOptions($conn, $col), JSON_UNESCAPED_UNICODE);
         exit;
     }
     return null;
@@ -95,82 +83,7 @@ if ($dateFrom !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFr
 if ($dateTo   !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo))   $dateTo   = '';
 
 // ---- column filters must run BEFORE getTotalCount ----
-$clientFilter = (string)($_GET['client_id'] ?? '');
-$clientFilterIds = []; $clientFilterNames = [];
-$zatFilter = (string)($_GET['zat_id'] ?? '');
-$zatFilterIds = []; $zatFilterNames = [];
-$sotrFilter = (string)($_GET['sotr_id'] ?? '');
-$sotrFilterIds = []; $sotrFilterNames = [];
-
-$platTypeFilter = (string)($_GET['plat_type'] ?? '');
-$platTypeFilterIds = []; $platTypeFilterNames = [];
-$platTypeIdToValue = [1 => 'Наличные', 2 => 'Безнал.', 3 => 'Карта', 4 => 'Прочее'];
-
-$outTypeFilter = (string)($_GET['out_type'] ?? '');
-$outTypeFilterIds = []; $outTypeFilterNames = [];
-$outTypeIdToFlag = [1 => 0, 2 => 1];
-
-function loadFilterNames(mysqli $conn, string $table, string $idCol, string $labelExpr, array $ids): array {
-    if (empty($ids)) return [];
-    $ph = implode(',', array_fill(0, count($ids), '?'));
-    $sql = "SELECT $idCol AS id, $labelExpr AS name FROM $table WHERE $idCol IN ($ph) ORDER BY $labelExpr";
-    $stmt = @$conn->prepare($sql);
-    if (!$stmt) return [];
-    stmt_bind($stmt, str_repeat('i', count($ids)), $ids);
-    $stmt->execute();
-    $r = $stmt->get_result();
-    $out = [];
-    while ($row = $r->fetch_assoc()) $out[(int)$row['id']] = (string)$row['name'];
-    $stmt->close();
-    return $out;
-}
-
-if ($clientFilter !== '') {
-    $clientFilterIds = array_values(array_filter(array_map('intval', explode(',', $clientFilter)), fn($v) => $v > 0));
-}
-if (count($clientFilterIds) > 0) {
-    $clientFilterNames = loadFilterNames($conn, 'client', 'client_id', 'name', $clientFilterIds);
-    $ph = implode(',', array_fill(0, count($clientFilterIds), '?'));
-    $tp->appendWhere("p.client_id IN ($ph)", $clientFilterIds, str_repeat('i', count($clientFilterIds)));
-}
-
-if ($zatFilter !== '') {
-    $zatFilterIds = array_values(array_filter(array_map('intval', explode(',', $zatFilter)), fn($v) => $v > 0));
-}
-if (count($zatFilterIds) > 0) {
-    $zatFilterNames = loadFilterNames($conn, 'zat', 'zat_id', 'name', $zatFilterIds);
-    $ph = implode(',', array_fill(0, count($zatFilterIds), '?'));
-    $tp->appendWhere("p.zat_id IN ($ph)", $zatFilterIds, str_repeat('i', count($zatFilterIds)));
-}
-
-if ($sotrFilter !== '') {
-    $sotrFilterIds = array_values(array_filter(array_map('intval', explode(',', $sotrFilter)), fn($v) => $v > 0));
-}
-if (count($sotrFilterIds) > 0) {
-    $sotrFilterNames = loadFilterNames($conn, 'sotr', 'sotr_id', "CONCAT(COALESCE(last_name,''), ' ', COALESCE(first_name,''))", $sotrFilterIds);
-    $ph = implode(',', array_fill(0, count($sotrFilterIds), '?'));
-    $tp->appendWhere("p.sotr_id IN ($ph)", $sotrFilterIds, str_repeat('i', count($sotrFilterIds)));
-}
-
-if ($platTypeFilter !== '') {
-    $platTypeFilterIds = array_values(array_filter(array_map('intval', explode(',', $platTypeFilter)), fn($v) => $v >= 1 && $v <= 4));
-}
-if (count($platTypeFilterIds) > 0) {
-    $platTypeFilterNames = [];
-    foreach ($platTypeFilterIds as $pid) { if (isset($platTypeIdToValue[$pid])) $platTypeFilterNames[] = $platTypeIdToValue[$pid]; }
-    $ph = implode(',', array_fill(0, count($platTypeFilterNames), '?'));
-    $tp->appendWhere("p.plat_type IN ($ph)", $platTypeFilterNames, str_repeat('s', count($platTypeFilterNames)));
-}
-
-if ($outTypeFilter !== '') {
-    $outTypeFilterIds = array_values(array_filter(array_map('intval', explode(',', $outTypeFilter)), fn($v) => $v >= 1 && $v <= 2));
-}
-if (count($outTypeFilterIds) > 0) {
-    $outTypeFilterFlags = [];
-    foreach ($outTypeFilterIds as $oid) { if (isset($outTypeIdToFlag[$oid])) $outTypeFilterFlags[] = $outTypeIdToFlag[$oid]; $outTypeFilterNames[] = $oid === 1 ? 'Приход' : 'Расход'; }
-    $ph = implode(',', array_fill(0, count($outTypeFilterFlags), '?'));
-    $tp->appendWhere("p.out_flag IN ($ph)", $outTypeFilterFlags, str_repeat('i', count($outTypeFilterFlags)));
-}
+$tp->processColumnFilters($conn);
 
 if ($dateFrom !== '') {
     $tp->appendWhere("DATE(p.datetime) >= ?", [$dateFrom], 's');
@@ -190,61 +103,20 @@ foreach ($rows as $r) { if (isset($marks[(int)$r['plat_id']])) $rowsMarkedCount+
 $rowsTotalCount  = count($rows);
 $allRowsMarked   = $rowsTotalCount > 0 && $rowsMarkedCount === $rowsTotalCount;
 
-$clearQs = function($drop) use ($search, $searchActive, $searchCols, $searchCond, $sortQs) {
-    $drop = is_array($drop) ? $drop : [$drop];
-    $qs = [];
-    if (!in_array('q', $drop, true) && $searchActive && $search !== '') $qs['q'] = $search;
-    if (!in_array('cols', $drop, true) && $searchActive && count($searchCols) > 0) $qs['cols'] = implode(',', $searchCols);
-    if (!in_array('cond', $drop, true) && $searchActive) $qs['cond'] = $searchCond;
-    if (!in_array('sf', $drop, true) && $searchActive) $qs['sf'] = '1';
-    if (!in_array('sort', $drop, true) && $sortQs !== '') $qs['sort'] = $sortQs;
-    if (!in_array('client_id', $drop, true) && !empty($_GET['client_id'])) $qs['client_id'] = $_GET['client_id'];
-    if (!in_array('zat_id', $drop, true) && !empty($_GET['zat_id'])) $qs['zat_id'] = $_GET['zat_id'];
-    if (!in_array('sotr_id', $drop, true) && !empty($_GET['sotr_id'])) $qs['sotr_id'] = $_GET['sotr_id'];
-    if (!in_array('plat_type', $drop, true) && !empty($_GET['plat_type'])) $qs['plat_type'] = $_GET['plat_type'];
-    if (!in_array('out_type', $drop, true) && !empty($_GET['out_type'])) $qs['out_type'] = $_GET['out_type'];
-    if (!in_array('date_from', $drop, true) && !empty($_GET['date_from'])) $qs['date_from'] = $_GET['date_from'];
-    if (!in_array('date_to', $drop, true) && !empty($_GET['date_to'])) $qs['date_to'] = $_GET['date_to'];
-    return 'plat.php' . ($qs ? '?' . http_build_query($qs) : '');
-};
+$clearQs = $tp->buildClearQs();
 
 $tp->buildFilters();
 $filters = $tp->filters;
-if (count($clientFilterNames) > 0) {
-    $filters[] = ['kind' => 'client', 'text' => 'Контрагент = ' . implode(', ', $clientFilterNames), 'clear' => 'client_id'];
-}
-if (count($zatFilterNames) > 0) {
-    $filters[] = ['kind' => 'zat', 'text' => 'Вид операции = ' . implode(', ', $zatFilterNames), 'clear' => 'zat_id'];
-}
-if (count($sotrFilterNames) > 0) {
-    $filters[] = ['kind' => 'sotr', 'text' => 'Сотрудник = ' . implode(', ', $sotrFilterNames), 'clear' => 'sotr_id'];
-}
-if (count($platTypeFilterNames) > 0) {
-    $filters[] = ['kind' => 'plat_type', 'text' => 'Вид платежа = ' . implode(', ', $platTypeFilterNames), 'clear' => 'plat_type'];
-}
-if (count($outTypeFilterNames) > 0) {
-    $filters[] = ['kind' => 'out_type', 'text' => 'Тип = ' . implode(', ', $outTypeFilterNames), 'clear' => 'out_type'];
-}
 if ($dateFrom !== '' || $dateTo !== '') {
     $df = $dateFrom !== '' ? date('d-m-Y', strtotime($dateFrom)) : '...';
     $dt = $dateTo !== '' ? date('d-m-Y', strtotime($dateTo)) : '...';
     $filters[] = ['kind' => 'period', 'text' => "Период с $df по $dt", 'clear' => ['date_from', 'date_to']];
 }
 
-$exportQs = http_build_query(array_filter([
-    'q'    => $searchActive && $search !== '' ? $search : null,
-    'cols' => $searchActive && count($searchCols) > 0 ? implode(',', $searchCols) : null,
-    'cond' => $searchActive ? $searchCond : null,
-    'sf'   => $searchActive ? '1' : null,
-    'sort' => $sortQs !== '' ? $sortQs : null,
-    'client_id' => $clientFilter !== '' ? $clientFilter : null,
-    'zat_id' => $zatFilter !== '' ? $zatFilter : null,
-    'sotr_id' => $sotrFilter !== '' ? $sotrFilter : null,
-    'plat_type' => $platTypeFilter !== '' ? $platTypeFilter : null,
-    'out_type' => $outTypeFilter !== '' ? $outTypeFilter : null,
-    'date_from' => $dateFrom !== '' ? $dateFrom : null,
-    'date_to' => $dateTo !== '' ? $dateTo : null,
-], function ($v) { return $v !== null && $v !== ''; }));
+$exportQsExtra = [];
+if ($dateFrom !== '') $exportQsExtra['date_from'] = $dateFrom;
+if ($dateTo !== '') $exportQsExtra['date_to'] = $dateTo;
+$exportQs = $tp->buildExportQs($exportQsExtra);
 
 $clientFilterOptions = [];
 $clr = $conn->query("SELECT client_id, name FROM client ORDER BY name");
@@ -279,22 +151,7 @@ function cellValue($row, $colName, $vc) {
     return ['', ''];
 }
 
-$baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs) {
-    $qs = ['page' => (int)$p];
-    if ($searchActive) {
-        if ($search !== '') $qs['q'] = $search;
-        if (count($searchCols) > 0) $qs['cols'] = implode(',', $searchCols);
-        $qs['cond'] = $searchCond;
-        $qs['sf'] = '1';
-    }
-    if ($sortQs !== '') $qs['sort'] = $sortQs;
-    if (!empty($_GET['client_id'])) $qs['client_id'] = $_GET['client_id'];
-    if (!empty($_GET['zat_id'])) $qs['zat_id'] = $_GET['zat_id'];
-    if (!empty($_GET['sotr_id'])) $qs['sotr_id'] = $_GET['sotr_id'];
-    if (!empty($_GET['out_type'])) $qs['out_type'] = $_GET['out_type'];
-    return 'plat.php?' . http_build_query($qs);
-};
-$paginationHtml = render_pagination($page, $pages, $baseQs, true);
+$paginationHtml = '';
 
 $exportDropdownHtml = '';
 foreach ([
@@ -377,7 +234,7 @@ render_head_end(); ?>
                   $attrs = ' data-param="out_type"';
                   $raw = (string)($_GET['out_type'] ?? '');
                   if ($raw !== '') {
-                      $ids = array_values(array_filter(array_map('intval', explode(',', $raw)), fn($v) => $v >= 1 && $v <= 2));
+                      $ids = array_values(array_filter(array_map('intval', explode(',', $raw)), fn($v) => $v === 0 || $v === 1));
                       if (count($ids) > 0) $attrs .= ' data-values="' . implode(',', $ids) . '"';
                   }
                   return $attrs;
@@ -395,13 +252,18 @@ render_head_end(); ?>
     </table>
     </div>
 
-    <?= $paginationHtml ?>
+    <?php
+    $pagExtra = [];
+    if ($dateFrom !== '') $pagExtra['date_from'] = $dateFrom;
+    if ($dateTo !== '') $pagExtra['date_to'] = $dateTo;
+    $tp->renderPagination($pagExtra);
+    ?>
 
     <?php render_form_modal(); ?>
   </div>
 
 <?php
-render_script_includes(['scripts' => ['assets/lookup.js', 'assets/column-filter.js', 'assets/export-modal.js', 'assets/columns-panel.js', 'assets/column-resize.js', 'assets/inline-edit.js']]);
+render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'assets/column-filter.js', 'assets/export-modal.js', 'assets/columns-panel.js', 'assets/column-resize.js', 'assets/inline-edit.js']]);
 ?>
   <script>
   function applyDateFilter() {
@@ -431,24 +293,15 @@ render_script_includes(['scripts' => ['assets/lookup.js', 'assets/column-filter.
     const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
     const currentTotal = parseInt(toolbar.dataset.total || '0', 10);
 
-    const initialMarks = [];
-    document.querySelectorAll('.row-check').forEach(function (cb) {
-      if (cb.checked) initialMarks.push(parseInt(cb.dataset.id, 10));
-    });
-    const selected = new Set(initialMarks);
-
-    function updateSelectionUI() {
-      const any = parseInt(toolbar.dataset.marksCount || '0', 10) > 0;
-      selWrap.classList.toggle('visible', any);
-      selCount.textContent = 'Выбрано: ' + (toolbar.dataset.marksCount || '0');
-    }
+    SelectionToolbar.initTableSelection('plat.php', toolbar.getAttribute('data-search') || '');
 
     function updateRowActionButtons() {
       const id = rowSel.getSelectedId();
       const enabled = id !== 0;
-      rowOpenBtn.disabled = !enabled;
-      rowCopyBtn.disabled = !enabled;
-      rowDeleteBtn.disabled = !enabled;
+      const af = window.__accessFlags || {};
+      rowOpenBtn.disabled = !enabled || !!af.change_flag;
+      rowCopyBtn.disabled = !enabled || !!af.insert_flag;
+      rowDeleteBtn.disabled = !enabled || !!af.delete_flag;
     }
 
     const rowSel = RowSelect.init({
@@ -484,27 +337,7 @@ render_script_includes(['scripts' => ['assets/lookup.js', 'assets/column-filter.
       getPrintUrl: function () { return 'plat_print.php?all=1&' + new URLSearchParams(location.search).toString(); }
     });
 
-    function toggleMark(id, to) {
-      fetch('plat.php?action=toggleSelect', {
-        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
-        body: 'id=' + id + '&to=' + (to ? '1' : '0')
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d.ok) {
-          toolbar.dataset.marksCount = d.count;
-          updateSelectionUI();
-        }
-      });
-    }
-
     document.querySelectorAll('.row-check').forEach(function (cb) {
-      cb.addEventListener('change', function () {
-        const id = parseInt(cb.dataset.id, 10);
-        if (cb.checked) selected.add(id); else selected.delete(id);
-        var cur = parseInt(toolbar.dataset.marksCount || '0', 10);
-        toolbar.dataset.marksCount = String(cb.checked ? cur + 1 : Math.max(0, cur - 1));
-        updateSelectionUI();
-        toggleMark(id, cb.checked);
-      });
       cb.addEventListener('click', function (e) { e.stopPropagation(); });
     });
 
@@ -576,7 +409,7 @@ render_script_includes(['scripts' => ['assets/lookup.js', 'assets/column-filter.
     document.querySelectorAll('tbody tr').forEach(function (tr) {
       const id = parseInt(tr.dataset.rowId, 10);
       tr.addEventListener('click', function (e) { if (e.target.closest('input.row-check')) return; selectRow(id); });
-      tr.addEventListener('dblclick', function () { if (typeof window.__openFormModal === 'function') window.__openFormModal('plat_form.php?mode=edit&id=' + id); });
+      tr.addEventListener('dblclick', function () { if (window.__accessFlags && window.__accessFlags.change_flag) return; if (typeof window.__openFormModal === 'function') window.__openFormModal('plat_form.php?mode=edit&id=' + id); });
     });
 
     document.getElementById('rowOpenBtn').addEventListener('click', function () { const id = rowSel.getSelectedId(); if (id !== 0 && typeof window.__openFormModal === 'function') window.__openFormModal('plat_form.php?mode=edit&id=' + id); });
@@ -585,7 +418,7 @@ render_script_includes(['scripts' => ['assets/lookup.js', 'assets/column-filter.
 
     const tableWrapEl = document.querySelector('.table-wrap');
     if (typeof bindTableKeyboardShortcuts === 'function') {
-      bindTableKeyboardShortcuts({ formPrefix: 'plat_form', rowSel: rowSel, currentPage: currentPage, currentPages: currentPages, navigate: navigate, tableWrapEl: tableWrapEl });
+      bindTableKeyboardShortcuts({ formPrefix: 'plat_form', rowSel: rowSel, currentPage: currentPage, currentPages: currentPages, navigate: navigate, tableWrapEl: tableWrapEl, accessFlags: window.__accessFlags });
     }
 
     (function applyInitialFocus() {
@@ -598,10 +431,13 @@ render_script_includes(['scripts' => ['assets/lookup.js', 'assets/column-filter.
       rowSel.selectByIndex(0);
     })();
 
-    updateSelectionUI();
+    __refreshSelectionUI();
   })();
 
   ExportModal.init();
+
+  window.__accessFlags = <?= json_encode($accessFlags) ?>;
+  if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
 </script>
 <?php render_form_modal_script([
     'form_prefix' => 'plat_form',
@@ -628,6 +464,7 @@ ColumnsPanel.init({
   }, $COLUMN_DEFAULTS), JSON_UNESCAPED_UNICODE) ?>
 });
 
+if (window.__accessFlags && (window.__accessFlags.save_flag || window.__accessFlags.change_flag)) { /* skip */ } else {
 InlineEdit.init({
     tbody: document.querySelector('table tbody'),
     saveUrl: 'plat_field_save.php',
@@ -659,6 +496,7 @@ InlineEdit.init({
       return [];
     }
 });
+}
 
 var __clientLookupData = <?= json_encode($clientFilterOptions, JSON_UNESCAPED_UNICODE) ?>;
 var __zatLookupData = <?= json_encode($zatFilterOptions, JSON_UNESCAPED_UNICODE) ?>;

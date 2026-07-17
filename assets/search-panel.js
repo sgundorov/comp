@@ -293,7 +293,8 @@
         params.set('sf', '1');
         var other = new URLSearchParams(location.search);
         preserveParams.forEach(function (k) { if (other.has(k)) params.set(k, other.get(k)); });
-        location.href = pageUrl + (params.toString() ? '?' + params.toString() : '');
+        var base = pageUrl.split('?')[0];
+        location.href = base + (params.toString() ? '?' + params.toString() : '');
       });
 
       toggleBtn.addEventListener('click', function (e) {
@@ -314,7 +315,8 @@
         params.set('sf', '1');
         var other = new URLSearchParams(location.search);
         preserveParams.forEach(function (k) { if (other.has(k)) params.set(k, other.get(k)); });
-        location.href = pageUrl + (params.toString() ? '?' + params.toString() : '');
+        var base = pageUrl.split('?')[0];
+        location.href = base + (params.toString() ? '?' + params.toString() : '');
       });
 
       form.addEventListener('submit', function (e) {
@@ -328,7 +330,8 @@
           var other = new URLSearchParams(location.search);
           ['q', 'cols', 'cond', 'sf', 'page'].forEach(function (k) { other.delete(k); });
           var s = other.toString();
-          location.href = pageUrl + (s ? '?' + s : '');
+          var base = pageUrl.split('?')[0];
+          location.href = base + (s ? '?' + s : '');
           return;
         }
         var params = new URLSearchParams();
@@ -338,7 +341,8 @@
         params.set('sf', '1');
         var other = new URLSearchParams(location.search);
         preserveParams.forEach(function (k) { if (other.has(k)) params.set(k, other.get(k)); });
-        location.href = pageUrl + (params.toString() ? '?' + params.toString() : '');
+        var base = pageUrl.split('?')[0];
+        location.href = base + (params.toString() ? '?' + params.toString() : '');
       });
     },
 

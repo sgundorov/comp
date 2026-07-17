@@ -6,6 +6,8 @@ require_once __DIR__ . '/lib/table-template.php';
 require_once __DIR__ . '/lib/marks-actions.php';
 require_once __DIR__ . '/lib/form-modal-handler.php';
 
+$accessFlags = render_access_control($conn, 'Group');
+
 $TBL = 'group';
 $PAGE_TITLE = 'Группы услуг';
 $PAGE_URL   = 'groupserv.php';
@@ -226,83 +228,29 @@ render_form_modal(); ?>
   </div>
 
 <?php
-render_script_includes(['scripts' => ['assets/export-modal.js']]);
+render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.js']]);
 ?>
   <script>
     window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
     window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'name' => 250, 'note' => 500], JSON_UNESCAPED_UNICODE) ?>;
+    window.__accessFlags = <?= json_encode($accessFlags) ?>;
+    if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
   </script>
   <script>
     function closeAllPanels() {
       document.querySelectorAll('.search-cond-panel.open, .search-cond-pop.open, .columns-panel.open, .col-filter-panel.open').forEach(function (p) { p.classList.remove('open'); if (p.style) p.style.display = ''; });
     }
     (function () {
-      const checkAll  = document.getElementById('checkAll');
-      const rowChecks = document.querySelectorAll('.row-check');
-      const selWrap   = document.getElementById('selectedActions');
-      const selCount  = document.getElementById('selectedCount');
-      const toolbar   = document.querySelector('.toolbar');
-      const search    = toolbar.getAttribute('data-search') || '';
-      const markedSet = new Set(Array.from(rowChecks).filter(cb => cb.checked).map(cb => parseInt(cb.value, 10)));
-      let globalCount = parseInt(toolbar.getAttribute('data-marks-count') || '0', 10);
-
-      document.querySelectorAll('.submenu a').forEach(function (a) {
-        a.addEventListener('click', function () {
-          var item = a.closest('.menu-item');
-          if (item) item.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-        });
-      });
-
-      function refreshCounter() {
-        selCount.textContent = 'Выбрано: ' + globalCount;
-        selWrap.classList.toggle('visible', globalCount > 0);
-        const rowTotal = rowChecks.length;
-        let rowOn = 0;
-        rowChecks.forEach(cb => { if (cb.checked) rowOn++; });
-        if (rowTotal === 0) {
-          checkAll.checked = false;
-          checkAll.indeterminate = false;
-        } else {
-          checkAll.checked = rowOn === rowTotal;
-          checkAll.indeterminate = rowOn > 0 && rowOn < rowTotal;
-        }
-      }
-
-      checkAll.addEventListener('change', function () {
-        location.href = '<?= $PAGE_URL ?>?action=toggleSelectAll' + (search ? '&q=' + encodeURIComponent(search) : '');
-      });
-
-      rowChecks.forEach(cb => cb.addEventListener('change', function () {
-        const id  = parseInt(cb.value, 10);
-        const to  = cb.checked;
-        cb.disabled = true;
-        fetch('<?= $PAGE_URL ?>?action=toggleSelect', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: 'id=' + encodeURIComponent(id) + '&to=' + (to ? '1' : '0')
-        })
-        .then(r => r.json())
-        .then(function (j) {
-          cb.disabled = false;
-          if (j.ok) {
-            if (to) markedSet.add(id); else markedSet.delete(id);
-            globalCount = (typeof j.count === 'number') ? j.count : globalCount;
-            refreshCounter();
-          }
-        })
-        .catch(function () { cb.disabled = false; });
-      }));
+      SelectionToolbar.initTableSelection('<?= $PAGE_URL ?>', document.querySelector('.toolbar').getAttribute('data-search') || '');
 
       SelectionToolbar.init({
         pageUrl: '<?= $PAGE_URL ?>',
-        search: search,
+        search: document.querySelector('.toolbar').getAttribute('data-search') || '',
         getExportUrl: function () {
-          if (markedSet.size === 0) return null;
-          return 'groupserv_export.php?format=csv&all=1';
+          return null;
         },
         getPrintUrl: function () {
-          if (markedSet.size === 0) return null;
-          return 'groupserv_print.php?all=1';
+          return null;
         }
       });
 
@@ -372,9 +320,10 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
         rowClass: 'selected',
         onChange: function (id) {
           const enabled = id > 0;
-          if (openBtn)   openBtn.disabled   = !enabled;
-          if (copyBtn)   copyBtn.disabled   = !enabled;
-          if (deleteBtn) deleteBtn.disabled = !enabled;
+          const af = window.__accessFlags || {};
+          if (openBtn)   openBtn.disabled   = !enabled || !!af.change_flag;
+          if (copyBtn)   copyBtn.disabled   = !enabled || !!af.insert_flag;
+          if (deleteBtn) deleteBtn.disabled = !enabled || !!af.delete_flag;
         },
         currentPage: currentPage,
         totalPages: currentPages,
@@ -395,6 +344,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
       if (tbody) {
         tbody.addEventListener('dblclick', function (e) {
           if (e.target.closest('input[type="checkbox"]')) return;
+          if (window.__accessFlags && window.__accessFlags.change_flag) return;
           const tr = e.target.closest('tr[data-row-id]');
           if (!tr) return;
           const id = parseInt(tr.dataset.rowId, 10) || 0;
@@ -429,7 +379,8 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
         currentPage: currentPage,
         currentPages: currentPages,
         navigate: navigate,
-        tableWrapEl: tableWrapEl
+        tableWrapEl: tableWrapEl,
+        accessFlags: window.__accessFlags
       });
     })();
 
@@ -437,6 +388,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
       const tbody = document.querySelector('table tbody');
       if (!tbody) return;
 
+      if (window.__accessFlags && (window.__accessFlags.save_flag || window.__accessFlags.change_flag)) { /* skip */ } else {
       InlineEdit.init({
         tbody: tbody,
         saveUrl: 'group_field_save.php',
@@ -468,6 +420,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
         },
         onOpenForm: window.__openFormModal
       });
+      }
     })();
 
     ColumnResize.init({ saveUrl: 'group_column_width_save.php', tbl: 'group' });

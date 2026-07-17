@@ -8,7 +8,8 @@ $tbl  = (string)($_POST['tbl'] ?? '');
 $name = (string)($_POST['name'] ?? '');
 $width = isset($_POST['width']) ? ($_POST['width'] === '' ? null : (int)$_POST['width']) : null;
 
-if ($tbl !== 'invoice' && $tbl !== 'invoice2') {
+$allowedTbls = ['invoice', 'invoice2', 'kom', 'kom2'];
+if (!in_array($tbl, $allowedTbls, true)) {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['ok' => false, 'error' => 'Invalid table']);
     exit;

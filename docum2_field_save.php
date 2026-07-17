@@ -18,18 +18,8 @@ function check_docum_accepted(mysqli $conn, int $documId): void {
     }
 }
 
-function _fmt_qty($v) {
-    $n = (float)str_replace(',', '.', $v);
-    if ($n == 0) return '';
-    $s = number_format($n, 3, '.', '');
-    $s = rtrim(rtrim($s, '0'), '.');
-    return $n == (int)$n ? (string)(int)$n : str_replace('.', ',', $s);
-}
-function _fmt_d2($v, $dec) {
-    $n = (float)str_replace(',', '.', $v);
-    if ($n == 0) return '';
-    return number_format($n, $dec, ',', '');
-}
+function _fmt_qty($v) { return fmt_num($v, 3); }
+function _fmt_d2($v, $dec) { return fmt_num($v, $dec); }
 
 function recalc_docum_totals(mysqli $conn, int $documId): array {
     $stmt = $conn->prepare("SELECT COALESCE(SUM(sum),0), COALESCE(SUM(sum_discount),0), COUNT(*) FROM docum2 WHERE docum_id = ?");

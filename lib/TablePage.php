@@ -80,6 +80,7 @@ if (!defined('TABLEPAGE_LOADED')) {
             $this->parseRequest();
             $this->parseSort();
             $this->loadColumnsConfig($conn);
+            $this->loadColumnWidths($conn);
             $this->loadMarks($conn);
             $this->loadSession();
             if ($this->showOnly && $this->marksCount === 0) {
@@ -283,7 +284,9 @@ if (!defined('TABLEPAGE_LOADED')) {
             $stmt = @mysqli_prepare($conn, "SELECT $lookupIdCol, $lookupNameCol FROM $lookupTable WHERE $lookupIdCol IN ($ph2)");
             $names = [];
             if ($stmt) {
-                $stmt->bind_param(str_repeat('i', count($ids)), ...$ids);
+                $refs = [];
+                foreach ($ids as $k => $v) { $refs[$k] = &$ids[$k]; }
+                $stmt->bind_param(str_repeat('i', count($ids)), ...$refs);
                 $stmt->execute();
                 $res = $stmt->get_result();
                 if ($res) while ($r = $res->fetch_assoc()) $names[] = (string)$r[$lookupNameCol];
@@ -297,7 +300,11 @@ if (!defined('TABLEPAGE_LOADED')) {
         }
 
         public function buildFilters() {
-            $this->filters = [];
+            $colFilterChips = [];
+            foreach ($this->filters as $f) {
+                if (($f['kind'] ?? '') === 'col_filter') $colFilterChips[] = $f;
+            }
+            $this->filters = $colFilterChips;
             if ($this->searchActive && $this->search !== '') {
                 $condLabels = [
                     'contains' => 'содержит', 'not_contains' => 'не содержит',
@@ -738,7 +745,8 @@ if (!defined('TABLEPAGE_LOADED')) {
             $qs = $_GET;
             foreach ($drop as $k) unset($qs[$k], $qs['page']);
             $s = http_build_query($qs);
-            return $s !== '' ? $this->baseUrl . '?' . $s : $this->baseUrl;
+            $sep = strpos($this->baseUrl, '?') !== false ? '&' : '?';
+            return $s !== '' ? $this->baseUrl . $sep . $s : $this->baseUrl;
         }
 
         public function buildClearQs(array $extraDrop = []) {
@@ -770,24 +778,114 @@ if (!defined('TABLEPAGE_LOADED')) {
                 'sf'   => $this->searchActive ? '1' : null,
                 'sort' => $this->sortQs !== '' ? $this->sortQs : null,
             ];
+            foreach ($this->getColumnFilterParams() as $p) {
+                if (!empty($_GET[$p])) $params[$p] = $_GET[$p];
+            }
             foreach ($extraParams as $k => $v) {
                 $params[$k] = ($v !== null && $v !== '') ? $v : null;
             }
             return http_build_query(array_filter($params, function ($v) { return $v !== null && $v !== ''; }));
         }
 
+        public function normalizeColFilterConfig($cfg): array {
+            if (isset($cfg['table']) || isset($cfg['options'])) return $cfg;
+            if (is_array($cfg)) {
+                $a = array_values($cfg);
+                return [
+                    'col'   => $a[0] ?? null,
+                    'table' => $a[1] ?? null,
+                    'id'    => $a[2] ?? null,
+                    'label' => $a[3] ?? null,
+                    'param' => $a[4] ?? null,
+                ];
+            }
+            return [];
+        }
+
         public function colFilterOptions(mysqli $conn, string $col) {
             $cfg = $this->colFilters[$col] ?? null;
             if (!$cfg) return [];
-            [$colExpr, $colTable, $idCol, $labelExpr] = $cfg + [null, null, null, null];
-            if (!$colTable || !$idCol || !$labelExpr) return [];
-            $sql = "SELECT $idCol AS id, $labelExpr AS name FROM $colTable ORDER BY $labelExpr";
+            $cfg = $this->normalizeColFilterConfig($cfg);
+            if (isset($cfg['options'])) return $cfg['options'];
+            $table = $cfg['table'] ?? null;
+            $idCol = $cfg['id'] ?? null;
+            $labelExpr = $cfg['label'] ?? null;
+            if (!$table || !$idCol || !$labelExpr) return [];
+            $sql = "SELECT $idCol AS id, $labelExpr AS name FROM $table ORDER BY $labelExpr";
             $out = [];
             $res = @$conn->query($sql);
             if ($res) while ($r = $res->fetch_assoc()) {
                 $out[] = ['id' => (int)$r['id'], 'name' => (string)$r['name']];
             }
             return $out;
+        }
+
+        public function getColumnFilterParams(): array {
+            $params = [];
+            foreach ($this->colFilters as $col => $cfg) {
+                $cfg = $this->normalizeColFilterConfig($cfg);
+                $p = $cfg['param'] ?? ($this->colMeta[$col]['param'] ?? ($col . '_id'));
+                $params[] = $p;
+            }
+            return $params;
+        }
+
+        public function processColumnFilters(mysqli $conn): void {
+            foreach ($this->colFilters as $col => $cfg) {
+                $cfg = $this->normalizeColFilterConfig($cfg);
+                if (empty($cfg)) continue;
+                $param = $cfg['param'] ?? ($this->colMeta[$col]['param'] ?? ($col . '_id'));
+                $raw = (string)($_GET[$param] ?? '');
+                if ($raw === '') continue;
+                $colExpr = $cfg['col'] ?? '';
+                if ($colExpr === '') {
+                    $cm = $this->colMeta[$col] ?? null;
+                    $colExpr = ($cm['sort_expr'] ?? '') ?: $param;
+                }
+                if (isset($cfg['options'])) {
+                    $useId = ($cfg['value_key'] ?? 'name') === 'id';
+                    $parts = array_values(array_filter(explode(',', $raw), fn($s) => $s !== ''));
+                    $rawIds = array_map('intval', $parts);
+                    $validIds = [];
+                    foreach ($cfg['options'] as $opt) $validIds[] = (int)$opt['id'];
+                    $ids = array_values(array_intersect($rawIds, $validIds));
+                    if (count($ids) === 0) continue;
+                    $idToName = [];
+                    foreach ($cfg['options'] as $opt) $idToName[(int)$opt['id']] = (string)$opt['name'];
+                    $names = array_map(fn($id) => $idToName[$id] ?? '#' . $id, $ids);
+                    if ($useId) {
+                        $ph = implode(',', array_fill(0, count($ids), '?'));
+                        $this->appendWhere("$colExpr IN ($ph)", $ids, str_repeat('i', count($ids)));
+                    } else {
+                        $ph = implode(',', array_fill(0, count($names), '?'));
+                        $this->appendWhere("$colExpr IN ($ph)", $names, str_repeat('s', count($names)));
+                    }
+                    $label = $cfg['label'] ?? $this->colMeta[$col]['label'] ?? $col;
+                    $this->filters[] = ['kind' => 'col_filter', 'text' => "$label = " . implode(', ', $names), 'clear' => $param];
+                } elseif (isset($cfg['table'])) {
+                    $ids = array_values(array_filter(array_map('intval', explode(',', $raw)), fn($v) => $v > 0));
+                    if (count($ids) === 0) continue;
+                    $ph = implode(',', array_fill(0, count($ids), '?'));
+                    $this->appendWhere("$colExpr IN ($ph)", $ids, str_repeat('i', count($ids)));
+                    $lookupTable = $cfg['table'];
+                    $lookupIdCol = $cfg['id'] ?? 'id';
+                    $lookupNameCol = $cfg['label'] ?? 'name';
+                    $names = [];
+                    $ph2 = implode(',', array_fill(0, count($ids), '?'));
+                    $stmt = @$conn->prepare("SELECT $lookupIdCol, $lookupNameCol AS name FROM $lookupTable WHERE $lookupIdCol IN ($ph2)");
+                    if ($stmt) {
+                        $refs2 = [];
+                        foreach ($ids as $k => $v) { $refs2[$k] = &$ids[$k]; }
+                        $stmt->bind_param(str_repeat('i', count($ids)), ...$refs2);
+                        $stmt->execute();
+                        $res = $stmt->get_result();
+                        if ($res) while ($r = $res->fetch_assoc()) $names[] = (string)$r['name'];
+                        $stmt->close();
+                    }
+                    $label = $cfg['label'] ?? $this->colMeta[$col]['label'] ?? $col;
+                    $this->filters[] = ['kind' => 'col_filter', 'text' => "$label = " . (count($names) > 0 ? implode(', ', $names) : implode(',', $ids)), 'clear' => $param];
+                }
+            }
         }
 
         // --- Rendering ---
@@ -1085,6 +1183,22 @@ if (!defined('TABLEPAGE_LOADED')) {
         $thAttrs = 'class="col-' . h($cn) . '" data-col="' . h($cn) . '"' . ($hasSortExpr ? ' data-sort-col="' . h($cn) . '"' : '') . ' data-col-idx="' . (int)$i . '" data-sort-dir="' . h($sortDir) . '"';
         if (!empty($cm['param'])) $thAttrs .= ' data-param="' . h($cm['param']) . '"';
         if (!empty($vc['no_resize'])) $thAttrs .= ' data-no-resize="1"';
+        // auto-add data-param and data-values for column filters
+        $cfCfg = $this->colFilters[$cn] ?? null;
+        if ($cfCfg) {
+            $cfCfg = $this->normalizeColFilterConfig($cfCfg);
+            $cfParam = $cfCfg['param'] ?? ($cm['param'] ?? ($cn . '_id'));
+            if (empty($cm['param'])) $thAttrs .= ' data-param="' . h($cfParam) . '"';
+            $raw = (string)($_GET[$cfParam] ?? '');
+            if ($raw !== '') {
+                $validIds = [];
+                if (isset($cfCfg['options']) && ($cfCfg['value_key'] ?? 'name') === 'id') {
+                    foreach ($cfCfg['options'] as $opt) $validIds[] = (int)$opt['id'];
+                }
+                $ids = array_values(array_filter(array_map('intval', explode(',', $raw)), fn($v) => count($validIds) > 0 ? in_array($v, $validIds) : $v > 0));
+                if (count($ids) > 0) $thAttrs .= ' data-values="' . implode(',', $ids) . '"';
+            }
+        }
         if ($thAttrsCallback) $thAttrs .= $thAttrsCallback($cn, $cm, $i);
     ?>
       <th <?= $thAttrs ?>>
@@ -1137,12 +1251,19 @@ if (!defined('TABLEPAGE_LOADED')) {
   </tbody><?php
         }
 
-        public function renderPagination(): void {
+        public function renderPagination(array $extraParams = []): void {
             if ($this->pages <= 1) return;
             $prev = max(1, $this->page - 1);
             $next = min($this->pages, $this->page + 1);
-            $baseQs = function ($p) {
-                $qs = ['page' => $p];
+            $cfParams = [];
+            foreach ($this->getColumnFilterParams() as $p) {
+                if (!empty($_GET[$p])) $cfParams[$p] = $_GET[$p];
+            }
+            $baseQs = function ($p) use ($cfParams, $extraParams) {
+                $qs = ['page' => (int)$p];
+                foreach ($extraParams as $k => $v) {
+                    if ($v !== '' && $v !== null) $qs[$k] = $v;
+                }
                 if ($this->searchActive) {
                     if ($this->search !== '') $qs['q'] = $this->search;
                     if (count($this->searchCols) > 0) $qs['cols'] = implode(',', $this->searchCols);
@@ -1153,7 +1274,9 @@ if (!defined('TABLEPAGE_LOADED')) {
                     $qs[$this->countryFilterField] = $this->countryFilter;
                 }
                 if ($this->sortQs !== '') $qs['sort'] = $this->sortQs;
-                return $this->baseUrl . '?' . http_build_query($qs);
+                foreach ($cfParams as $k => $v) $qs[$k] = $v;
+                $sep = strpos($this->baseUrl, '?') !== false ? '&' : '?';
+                return $this->baseUrl . $sep . http_build_query($qs);
             };
             ?><div class="pagination">
       <a class="page-btn" href="<?= h($baseQs(1)) ?>"<?= $this->page <= 1 ? ' aria-disabled="true" style="pointer-events:none;opacity:.5;"' : '' ?>>«</a>
@@ -1250,7 +1373,9 @@ if (!defined('TABLEPAGE_LOADED')) {
     </div>
     <div class="table-wrap" style="overflow-x:auto">
     <table class="data-table docum2-table" style="table-layout:fixed;width:100%" id="<?= h($p) ?>-table"
-           data-items='<?= h(json_encode($data, JSON_UNESCAPED_UNICODE)) ?>'>
+           data-items='<?= h(json_encode($data, JSON_UNESCAPED_UNICODE)) ?>'
+           <?php if (!empty($options['columnResizeUrl'])): ?>data-col-resize-url="<?= h($options['columnResizeUrl']) ?>"<?php endif; ?>
+           <?php if (!empty($options['columnResizeTbl'])): ?>data-col-resize-tbl="<?= h($options['columnResizeTbl']) ?>"<?php endif; ?>>
       <?php $this->renderColgroup(true, $visibleCols) ?>
       <thead>
         <tr>
@@ -1684,79 +1809,25 @@ if (!defined('TABLEPAGE_LOADED')) {
         } else { params.delete('focus'); }
       } else { params.delete('focus'); }
     };
-    (function () {
-      const checkAll  = document.getElementById('checkAll');
-      const rowChecks = document.querySelectorAll('.row-check');
-      const selWrap   = document.getElementById('selectedActions');
-      const selCount  = document.getElementById('selectedCount');
-      const toolbar   = document.querySelector('.toolbar');
-      const search    = toolbar.getAttribute('data-search') || '';
-      const markedSet = new Set(Array.from(rowChecks).filter(cb => cb.checked).map(cb => parseInt(cb.value, 10)));
-      let globalCount = parseInt(toolbar.getAttribute('data-marks-count') || '0', 10);
-
-      document.querySelectorAll('.submenu a').forEach(function (a) {
-        a.addEventListener('click', function () {
-          var item = a.closest('.menu-item');
-          if (item) item.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-        });
+    document.querySelectorAll('.submenu a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        var item = a.closest('.menu-item');
+        if (item) item.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
       });
+    });
 
-      function refreshCounter() {
-        selCount.textContent = 'Выбрано: ' + globalCount;
-        selWrap.classList.toggle('visible', globalCount > 0);
-        const rowTotal = rowChecks.length;
-        let rowOn = 0;
-        rowChecks.forEach(cb => { if (cb.checked) rowOn++; });
-        if (rowTotal === 0) {
-          checkAll.checked = false;
-          checkAll.indeterminate = false;
-        } else {
-          checkAll.checked = rowOn === rowTotal;
-          checkAll.indeterminate = rowOn > 0 && rowOn < rowTotal;
-        }
-      }
-
-      window.__marksUrl = function (action) {
-        var _u = new URLSearchParams(location.search);
-        _u.set('action', action);
-        if (search) _u.set('q', search);
-        return '<?= h($pageUrl) ?>?' + _u.toString();
-      };
-
-      checkAll.addEventListener('change', function () {
-        location.href = window.__marksUrl('toggleSelectAll');
-      });
-
-      rowChecks.forEach(cb => cb.addEventListener('change', function () {
-        const id  = parseInt(cb.value, 10);
-        const to  = cb.checked;
-        cb.disabled = true;
-        fetch(window.__marksUrl('toggleSelect'), {
-          method: 'POST',
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: 'id=' + encodeURIComponent(id) + '&to=' + (to ? '1' : '0')
-        })
-        .then(r => r.json())
-        .then(function (j) {
-          cb.disabled = false;
-          if (j.ok) {
-            if (to) markedSet.add(id); else markedSet.delete(id);
-            globalCount = (typeof j.count === 'number') ? j.count : globalCount;
-            refreshCounter();
-          }
-        })
-        .catch(function () { cb.disabled = false; });
-      }));
+    var _tb = document.querySelector('.toolbar');
+    SelectionToolbar.initTableSelection('<?= h($pageUrl) ?>', _tb ? _tb.getAttribute('data-search') || '' : '');
 
       SelectionToolbar.init({
         pageUrl: '<?= h($pageUrl) ?>',
-        search: search,
+        search: _tb ? _tb.getAttribute('data-search') || '' : '',
         getExportUrl: function () {
-          if (markedSet.size === 0) return null;
+          if (document.querySelectorAll('.row-check:checked').length === 0) return null;
           return '<?= h($exportUrl) ?>?format=csv&all=1';
         },
         getPrintUrl: function () {
-          if (markedSet.size === 0) return null;
+          if (document.querySelectorAll('.row-check:checked').length === 0) return null;
           return '<?= h($printUrl) ?>?all=1';
         },
 <?php if ($marksTbl): ?>
@@ -1801,7 +1872,6 @@ foreach ($searchPanelKeys as $k) {
           { key: 'desc', label: 'По убыванию' },
         ]<?= $currentSort !== null ? ',' . "\n        " . 'currentSort: ' . json_encode($currentSort, JSON_UNESCAPED_UNICODE) : '' ?>
       });
-    })();
 
     ExportModal.init();
     </script>
@@ -1824,9 +1894,21 @@ foreach ($searchPanelKeys as $k) {
     };
     </script>
 <?php endif; ?>
-<?php if (!empty($colFilters)): ?>
+<?php
+$cfInit = is_array($colFilters) ? $colFilters : [];
+if ($colFilters === true) {
+    foreach ($this->colFilters as $col => $cfg) {
+        $cfg = $this->normalizeColFilterConfig($cfg);
+        $cfParam = $cfg['param'] ?? ($this->colMeta[$col]['param'] ?? ($col . '_id'));
+        $init = ['thSelector' => '.col-' . $col, 'pageUrl' => $this->baseUrl];
+        if ($cfParam !== $col . '_id') $init['param'] = $cfParam;
+        if (isset($cfg['options'])) $init['options'] = $cfg['options'];
+        $cfInit[] = $init;
+    }
+}
+if (!empty($cfInit)): ?>
     <script>
-<?php foreach ($colFilters as $cf): ?>
+<?php foreach ($cfInit as $cf): ?>
     ColumnFilter.init(<?= json_encode($cf, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>);
 <?php endforeach; ?>
     </script>
@@ -1906,14 +1988,18 @@ foreach ($searchPanelKeys as $k) {
         try {
           if (typeof window.ColumnResize !== 'undefined') {
             root.querySelectorAll('.data-table').forEach(function(t) {
+              t.querySelectorAll('.col-resize-handle').forEach(function(h) { h.remove(); });
               t.removeAttribute('data-col-resize-inited');
-              window.ColumnResize.init({ selector: '#' + t.id });
+              var opts = { selector: '#' + t.id };
+              if (t.dataset.colResizeUrl) opts.saveUrl = t.dataset.colResizeUrl;
+              if (t.dataset.colResizeTbl) opts.tbl = t.dataset.colResizeTbl;
+              window.ColumnResize.init(opts);
             });
           }
         } catch(ex) { console.error('[FM] ColumnResize re-init error', ex); }
       }
 
-      function stashCurrentForm(onRestore) {
+      function stashCurrentForm(onRestore, estSelectedId) {
         var form = body.querySelector('form[data-form-modal]');
         if (!form) return;
         var active = document.activeElement;
@@ -1928,15 +2014,26 @@ foreach ($searchPanelKeys as $k) {
             el.setAttribute('value', el.value);
           }
         });
+        var savedTableSelections = {};
+        Object.keys(window).forEach(function(k) {
+          if (k.indexOf('__') === 0 && k.indexOf('Table') === k.length - 5 && window[k] && typeof window[k].selectedId === 'number') {
+            savedTableSelections[k] = window[k].selectedId;
+          }
+        });
+        if (estSelectedId && !Object.keys(savedTableSelections).length) {
+          savedTableSelections['__estFallback'] = estSelectedId;
+        }
         stashed = {
           html: body.innerHTML,
           onRestore: onRestore || function () {},
-          activeId: active && active.id ? active.id : null
+          activeId: active && active.id ? active.id : null,
+          _tableSelections: savedTableSelections
         };
       }
 
       function restoreStashedForm(data) {
         if (!stashed) return false;
+        var savedTableSelections = stashed._tableSelections || {};
         body.innerHTML = stashed.html;
         var old = stashed;
         stashed = null;
@@ -1949,9 +2046,51 @@ foreach ($searchPanelKeys as $k) {
             <?= $fmExtraRestore ?>
             try { <?= $fmExtraOpen ?> } catch(ex) { console.error('[FM] extraOpen error', ex); }
         autoInitFormBody(body);
+        if (savedTableSelections && Object.keys(savedTableSelections).length) {
+          var restoreFn = function() {
+            console.log('[FM] restoreFn running, savedTableSelections=', JSON.stringify(savedTableSelections), 'window.__sgTable=', !!window.__sgTable);
+            Object.keys(savedTableSelections).forEach(function(k) {
+              if (k === '__estFallback') return;
+              var tbl = window[k];
+              if (tbl && typeof tbl.selectedId === 'number' && savedTableSelections[k]) {
+                var id = savedTableSelections[k];
+                var found = false;
+                if (tbl.data) { for (var i = 0; i < tbl.data.length; i++) { if (tbl.data[i].id == id) { found = true; break; } } }
+                if (found) {
+                  tbl.selectedId = id;
+                  tbl.render();
+                  if (tbl.tbody) {
+                    var row = tbl.tbody.querySelector('tr[data-id="' + id + '"]');
+                    if (row) row.scrollIntoView({ block: 'nearest' });
+                  }
+                }
+              }
+            });
+            if (savedTableSelections['__estFallback']) {
+              var fallbackId = savedTableSelections['__estFallback'];
+              Object.keys(window).forEach(function(k) {
+                if (k.indexOf('__') === 0 && k.indexOf('Table') === k.length - 5 && window[k] && typeof window[k].selectedId === 'number' && window[k].data) {
+                  var tbl = window[k];
+                  var found = false;
+                  for (var i = 0; i < tbl.data.length; i++) { if (tbl.data[i].id == fallbackId) { found = true; break; } }
+                  if (found) {
+                    tbl.selectedId = fallbackId;
+                    tbl.render();
+                    if (tbl.tbody) {
+                      var row = tbl.tbody.querySelector('tr[data-id="' + fallbackId + '"]');
+                      if (row) row.scrollIntoView({ block: 'nearest' });
+                    }
+                  }
+                }
+              });
+            }
+          };
+          setTimeout(restoreFn, 50);
+          setTimeout(restoreFn, 200);
+        }
         if (data) { try { old.onRestore(data, body); } catch (e) { console.error('[FM] onRestore error', e); } }
         if (old.activeId) {
-          var el = body.querySelector('#' + old.activeId);
+          var el = body.querySelector('[id="' + old.activeId.replace(/"/g, '\\"') + '"]');
           if (el && !el.readOnly) { el.focus(); if (el.select) el.select(); }
         } else {
           FormModalCore.focusFirstField(body);
@@ -1960,7 +2099,7 @@ foreach ($searchPanelKeys as $k) {
       }
 
       function openFormModal(url, stash) {
-        stashCurrentForm(stash && stash.onRestore);
+        stashCurrentForm(stash && stash.onRestore, stash && stash._estSelectedId);
         body.innerHTML = '<div style="padding:20px;color:var(--muted);">Загрузка…</div>';
         backdrop.classList.add('open');
         document.body.style.overflow = 'hidden';

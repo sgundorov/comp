@@ -6,6 +6,8 @@ require_once __DIR__ . '/lib/TablePage.php';
 require_once __DIR__ . '/lib/table-template.php';
 require_once __DIR__ . '/lib/form-modal-handler.php';
 
+$accessFlags = render_access_control($conn, 'Unit');
+
 ensure_marks_table($conn);
 
 $tp = new TablePage($conn, $unitPageConfig);
@@ -167,7 +169,7 @@ render_head_end(); ?>
   </div>
 
 <?php
-render_script_includes(['scripts' => ['assets/export-modal.js']]);
+render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.js']]);
 ?>
   <script>
   (function () {
@@ -188,24 +190,16 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
     const currentPage  = parseInt(toolbar.dataset.page  || '1', 10);
     const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
     const currentTotal = parseInt(toolbar.dataset.total || '0', 10);
-    const initialMarks = [];
-    document.querySelectorAll('.row-check').forEach(function (cb) {
-      if (cb.checked) initialMarks.push(parseInt(cb.dataset.id, 10));
-    });
-    const selected = new Set(initialMarks);
 
-    function updateSelectionUI() {
-      const any = selected.size > 0;
-      selWrap.classList.toggle('visible', any);
-      selCount.textContent = 'Выбрано: ' + selected.size;
-    }
+    SelectionToolbar.initTableSelection('unit.php', document.querySelector('.toolbar').getAttribute('data-search') || '');
 
     function updateRowActionButtons() {
       const id = rowSel.getSelectedId();
       const enabled = id !== 0;
-      rowOpenBtn.disabled = !enabled;
-      rowCopyBtn.disabled = !enabled;
-      rowDeleteBtn.disabled = !enabled;
+      const af = window.__accessFlags || {};
+      rowOpenBtn.disabled = !enabled || !!af.change_flag;
+      rowCopyBtn.disabled = !enabled || !!af.insert_flag;
+      rowDeleteBtn.disabled = !enabled || !!af.delete_flag;
     }
 
     const rowSel = RowSelect.init({
@@ -237,41 +231,14 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
         return 'unit.php?action=invertSelection&' + other.toString();
       },
       getExportUrl: function () {
-        if (selected.size === 0) return null;
-        var ids = Array.from(selected);
-        var other = new URLSearchParams(location.search);
-        if (ids.length > 0) other.set('ids', ids.join(','));
         return null;
       },
       getPrintUrl: function () {
-        if (selected.size === 0) return null;
-        var ids = Array.from(selected);
-        var other = new URLSearchParams(location.search);
-        if (ids.length > 0) other.set('ids', ids.join(','));
         return null;
       }
     });
 
-    function toggleMark(id, to) {
-      fetch('unit.php?action=toggleSelect', {
-        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
-        body: 'id=' + id + '&to=' + (to ? '1' : '0')
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d.ok) {
-          selCount.textContent = 'Выбрано: ' + d.count;
-          selWrap.classList.toggle('visible', d.count > 0);
-          toolbar.dataset.marksCount = d.count;
-        }
-      });
-    }
-
     document.querySelectorAll('.row-check').forEach(function (cb) {
-      cb.addEventListener('change', function () {
-        const id = parseInt(cb.dataset.id, 10);
-        if (cb.checked) selected.add(id); else selected.delete(id);
-        updateSelectionUI();
-        toggleMark(id, cb.checked);
-      });
       cb.addEventListener('click', function (e) { e.stopPropagation(); });
     });
 
@@ -354,6 +321,8 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
 
     window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
     window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'unit' => 200, 'note' => 500], JSON_UNESCAPED_UNICODE) ?>;
+    window.__accessFlags = <?= json_encode($accessFlags) ?>;
+    if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
 
     document.querySelectorAll('tbody tr').forEach(function (tr) {
       const id = parseInt(tr.dataset.rowId, 10);
@@ -362,6 +331,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
         selectRow(id);
       });
       tr.addEventListener('dblclick', function () {
+        if (window.__accessFlags && window.__accessFlags.change_flag) return;
         window.__openFormModal('unit_form.php?mode=edit&id=' + id);
       });
     });
@@ -398,10 +368,11 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
       currentPage: currentPage,
       currentPages: currentPages,
       navigate: navigate,
-      tableWrapEl: tableWrapEl
+      tableWrapEl: tableWrapEl,
+      accessFlags: window.__accessFlags
     });
 
-    updateSelectionUI();
+    __refreshSelectionUI();
   })();
   </script>
     <?php render_form_modal_script([
@@ -410,6 +381,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
       'lookup_tables' => [],
     ]); ?>
   <script>
+  if (window.__accessFlags && (window.__accessFlags.save_flag || window.__accessFlags.change_flag)) { /* skip */ } else {
   InlineEdit.init({
     tbody: document.querySelector('table tbody'),
     saveUrl: 'unit_field_save.php',
@@ -440,7 +412,8 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]);
     },
     onOpenForm: window.__openFormModal
   });
-
+  }
+  
   ColumnResize.init({ saveUrl: 'unit_column_width_save.php', tbl: 'unit' });
   ExportModal.init();
   </script>

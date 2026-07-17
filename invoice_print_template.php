@@ -5,6 +5,8 @@ require_once __DIR__ . '/lib/sum_propis.php';
 
 $invoiceId = (int)($_GET['id'] ?? 0);
 $templateFile = (string)($_GET['template'] ?? 'sdoc/invoice_template.html');
+$invoiceKind = (string)($_GET['kind'] ?? $_SESSION['invoice_kind'] ?? '');
+$invoiceIsOffer = ($invoiceKind === 'offer');
 
 if ($invoiceId <= 0) {
     echo '<p>Не указан ID счета.</p>';
@@ -33,7 +35,7 @@ $inv = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$inv) {
-    echo '<p>Счет не найден.</p>';
+    echo '<p>' . ($invoiceIsOffer ? 'Коммерческое предложение' : 'Счет') . ' не найден.</p>';
     exit;
 }
 

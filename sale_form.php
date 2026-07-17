@@ -6,6 +6,8 @@ require_once __DIR__ . '/lib/table-helper.php';
 require_once __DIR__ . '/lib/EmbeddedTable.php';
 require_once __DIR__ . '/config/docum2_columns.php';
 
+$accessFlags = get_access_flags($conn, 'Docum');
+
 $isAjax = (
     (string)($_GET['ajax'] ?? '') === '1' ||
     (string)($_POST['ajax'] ?? '') === '1' ||
@@ -83,6 +85,16 @@ if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
         }
     }
 }
+if ($mode === 'delete' && $values['accept_flag'] === 1) {
+    $errors[] = 'Нельзя удалить утверждённый документ.';
+    if ($isAjax) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'html' => '<div class="flash flash--error">Нельзя удалить утверждённый документ.</div>', 'mode' => $mode]);
+        exit;
+    }
+    header('Location: sale.php?typeop=' . $typeop);
+    exit;
+}
 
 // ---- docum2 items ----
 $docum2Data = [];
@@ -93,18 +105,8 @@ $docum2DefaultWidths = ['product_name' => 'auto', 'quant' => '80px', 'price' => 
 $d2w = function($name) use ($docum2ColWidths, $docum2DefaultWidths) {
     return isset($docum2ColWidths[$name]) ? $docum2ColWidths[$name] . 'px' : ($docum2DefaultWidths[$name] ?? 'auto');
 };
-function fmt_qty($v) {
-    $n = (float)str_replace(',', '.', $v);
-    if ($n == 0) return '';
-    $s = number_format($n, 3, '.', '');
-    $s = rtrim(rtrim($s, '0'), '.');
-    return $n == (int)$n ? (string)(int)$n : str_replace('.', ',', $s);
-}
-function fmt_price($v) {
-    $n = (float)str_replace(',', '.', $v);
-    if ($n == 0) return '';
-    return number_format($n, 2, ',', '');
-}
+function fmt_qty($v) { return fmt_num($v, 3); }
+function fmt_price($v) { return fmt_num($v, 2); }
 if ($id > 0) {
     $itemsRes = $conn->query("SELECT docum2_id AS id, product_id, code, product_name, quant, price, discount, sum, sum_discount, note FROM docum2 WHERE docum_id = $id ORDER BY docum2_id");
     if ($itemsRes) while ($ir = $itemsRes->fetch_assoc()) {
@@ -190,6 +192,7 @@ $d2Table = new EmbeddedTable([
         'product_name' => $productList,
     ],
     'totalsCallback' => 'applyDocum2Totals',
+    'accessFlags' => $accessFlags,
 ]);
 
 $d2RenderData = array_map(function($item) {
@@ -231,6 +234,7 @@ $platTable = new EmbeddedTable([
     'hasPrint'         => false,
     'hasSearch'        => true,
     'totalsCallback' => 'applyDocum2Totals',
+    'accessFlags' => $accessFlags,
 ]);
 
 $platListData = array_map(function($p) {
@@ -413,8 +417,10 @@ if ($mode === 'edit') {
     $pageTitle = $docLabel;
 }
 $isReadonly = ($mode === 'delete');
-$isApproved = !$isReadonly && $values['accept_flag'] === 1;
+$isApproved = $values['accept_flag'] === 1;
 $ro = $isReadonly || $isApproved;
+$d2Table->readonly = $ro;
+$platTable->readonly = $ro;
 
 function dv($v) { return fmt_price($v); }
 
@@ -455,7 +461,7 @@ ob_start();
         <td><?= render_input('number', 'number', $values['number'] > 0 ? $values['number'] : '', [
                 'id' => 'sale-number',
                 'readonly' => $ro,
-                'tabindex' => $ro ? '-1' : null,
+                'tabindex' => '-1',
                 'style' => 'max-width:120px',
             ]) ?></td>
         <td><div style="display:flex;gap:10px"><?= render_input('date', 'date', $values['date'] ?: date('Y-m-d'), [

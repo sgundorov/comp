@@ -6,6 +6,7 @@ $mode       = (string)($_GET['mode'] ?? 'new');
 $invoice2Id = (int)($_GET['id'] ?? $_POST['invoice2_id'] ?? 0);
 $invoiceId  = (int)($_GET['invoice_id'] ?? 0);
 $isAjax     = (string)($_GET['ajax'] ?? $_POST['ajax'] ?? '') === '1' || (strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest');
+$isOffer    = ((string)($_GET['kind'] ?? '') === 'offer');
 $errors     = [];
 
 $values = [
@@ -85,8 +86,8 @@ function recalc_invoice_totals(mysqli $conn, int $invoiceId): array {
     $sd    = (float)$row[1];
     $snds  = (float)$row[2];
     $pos   = (int)$row[3];
-    $ps = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = 10");
-    $ps->bind_param('i', $invoiceId);
+    $ps = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = (SELECT doctype_id FROM invoice WHERE invoice_id = ?)");
+    $ps->bind_param('ii', $invoiceId, $invoiceId);
     $ps->execute();
     $sumPlat = (float)$ps->get_result()->fetch_row()[0];
     $ps->close();
@@ -183,21 +184,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-function fmt_qty($v) { $n = (float)str_replace(',', '.', $v); if ($n == 0) return ''; $s = number_format($n, 3, '.', ''); $s = rtrim(rtrim($s, '0'), '.'); return $n == (int)$n ? (string)(int)$n : str_replace('.', ',', $s); }
-
-$sumDisplay          = number_format((float)$values['sum'], 2, ',', '');
-$sumDiscountDisplay  = number_format((float)$values['sum_discount'], 2, ',', '');
-$quantDisplay        = fmt_qty($values['quant']);
-$discountDisplay     = fmt_qty($values['discount']);
+$sumDisplay          = fmt_num($values['sum'], 2);
+$sumDiscountDisplay  = fmt_num($values['sum_discount'], 2);
+$priceDisplay        = fmt_num($values['price'], 2);
+$quantDisplay        = fmt_num($values['quant'], 3);
+$discountDisplay     = fmt_num($values['discount'], 2);
 
 ob_start();
 ?>
 <?php
 $productNameForTitle = $values['product_name'] ?: '?';
-$pageTitle = $mode === 'copy'   ? "Товар счета: $productNameForTitle (копия)"
-           : ($mode === 'delete' ? "Товар счета: $productNameForTitle (удаление)"
-           : ($invoice2Id > 0    ? "Товар счета: $productNameForTitle"
-                                 : 'Товар счета (новый)'));
+$docLabel  = $isOffer ? 'КП' : 'счета';
+$pageTitle = $mode === 'copy'   ? "Товар $docLabel: $productNameForTitle (копия)"
+           : ($mode === 'delete' ? "Товар $docLabel: $productNameForTitle (удаление)"
+           : ($invoice2Id > 0    ? "Товар $docLabel: $productNameForTitle"
+                                 : "Товар $docLabel (новый)"));
 $isReadonly = $mode === 'delete';
 $actionUrl = 'invoice2_form.php?mode=' . $mode . ($invoice2Id > 0 ? '&id=' . $invoice2Id : '') . '&invoice_id=' . $invoiceId;
 ?>
@@ -235,7 +236,7 @@ $actionUrl = 'invoice2_form.php?mode=' . $mode . ($invoice2Id > 0 ? '&id=' . $in
     <td class="form-label">&nbsp;</td>
   </tr>
   <tr class="col-3">
-    <td><?= render_input('text', 'price', $values['price'], ['id' => 'inv2-price', 'style' => 'max-width:140px', 'readonly' => $isReadonly]) ?></td>
+    <td><?= render_input('text', 'price', $priceDisplay, ['id' => 'inv2-price', 'style' => 'max-width:140px', 'readonly' => $isReadonly]) ?></td>
     <td><?= render_input('text', 'discount', $discountDisplay, ['id' => 'inv2-discount', 'style' => 'max-width:100px', 'readonly' => $isReadonly]) ?></td>
     <td>&nbsp;</td>
   </tr>
@@ -351,14 +352,14 @@ if ($isAjax) {
       var d = parseFloat((discountInput ? discountInput.value : '0').replace(',', '.')) || 0;
       var sum = q * p * (1 - d / 100);
       var sumD = q * p * (d / 100);
-      if (sumInput) sumInput.value = sum.toFixed(2).replace('.', ',');
-      if (sumDiscInput) sumDiscInput.value = sumD.toFixed(2).replace('.', ',');
+      if (sumInput) { var sf = sum.toFixed(2); sumInput.value = sf === '0.00' ? '' : sf.replace('.', ','); }
+      if (sumDiscInput) { var sdf = sumD.toFixed(2); sumDiscInput.value = sdf === '0.00' ? '' : sdf.replace('.', ','); }
     }
 
     function onProductSelect(id, name) {
       var item = data.find(function (p) { return p.id === id; });
       if (!item) return;
-      if (priceInput) priceInput.value = item.price_out || '0';
+      if (priceInput) priceInput.value = item.price_out && item.price_out != '0' ? item.price_out : '';
       doRecalc();
     }
 

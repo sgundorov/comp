@@ -8,6 +8,8 @@ require_once __DIR__ . '/lib/form-modal-handler.php';
 require_once __DIR__ . '/lib/marks-actions.php';
 require_once __DIR__ . '/lib/table-page-scripts.php';
 
+$accessFlags = render_access_control($conn, 'RepMenu');
+
 ensure_marks_table($conn);
 
 $TBL = 'repmenu';
@@ -182,7 +184,7 @@ render_form_modal(); ?>
     <?= $paginationHtml ?>
   </div>
 <?php
-render_script_includes(['scripts' => ['assets/export-modal.js']]); ?>
+render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.js']]); ?>
 <?php render_table_page_scripts([
     'pageUrl'        => $PAGE_URL,
     'formPrefix'     => $FORM_PREFIX,
@@ -190,6 +192,7 @@ render_script_includes(['scripts' => ['assets/export-modal.js']]); ?>
     'fieldSaveUrl'   => 'repmenu_field_save.php',
     'columnsSaveUrl' => 'repmenu_columns_save.php',
     'columnResizeUrl'=> 'repmenu_column_width_save.php',
+    'accessFlags'    => $accessFlags,
     'visibleColumns' => $visibleColumns,
     'defaultColumns' => $COLUMN_DEFAULTS,
     'exportUrl'      => 'repmenu_export.php',

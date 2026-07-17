@@ -49,6 +49,7 @@ function render_table_page_scripts(array $cfg): void {
     $marksTbl       = $cfg['marksTbl'] ?? '';
     $searchPanelConfig = $cfg['searchPanelConfig'] ?? [];
     $colFilters     = $cfg['colFilters'] ?? [];
+    $accessFlags    = $cfg['accessFlags'] ?? null;
 
     if (!$searchColumns) {
         $searchColumns = array_values(array_map(fn($c) => ['key' => $c['name'], 'label' => $c['label']], array_filter($visibleColumns, fn($c) => !empty($c['search']))));
@@ -90,6 +91,8 @@ function render_table_page_scripts(array $cfg): void {
     function closeAllPanels() {
       document.querySelectorAll('.search-cond-panel.open, .search-cond-pop.open, .columns-panel.open, .col-filter-panel.open').forEach(function (p) { p.classList.remove('open'); if (p.style) p.style.display = ''; });
     }
+    window.__accessFlags = <?= $accessFlags ? json_encode($accessFlags) : 'null' ?>;
+    if (window.__accessFlags && typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
     window.__focusAfterSave = function (params, form, data) {
       var mode = (form.querySelector('input[name="mode"]') || {}).value || '';
       if (mode === 'new' || mode === 'copy') {
@@ -287,9 +290,10 @@ foreach ($searchPanelKeys as $k) {
         rowClass: 'selected',
         onChange: function (id) {
           const enabled = id > 0;
-          if (openBtn)   openBtn.disabled   = !enabled;
-          if (copyBtn)   copyBtn.disabled   = !enabled;
-          if (deleteBtn) deleteBtn.disabled = !enabled;
+          const af = window.__accessFlags || {};
+          if (openBtn)   openBtn.disabled   = !enabled || !!af.change_flag;
+          if (copyBtn)   copyBtn.disabled   = !enabled || !!af.insert_flag;
+          if (deleteBtn) deleteBtn.disabled = !enabled || !!af.delete_flag;
         },
         currentPage: currentPage,
         totalPages: currentPages,
@@ -310,6 +314,7 @@ foreach ($searchPanelKeys as $k) {
       if (tbody) {
         tbody.addEventListener('dblclick', function (e) {
           if (e.target.closest('input[type="checkbox"]')) return;
+          if (window.__accessFlags && window.__accessFlags.change_flag) return;
           const tr = e.target.closest('tr[data-row-id]');
           if (!tr) return;
           const id = parseInt(tr.dataset.rowId, 10) || 0;
@@ -345,11 +350,13 @@ foreach ($searchPanelKeys as $k) {
         currentPages: currentPages,
         navigate: navigate,
         tableWrapEl: tableWrapEl,
-        onOpenForm: <?= $onOpenForm ?>
+        onOpenForm: <?= $onOpenForm ?>,
+        accessFlags: window.__accessFlags
       });
     })();
 
     (function () {
+      if (window.__accessFlags && (window.__accessFlags.save_flag || window.__accessFlags.change_flag)) return;
       const tbody = document.querySelector('table tbody');
       if (!tbody) return;
 

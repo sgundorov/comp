@@ -204,10 +204,6 @@ ob_start();
 ) ?>
 <?php endif; ?>
 
-<?php if ($mode === 'delete'): ?>
-  <p>Вы действительно хотите удалить сотрудника <strong><?= h($origLastName) ?></strong>?</p>
-<?php else: ?>
-
 <div class="field-row">
   <?= render_field('Фамилия',
       render_input('text', 'last_name', $values['last_name'], [
@@ -345,8 +341,6 @@ ob_start();
     false,
     ['wide' => true, 'readonly' => $isReadonly]
 ) ?>
-
-<?php endif; ?>
 
 <?= render_form_note() ?>
 

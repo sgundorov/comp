@@ -6,6 +6,8 @@ require_once __DIR__ . '/lib/TablePage.php';
 require_once __DIR__ . '/lib/table-template.php';
 require_once __DIR__ . '/lib/form-modal-handler.php';
 
+$accessFlags = render_access_control($conn, 'Contact');
+
 ensure_marks_table($conn);
 
 $tp = new TablePage($conn, $contactPageConfig);
@@ -198,7 +200,7 @@ render_head_start('Контакты');
 <?php render_head_end(); ?>
   <div class="page">
     <?php $activeMenu = 'contact.php'; include 'menu.php'; ?>
-    <h1 class="page-title"><img src="img/contact.png" alt="" /> Контакт</h1>
+    <h1 class="page-title"><img src="img/contact.png" alt="" /> Контакты</h1>
 
 <?php
     $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs) {
@@ -270,7 +272,7 @@ render_toolbar_wrapper_close(); ?>
 <?php render_form_modal(); ?>
 </div>
 
-<?php render_script_includes(['scripts' => ['assets/lookup.js', 'assets/column-filter.js', 'assets/export-modal.js']]); ?>
+<?php render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'assets/column-filter.js', 'assets/export-modal.js']]); ?>
 <script>
 (function () {
     const toolbar = document.querySelector('.toolbar');
@@ -281,11 +283,7 @@ render_toolbar_wrapper_close(); ?>
     const currentPage  = parseInt(toolbar.dataset.page  || '1', 10);
     const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
     const currentTotal = parseInt(toolbar.dataset.total || '0', 10);
-    const initialMarks = [];
-    document.querySelectorAll('.row-check').forEach(function (cb) { if (cb.checked) initialMarks.push(parseInt(cb.dataset.id, 10)); });
-    const selected = new Set(initialMarks);
-    function updateSelectionUI() { var total = parseInt(toolbar.dataset.marksCount || '0', 10); var any = total > 0; selWrap.classList.toggle('visible', any); selCount.textContent = 'Выбрано: ' + total; }
-    function updateRowActionButtons() { const id = rowSel.getSelectedId(); const en = id !== 0; document.getElementById('rowOpenBtn').disabled = !en; document.getElementById('rowCopyBtn').disabled = !en; document.getElementById('rowDeleteBtn').disabled = !en; rowSel.getRows().forEach(function (tr) { tr.querySelectorAll('td').forEach(function (td) { td.style.background = parseInt(tr.dataset.rowId, 10) === id ? '#3a5a8a' : ''; }); }); }
+    function updateRowActionButtons() { const id = rowSel.getSelectedId(); const en = id !== 0; const af = window.__accessFlags || {}; document.getElementById('rowOpenBtn').disabled = !en || !!af.change_flag; document.getElementById('rowCopyBtn').disabled = !en || !!af.insert_flag; document.getElementById('rowDeleteBtn').disabled = !en || !!af.delete_flag; rowSel.getRows().forEach(function (tr) { tr.querySelectorAll('td').forEach(function (td) { td.style.background = parseInt(tr.dataset.rowId, 10) === id ? '#3a5a8a' : ''; }); }); }
     const rowSel = RowSelect.init({ tbody: tbody, rowClass: 'selected', onChange: updateRowActionButtons, currentPage: currentPage, totalPages: currentPages, navigate: navigate });
     function selectRow(rowId) { rowSel.selectById(rowId, true); }
     function navigate(params) { const url = new URL(window.location.href); params(url.searchParams); window.location.href = url.pathname + '?' + url.searchParams.toString(); }
@@ -293,20 +291,16 @@ render_toolbar_wrapper_close(); ?>
     const SEARCH_COLS = <?= json_encode(array_values(array_filter(array_map(function ($c) { return $c['search'] ? ['key' => $c['name'], 'label' => $c['label']] : null; }, $COLUMN_DEFAULTS))), JSON_UNESCAPED_UNICODE) ?>;
     const currentSortLevels = <?= json_encode($sortLevels, JSON_UNESCAPED_UNICODE) ?>;
 
+    SelectionToolbar.initTableSelection('contact.php', document.querySelector('.toolbar').getAttribute('data-search') || '');
+
     SelectionToolbar.init({
         pageUrl: 'contact.php',
         getInvertUrl: function () { var o = new URLSearchParams(location.search); o.delete('ids'); return 'contact.php?action=invertSelection&' + o.toString(); },
-        getExportUrl: function () { return 'contact_export.php?format=csv&all=1&' + new URLSearchParams(location.search).toString(); },
-        getPrintUrl: function () { return 'contact_print.php?all=1&' + new URLSearchParams(location.search).toString(); }
+        getExportUrl: function () { return null; },
+        getPrintUrl: function () { return null; }
     });
 
-    function toggleMark(id, to) {
-        fetch('contact.php?action=toggleSelect', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: 'id=' + id + '&to=' + (to ? '1' : '0') })
-            .then(function (r) { return r.json(); }).then(function (d) { if (d.ok) { toolbar.dataset.marksCount = d.count; updateSelectionUI(); } });
-    }
-
     document.querySelectorAll('.row-check').forEach(function (cb) {
-        cb.addEventListener('change', function () { const id = parseInt(cb.dataset.id, 10); if (cb.checked) selected.add(id); else selected.delete(id); var cur = parseInt(toolbar.dataset.marksCount || '0', 10); toolbar.dataset.marksCount = String(cb.checked ? cur + 1 : Math.max(0, cur - 1)); updateSelectionUI(); toggleMark(id, cb.checked); });
         cb.addEventListener('click', function (e) { e.stopPropagation(); });
     });
 
@@ -342,6 +336,9 @@ render_toolbar_wrapper_close(); ?>
     window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
     window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'client' => 200, 'datetime' => 160, 'impotant_flag' => 80, 'contype' => 150, 'sotr' => 180, 'note' => 900], JSON_UNESCAPED_UNICODE) ?>;
 
+    window.__accessFlags = <?= json_encode($accessFlags) ?>;
+    if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
+
     document.addEventListener('click', function (e) {
         let a = e.target.closest('a[href*="contact_form.php"]');
         if (a) { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return; e.preventDefault(); e.stopImmediatePropagation(); window.__openFormModal(a.getAttribute('href')); return; }
@@ -352,7 +349,7 @@ render_toolbar_wrapper_close(); ?>
     document.querySelectorAll('tbody tr').forEach(function (tr) {
         const id = parseInt(tr.dataset.rowId, 10);
         tr.addEventListener('click', function (e) { if (e.target.closest('input.row-check')) return; selectRow(id); });
-        tr.addEventListener('dblclick', function () { window.__openFormModal('contact_form.php?mode=edit&id=' + id); });
+        tr.addEventListener('dblclick', function () { if (window.__accessFlags && window.__accessFlags.change_flag) return; window.__openFormModal('contact_form.php?mode=edit&id=' + id); });
     });
 
     document.getElementById('rowOpenBtn').addEventListener('click', function () { const id = rowSel.getSelectedId(); if (id !== 0) window.__openFormModal('contact_form.php?mode=edit&id=' + id); });
@@ -371,8 +368,8 @@ render_toolbar_wrapper_close(); ?>
         rowSel.selectByIndex(0);
     })();
 
-    bindTableKeyboardShortcuts({ formPrefix: 'contact_form', rowSel: rowSel, currentPage: currentPage, currentPages: currentPages, navigate: navigate, tableWrapEl: tableWrapEl });
-    updateSelectionUI();
+    bindTableKeyboardShortcuts({ formPrefix: 'contact_form', rowSel: rowSel, currentPage: currentPage, currentPages: currentPages, navigate: navigate, tableWrapEl: tableWrapEl, accessFlags: window.__accessFlags });
+    __refreshSelectionUI();
 })();
 </script>
   <?php render_form_modal_script([
@@ -381,6 +378,7 @@ render_toolbar_wrapper_close(); ?>
     'lookup_tables' => [],
   ]); ?>
 <script>
+    if (window.__accessFlags && (window.__accessFlags.save_flag || window.__accessFlags.change_flag)) { /* skip */ } else {
     InlineEdit.init({
         tbody: document.querySelector('table tbody'),
         saveUrl: 'contact_field_save.php',
@@ -410,6 +408,7 @@ render_toolbar_wrapper_close(); ?>
             return [];
         }
     });
+    }
 
     var __clientLookupData = <?= json_encode($clientLookupData, JSON_UNESCAPED_UNICODE) ?>;
     var __contypeLookupData = <?= json_encode($contypeLookupData, JSON_UNESCAPED_UNICODE) ?>;

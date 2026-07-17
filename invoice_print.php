@@ -4,7 +4,7 @@ require_once __DIR__ . '/config/invoice_columns.php';
 require_once __DIR__ . '/config/invoice_page.php';
 
 $tp = new TablePage($conn, $invoicePageConfig);
-$tp->appendWhere("i.doctype_id = ?", [10], 'i');
+$tp->appendWhere("i.doctype_id = ?", [$invoiceDoctypeId], 'i');
 
 $tp->applyFilterWithLabel($conn, 'client_id', 'i.client_id', 'Контрагент', 'client', 'client_id', 'name');
 $tp->applyFilterWithLabel($conn, 'store_id',  'i.store_id',  'Склад',      'store',  'store_id',  'name');
@@ -30,7 +30,7 @@ $filterLabels = $tp->getFilterDescription();
 $now = date('d.m.Y H:i');
 ?><!DOCTYPE html>
 <html lang="ru">
-<head><meta charset="UTF-8"><title>Счета — Печать</title>
+<head><meta charset="UTF-8"><title><?= $invoiceIsOffer ? 'Коммерческие предложения' : 'Счета' ?> — Печать</title>
 <style>
 @media print { .no-print { display: none; } }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 13px; color: #222; margin: 20px; }
@@ -51,7 +51,7 @@ th { background: #e8e8e8; font-weight: 600; }
   <button onclick="window.close()">Закрыть</button>
   <span style="margin-left:12px;font-size:12px;color:#555">Записей: <?= count($rows) ?></span>
 </div>
-<div class="print-page-title">Счета <span style="font-size:13px;color:#888;font-weight:normal">(<?= h($now) ?>)</span></div>
+<div class="print-page-title"><?= $invoiceIsOffer ? 'Коммерческие предложения' : 'Счета' ?> <span style="font-size:13px;color:#888;font-weight:normal">(<?= h($now) ?>)</span></div>
 <?php if (count($filterLabels) > 0): ?>
 <div class="filter-sub"><?php foreach ($filterLabels as $fl): ?><span><?= h($fl) ?></span><?php endforeach; ?></div>
 <?php endif; ?>

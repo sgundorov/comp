@@ -12,11 +12,13 @@
     const tw = config.tableWrapEl;
     const of = function() { return config.onOpenForm || window.__openFormModal; };
     const extraP = config.formExtraParams || '';
+    const af = config.accessFlags || window.__accessFlags || {};
 
     Keyboard.init();
-    Keyboard.bind({ key: 'Insert' }, function () { of()(fp + '.php?mode=new' + extraP); });
-    Keyboard.bind({ key: 'Enter' },   function () { const id = r.getSelectedId(); if (id) of()(fp + '.php?mode=edit&id=' + id + extraP); });
-    Keyboard.bind({ key: 'Delete' },  function () { const id = r.getSelectedId(); if (id) of()(fp + '.php?mode=delete&id=' + id + extraP); });
+    if (!af.insert_flag) Keyboard.bind({ key: 'Insert' }, function () { of()(fp + '.php?mode=new' + extraP); });
+    if (!af.insert_flag) Keyboard.bind({ key: 'Insert', ctrl: true }, function () { const btn = document.getElementById('rowCopyBtn'); if (btn) btn.click(); });
+    if (!af.change_flag) Keyboard.bind({ key: 'Enter' },   function () { const id = r.getSelectedId(); if (id) of()(fp + '.php?mode=edit&id=' + id + extraP); });
+    if (!af.delete_flag) Keyboard.bind({ key: 'Delete' },  function () { const id = r.getSelectedId(); if (id) of()(fp + '.php?mode=delete&id=' + id + extraP); });
     Keyboard.bind({ key: 'ArrowUp' },   function () { r.selectUp(); });
     Keyboard.bind({ key: 'ArrowDown' }, function () { r.selectDown(); });
     Keyboard.bind({ key: 'Home' },      function () { r.selectFirst(); });

@@ -301,8 +301,8 @@ render_form_modal(); ?>
                             var _d = parseFloat((_di?_di.value:"0").replace(",","."))||0;
                             var _sum = _q*_p*(1-_d/100);
                             var _sdv = _q*_p*(_d/100);
-                            if(_si) _si.value = _sum.toFixed(2).replace(".",",");
-                            if(_sd) _sd.value = _sdv.toFixed(2).replace(".",",");
+                            if(_si) { var _sf = _sum.toFixed(2); _si.value = _sf === '0.00' ? '' : _sf.replace(".",","); }
+                            if(_sd) { var _sdf = _sdv.toFixed(2); _sd.value = _sdf === '0.00' ? '' : _sdf.replace(".",","); }
                             var _frm = body.querySelector("form[data-form-modal]");
                             if(_frm) {
                                 var _fd = new FormData(_frm);
@@ -336,8 +336,8 @@ render_form_modal(); ?>
                         var d = parseFloat((_di2?_di2.value:"0").replace(",","."))||0;
                         var s = q*p*(1-d/100), sd = q*p*(d/100);
                         var si = body.querySelector("#inv2-sum"), sdi = body.querySelector("#inv2-sum-discount");
-                        if(si) si.value = s.toFixed(2).replace(".",",");
-                        if(sdi) sdi.value = sd.toFixed(2).replace(".",",");
+                        if(si) { var _sf = s.toFixed(2); si.value = _sf === '0.00' ? '' : _sf.replace(".",","); }
+                        if(sdi) { var _sdf = sd.toFixed(2); sdi.value = _sdf === '0.00' ? '' : _sdf.replace(".",","); }
                     }
                     if (_qi2) _qi2.addEventListener("input", _recalc);
                     if (_pi2) _pi2.addEventListener("input", _recalc);

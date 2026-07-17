@@ -5,10 +5,10 @@ if (empty($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQU
     http_response_code(403); exit;
 }
 $tbl = 'regcod';
-$col = (string)($_POST['col'] ?? '');
+$name = (string)($_POST['name'] ?? '');
 $width = (int)($_POST['width'] ?? 0);
-if ($col !== '' && $width > 0) {
-    save_column_width($conn, $tbl, $col, $width);
+if ($name !== '' && $width > 0) {
+    save_column_width($conn, $tbl, $name, $width);
 }
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode(['ok' => true]);

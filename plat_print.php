@@ -192,7 +192,9 @@ $sql = "SELECT p.plat_id, p.datetime, p.client_id, p.zat_id, p.sum, p.sum_in, p.
 $stmt = @$conn->prepare($sql);
 if ($stmt) {
     if (!empty($params)) {
-        $stmt->bind_param($types, ...$params);
+        $refs3 = [];
+        foreach ($params as $k => $v) { $refs3[$k] = &$params[$k]; }
+        $stmt->bind_param($types, ...$refs3);
     }
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

@@ -121,19 +121,8 @@ function recalc_docum_totals(mysqli $conn, int $documId): array {
     return ['total_sum' => _fmt_d2($sum, 2), 'total_sum_discount' => _fmt_d2($sd, 2), 'pos' => $pos, 'sum_plat' => $sumPlatFmt, 'sum_plat_red' => $sumPlatRed];
 }
 
-function _fmt_qty($v) {
-    $n = (float)str_replace(',', '.', $v);
-    if ($n == 0) return '';
-    $s = number_format($n, 3, '.', '');
-    $s = rtrim(rtrim($s, '0'), '.');
-    return $n == (int)$n ? (string)(int)$n : str_replace('.', ',', $s);
-}
-
-function _fmt_d2($v, $dec) {
-    $n = (float)str_replace(',', '.', $v);
-    if ($n == 0) return '';
-    return number_format($n, $dec, ',', '');
-}
+function _fmt_qty($v) { return fmt_num($v, 3); }
+function _fmt_d2($v, $dec) { return fmt_num($v, $dec); }
 
 $isReadonly = $mode === 'delete' || $parentAccepted;
 
@@ -286,7 +275,7 @@ $pageTitle = $mode === 'copy'   ? "Товар документа: $productNameFo
 </table>
 
 <?= render_form_actions(
-    $mode === 'delete' || $isReadonly
+    $mode === 'delete'
         ? [render_btn_danger('img/delete.png', 'Удалить', ['type'=>'submit','name'=>'action','value'=>'delete','formnovalidate'=>true]),
            '<button type="button" class="btn btn-secondary" data-form-close><img src="img/cancel.png" alt="" /> Отменить</button>']
         : [render_btn_primary('img/save.png', 'Сохранить', ['type'=>'submit','name'=>'action','value'=>'save','formnovalidate'=>true]),

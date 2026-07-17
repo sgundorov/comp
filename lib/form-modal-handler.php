@@ -94,14 +94,18 @@ function render_form_modal_script(array $config = []): void {
         try {
           if (typeof window.ColumnResize !== 'undefined') {
             root.querySelectorAll('.data-table').forEach(function(t) {
+              t.querySelectorAll('.col-resize-handle').forEach(function(h) { h.remove(); });
               t.removeAttribute('data-col-resize-inited');
-              window.ColumnResize.init({ selector: '#' + t.id });
+              var opts = { selector: '#' + t.id };
+              if (t.dataset.colResizeUrl) opts.saveUrl = t.dataset.colResizeUrl;
+              if (t.dataset.colResizeTbl) opts.tbl = t.dataset.colResizeTbl;
+              window.ColumnResize.init(opts);
             });
           }
         } catch(ex) { console.error('[FM] ColumnResize re-init error', ex); }
       }
 
-      function stashCurrentForm(onRestore) {
+      function stashCurrentForm(onRestore, estSelectedId) {
         var form = body.querySelector('form[data-form-modal]');
         if (!form) return;
         var active = document.activeElement;
@@ -116,15 +120,26 @@ function render_form_modal_script(array $config = []): void {
             el.setAttribute('value', el.value);
           }
         });
+        var savedTableSelections = {};
+        Object.keys(window).forEach(function(k) {
+          if (k.indexOf('__') === 0 && k.indexOf('Table') === k.length - 5 && window[k] && typeof window[k].selectedId === 'number') {
+            savedTableSelections[k] = window[k].selectedId;
+          }
+        });
+        if (estSelectedId && !Object.keys(savedTableSelections).length) {
+          savedTableSelections['__estFallback'] = estSelectedId;
+        }
         stashed = {
           html: body.innerHTML,
           onRestore: onRestore || function () {},
-          activeId: active && active.id ? active.id : null
+          activeId: active && active.id ? active.id : null,
+          _tableSelections: savedTableSelections
         };
       }
 
       function restoreStashedForm(data) {
         if (!stashed) return false;
+        var savedTableSelections = stashed._tableSelections || {};
         body.innerHTML = stashed.html;
         var old = stashed;
         stashed = null;
@@ -137,6 +152,47 @@ function render_form_modal_script(array $config = []): void {
             <?= $extraRestore ?>
             try { <?= $extraOpen ?> } catch(ex) { console.error('[FM] extraOpen error', ex); }
         autoInitFormBody(body);
+        if (savedTableSelections && Object.keys(savedTableSelections).length) {
+          var restoreFn = function() {
+            Object.keys(savedTableSelections).forEach(function(k) {
+              if (k === '__estFallback') return;
+              var tbl = window[k];
+              if (tbl && typeof tbl.selectedId === 'number' && savedTableSelections[k]) {
+                var id = savedTableSelections[k];
+                var found = false;
+                if (tbl.data) { for (var i = 0; i < tbl.data.length; i++) { if (tbl.data[i].id == id) { found = true; break; } } }
+                if (found) {
+                  tbl.selectedId = id;
+                  tbl.render();
+                  if (tbl.tbody) {
+                    var row = tbl.tbody.querySelector('tr[data-id="' + id + '"]');
+                    if (row) row.scrollIntoView({ block: 'nearest' });
+                  }
+                }
+              }
+            });
+            if (savedTableSelections['__estFallback']) {
+              var fallbackId = savedTableSelections['__estFallback'];
+              Object.keys(window).forEach(function(k) {
+                if (k.indexOf('__') === 0 && k.indexOf('Table') === k.length - 5 && window[k] && typeof window[k].selectedId === 'number' && window[k].data) {
+                  var tbl = window[k];
+                  var found = false;
+                  for (var i = 0; i < tbl.data.length; i++) { if (tbl.data[i].id == fallbackId) { found = true; break; } }
+                  if (found) {
+                    tbl.selectedId = fallbackId;
+                    tbl.render();
+                    if (tbl.tbody) {
+                      var row = tbl.tbody.querySelector('tr[data-id="' + fallbackId + '"]');
+                      if (row) row.scrollIntoView({ block: 'nearest' });
+                    }
+                  }
+                }
+              });
+            }
+          };
+          setTimeout(restoreFn, 50);
+          setTimeout(restoreFn, 200);
+        }
         if (data) { try { old.onRestore(data, body); } catch (e) { console.error('[FM] onRestore error', e); } }
         if (old.activeId) {
           var el = body.querySelector('#' + old.activeId);
@@ -148,7 +204,7 @@ function render_form_modal_script(array $config = []): void {
       }
 
       function openFormModal(url, stash) {
-        stashCurrentForm(stash && stash.onRestore);
+        stashCurrentForm(stash && stash.onRestore, stash && stash._estSelectedId);
         body.innerHTML = '<div style="padding:20px;color:var(--muted);">Загрузка…</div>';
         backdrop.classList.add('open');
         document.body.style.overflow = 'hidden';
@@ -182,7 +238,11 @@ function render_form_modal_script(array $config = []): void {
 
       function bindForm(form) {
         if (!form) return;
+        if (window.__accessFlags && window.__accessFlags.save_flag) {
+          form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; });
+        }
         form.addEventListener('submit', function (e) {
+          if (window.__accessFlags && window.__accessFlags.save_flag) return;
           e.preventDefault();
           var fd = new FormData(form);
           var submitBtn = e.submitter || form.querySelector('button[type="submit"]');

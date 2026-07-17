@@ -109,10 +109,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['regcod']     = trim((string)($_POST['regcod'] ?? ''));
     $values['product_id'] = (int)($_POST['product_id'] ?? 0);
     $values['product']    = trim((string)($_POST['product'] ?? ''));
-    $values['quant']      = trim((string)($_POST['quant'] ?? '1'));
+    $values['quant']      = max(1, (int)($_POST['quant'] ?? 1));
     $values['city']       = trim((string)($_POST['city'] ?? ''));
     $values['signat']     = trim((string)($_POST['signat'] ?? ''));
-    $values['days']       = trim((string)($_POST['days'] ?? '0'));
+    $values['days']       = (int)($_POST['days'] ?? 0);
     $values['block_flag'] = (int)(!empty($_POST['block_flag']) ? 1 : 0);
     $values['note']       = trim((string)($_POST['note'] ?? ''));
 
@@ -139,8 +139,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($mode === 'new' || $mode === 'copy') {
             $stmt = $conn->prepare("INSERT INTO regcod (client_id, client, datetime, regcod, product_id, product, quant, date, city, signat, days, sotr_id, block_flag, note) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)");
+            if (!$stmt) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => 'prepare failed: ' . $conn->error]);
+                exit;
+            }
             bind_auto($stmt, [$values['client_id'], $values['client'], $values['regcod'], $values['product_id'], $values['product'], $values['quant'], $values['date'], $values['city'], $values['signat'], $values['days'], $values['block_flag'], $values['note']]);
-            $stmt->execute();
+            $ok = $stmt->execute();
+            if (!$ok) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => $stmt->error]);
+                exit;
+            }
             $newId = $conn->insert_id;
             $stmt->close();
         } else {
@@ -168,7 +178,7 @@ $isReadonly = ($mode === 'delete');
 <?php foreach ($errors as $e): ?>
   <div class="flash flash--error"><?= h($e) ?></div>
 <?php endforeach; ?>
-<table class="form-table">
+<table class="form-table" style="width:100%">
   <tr>
     <td class="form-label">Клиент</td>
     <td class="form-label" style="padding-left:10px">Дата</td>

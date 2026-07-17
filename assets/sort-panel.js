@@ -54,7 +54,7 @@
         params.delete('page');
         params.delete('sort');
         if (nextDir) params.set('sort', col + ':' + nextDir);
-        location.href = config.pageUrl + (params.toString() ? '?' + params.toString() : '');
+        location.href = config.pageUrl.split('?')[0] + (params.toString() ? '?' + params.toString() : '');
       });
     });
   }
@@ -276,7 +276,7 @@
       params.delete('page');
       params.delete('sort');
       params.set('sort', serialize(levels));
-      location.href = pageUrl + '?' + params.toString();
+      location.href = pageUrl.split('?')[0] + '?' + params.toString();
     });
 
     document.addEventListener('keydown', function (e) {
@@ -385,13 +385,13 @@
         panel.querySelector('[data-act="reset"]').addEventListener('click', function () {
           var other = new URLSearchParams(location.search);
           other.delete('sort'); other.delete('page'); other.delete('focus');
-          window.location.href = pageUrl + '?' + other.toString();
+          window.location.href = pageUrl.split('?')[0] + '?' + other.toString();
         });
         panel.querySelector('[data-act="apply"]').addEventListener('click', function () {
           var other = new URLSearchParams(location.search);
           other.set('sort', serialize(levels));
           other.delete('page'); other.delete('focus');
-          window.location.href = pageUrl + '?' + other.toString();
+          window.location.href = pageUrl.split('?')[0] + '?' + other.toString();
         });
       }
 

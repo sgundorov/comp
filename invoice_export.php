@@ -12,7 +12,7 @@ if (!in_array($format, $validFormats, true)) {
 }
 
 $tp = new TablePage($conn, $invoicePageConfig);
-$tp->appendWhere("i.doctype_id = ?", [10], 'i');
+$tp->appendWhere("i.doctype_id = ?", [$invoiceDoctypeId], 'i');
 
 $tp->applyFilterWithLabel($conn, 'client_id', 'i.client_id', 'Контрагент', 'client', 'client_id', 'name');
 $tp->applyFilterWithLabel($conn, 'store_id',  'i.store_id',  'Склад',      'store',  'store_id',  'name');
@@ -45,7 +45,7 @@ $colValues = [
     'note'   => fn($r) => (string)($r['note'] ?? ''),
 ];
 
-$baseName = 'Счета';
+$baseName = $invoiceIsOffer ? 'Коммерческие предложения' : 'Счета';
 
 $customName = trim((string)($_GET['filename'] ?? ''));
 if ($customName !== '') {

@@ -110,6 +110,8 @@ a { color: inherit; }
 }
 .submenu a:hover { background: #506575; }
 .submenu a.active { background: #506575; font-weight: 700; }
+.submenu a.menu-disabled,
+.submenu a.menu-disabled:hover { opacity: 0.35; background: transparent; cursor: default; pointer-events: none; }
 
 /* ---------- Buttons (icon / menu / page) ---------- */
 .btn,
@@ -151,6 +153,23 @@ a { color: inherit; }
   background: var(--btn);
 }
 .icon-btn:disabled:hover { background: var(--btn); }
+.btn-primary:disabled,
+.btn-primary[aria-disabled="true"],
+.btn-danger:disabled,
+.btn-danger[aria-disabled="true"],
+.menu-btn:disabled,
+.menu-btn[aria-disabled="true"],
+.btn-secondary:disabled,
+.btn-secondary[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-primary:disabled:hover,
+.btn-danger:disabled:hover,
+.menu-btn:disabled:hover,
+.btn-secondary:disabled:hover {
+  opacity: 0.4;
+}
 .icon-btn svg,
 .menu-btn svg { width: 14px; height: 14px; fill: currentColor; flex: 0 0 auto; }
 .icon-btn img,

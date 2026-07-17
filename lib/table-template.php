@@ -135,9 +135,15 @@ function render_toolbar_wrapper_close(): void {
     echo "</div>\n";
 }
 
-function render_toolbar_left(string $formPrefix, int $marksCount, string $exportDropdownHtml, string $printDropdownHtml, string $extraHtml = ''): void {
+function render_toolbar_left(string $formPrefix, int $marksCount, string $exportDropdownHtml, string $printDropdownHtml, string $extraHtml = '', string $afterPrintHtml = ''): void {
+    $qPos = strpos($formPrefix, '?');
+    if ($qPos !== false) {
+        $formNewUrl = substr($formPrefix, 0, $qPos) . '.php' . substr($formPrefix, $qPos) . '&mode=new';
+    } else {
+        $formNewUrl = $formPrefix . '.php?mode=new';
+    }
     ?><div class="toolbar-left">
-    <button class="icon-btn" title="Добавить" data-form-open="<?= h($formPrefix) ?>.php?mode=new"><img src="img/add.png" alt="" /></button>
+    <button class="icon-btn" title="Добавить" data-form-open="<?= h($formNewUrl) ?>"><img src="img/add.png" alt="" /></button>
     <button class="icon-btn" id="rowOpenBtn" title="Изменить" type="button" disabled><img src="img/edit.png" alt="" /></button>
     <button class="icon-btn" id="rowDeleteBtn" title="Удалить" type="button" disabled><img src="img/delete.png" alt="" /></button>
     <button class="icon-btn" id="rowCopyBtn" title="Копировать" type="button" disabled><img src="img/copy.png" alt="" /></button>
@@ -145,7 +151,7 @@ function render_toolbar_left(string $formPrefix, int $marksCount, string $export
     <?= $extraHtml ?>
 
     <div class="dropdown">
-      <button class="icon-btn" type="button" title="Экспорт"><img src="img/export.png" alt="" /></button>
+      <button class="icon-btn" type="button" title="Экспорт" data-print-export><img src="img/export.png" alt="" /></button>
       <div class="dropdown-menu"><?= $exportDropdownHtml ?></div>
     </div>
 
@@ -153,6 +159,7 @@ function render_toolbar_left(string $formPrefix, int $marksCount, string $export
       <button class="icon-btn" type="button" title="Печать"><img src="img/print.png" alt="" /></button>
       <div class="dropdown-menu"><?= $printDropdownHtml ?></div>
     </div>
+    <?= $afterPrintHtml ?>
 
     <div class="dropdown selected-actions<?= $marksCount > 0 ? ' visible' : '' ?>" id="selectedActions">
       <button class="menu-btn" type="button" title="Действия с выбранными">
@@ -163,8 +170,8 @@ function render_toolbar_left(string $formPrefix, int $marksCount, string $export
         <a class="dropdown-item" href="#" onclick="clearSelection();return false;">Очистить выбор</a>
         <a class="dropdown-item" href="#" onclick="invertSelection();return false;">Инвертировать выбор</a>
         <a class="dropdown-item" href="#" onclick="toggleShowOnly();return false;">Показать выбранные</a>
-        <a class="dropdown-item" href="#" onclick="exportSelected();return false;">Экспорт</a>
-        <a class="dropdown-item" href="#" onclick="printSelected();return false;">Печать</a>
+        <a class="dropdown-item" href="#" onclick="exportSelected();return false;" data-print-list>Экспорт</a>
+        <a class="dropdown-item" href="#" onclick="printSelected();return false;" data-print-list>Печать</a>
       </div>
     </div>
   </div><?php
@@ -216,7 +223,7 @@ function render_table_colgroup(array $visibleColumns, array $columnWidths, array
     <?php foreach ($visibleColumns as $vc):
         $cn = $vc['name'];
         $savedW = $columnWidths[$cn] ?? null;
-        $w = $savedW !== null ? $savedW . 'px' : ($defaultWidths[$cn] ?? '150px');
+        $w = $savedW !== null ? $savedW . 'px' : (!empty($defaultWidths[$cn]) ? $defaultWidths[$cn] : '150px');
     ?>
       <col class="col-<?= h($cn) ?>" style="width: <?= $w ?>;" />
     <?php endforeach; ?>
@@ -308,7 +315,8 @@ function render_table_tbody(array $visibleColumns, array $rows, array $marks, st
             $cn = $vc['name'];
             [$rawValue, $displayValue] = $cellValue($r, $cn, $vc);
             if ($search !== '' && strpos($displayValue, '<span class="hl"') === false) {
-                $displayValue = apply_search_highlight($displayValue, $search);
+                $shouldHighlight = !$searchActive || count($searchCols) === 0 || in_array($cn, $searchCols);
+                if ($shouldHighlight) $displayValue = apply_search_highlight($displayValue, $search);
             }
             $readonly = !empty($vc['readonly']) || $cn === 'id' || ($rowReadonly && $rowReadonly($r, $cn));
             $editable = !$readonly;
@@ -406,9 +414,9 @@ function render_print_dropdown_items(string $pageUrl, string $exportQs, int $pag
     $printQs = $exportQs !== '' ? '?' . $exportQs : '';
     $allQs = $exportQs !== '' ? '?all=1&' . $exportQs : '?all=1';
     return
-        '<a class="dropdown-item" href="' . h($pageUrl) . '_print.php' . $printQs . '" target="_blank">Все записи</a>' .
-        '<a class="dropdown-item" href="' . h($pageUrl) . '_print.php' . $allQs . '" target="_blank">Выбранные</a>' .
-        '<a class="dropdown-item" href="' . h($pageUrl) . '_print.php?page=' . (int)$page . ($exportQs !== '' ? '&' . $exportQs : '') . '" target="_blank">Текущая страница</a>';
+        '<a class="dropdown-item" data-print-list href="' . h($pageUrl) . '_print.php' . $printQs . '" target="_blank">Все записи</a>' .
+        '<a class="dropdown-item" data-print-list href="' . h($pageUrl) . '_print.php' . $allQs . '" target="_blank">Выбранные</a>' .
+        '<a class="dropdown-item" data-print-list href="' . h($pageUrl) . '_print.php?page=' . (int)$page . ($exportQs !== '' ? '&' . $exportQs : '') . '" target="_blank">Текущая страница</a>';
 }
 
 } // endif TABLE_TEMPLATE_LOADED

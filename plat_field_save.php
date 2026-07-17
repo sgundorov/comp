@@ -68,9 +68,9 @@ if ($field === '_delete') {
     $stmt->close();
     $conn->query("DELETE FROM marks WHERE tbl = 'plat' AND row_id = $delId");
     $sumPlat = 0;
-    if ($docId > 0 && in_array($docType, [10, 20, 110, 120, 127], true)) {
-        $parentTable = $docType === 10 ? 'invoice' : 'docum';
-        $parentKey = $docType === 10 ? 'invoice_id' : 'docum_id';
+    if ($docId > 0 && in_array($docType, [5, 10, 20, 110, 120, 127], true)) {
+        $parentTable = in_array($docType, [5, 10], true) ? 'invoice' : 'docum';
+        $parentKey = in_array($docType, [5, 10], true) ? 'invoice_id' : 'docum_id';
         $sp = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
         $sp->bind_param('ii', $docId, $docType);
         $sp->execute();
@@ -190,10 +190,10 @@ switch ($ALLOWED[$field]['type']) {
 
 $sumPlat = 0;
 $docQ = $conn->query("SELECT doc_id, doc_type FROM plat WHERE plat_id = $id");
-if ($docQ && ($docR = $docQ->fetch_assoc()) && in_array((int)$docR['doc_type'], [10, 20, 110, 120, 127], true) && (int)$docR['doc_id'] > 0) {
+if ($docQ && ($docR = $docQ->fetch_assoc()) && in_array((int)$docR['doc_type'], [5, 10, 20, 110, 120, 127], true) && (int)$docR['doc_id'] > 0) {
     $docType = (int)$docR['doc_type'];
-    $parentTable = $docType === 10 ? 'invoice' : 'docum';
-    $parentKey = $docType === 10 ? 'invoice_id' : 'docum_id';
+    $parentTable = in_array($docType, [5, 10], true) ? 'invoice' : 'docum';
+    $parentKey = in_array($docType, [5, 10], true) ? 'invoice_id' : 'docum_id';
     $sp = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
     $sp->bind_param('ii', $docR['doc_id'], $docType);
     $sp->execute();
