@@ -25,7 +25,7 @@
 
 /* ---------- Quick search ---------- */
 .quick-search {
-  height: 30px;
+  height: 24px;
   width: 180px;
   padding: 0 10px;
   border: 1px solid #cfd6dd;
@@ -274,6 +274,7 @@
 /* ---------- Column widths ---------- */
 .col-check { width: 32px; padding: 5px 0; text-align: center; }
 .col-check input { margin: 0; vertical-align: middle; cursor: pointer; }
+
 .col-id { width: 60px; }
 
 /* ---------- Pagination ---------- */
@@ -378,6 +379,7 @@
 .form-modal-backdrop.open { display: flex; }
 .form-modal {
   background: var(--panel);
+  border: 2px solid #6b7785;
   border-radius: 4px;
   padding: 18px 11px 10px;
   min-width: 480px;
@@ -904,6 +906,6 @@
 @media (max-width: 420px) {
   .page-title { font-size: 18px; }
   .icon-btn, .menu-btn, .page-btn { font-size: 12px; }
-  .quick-search { height: 28px; }
+  .quick-search { height: 24px; }
   .pagination .page-btn { padding: 0 8px; }
 }

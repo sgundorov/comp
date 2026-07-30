@@ -24,7 +24,10 @@ $values = [
     'nds_rate'     => '22',
     'no_nds'       => '0',
     'regcode_flag' => '0',
-    'firm_id'      => '0',
+    'show_hidden'  => '0',
+    'neg_ost_flag'     => '0',
+    'firm_id'          => '0',
+    'current_store_id' => '0',
 ];
 
 $appSettings = load_app_settings($conn);
@@ -34,7 +37,10 @@ $values['page_width']   = (string)((int)($appSettings['page_width'] ?? 1100));
 $values['nds_rate']     = (string)((int)($appSettings['nds_rate'] ?? 22));
 $values['no_nds']       = (string)((int)($appSettings['no_nds'] ?? 0));
 $values['regcode_flag'] = (string)((int)($appSettings['regcode_flag'] ?? 0));
-$values['firm_id']      = (string)((int)($appSettings['firm_id'] ?? 0));
+$values['show_hidden']  = (string)((int)($appSettings['show_hidden'] ?? 0));
+$values['neg_ost_flag'] = (string)((int)($appSettings['neg_ost_flag'] ?? 0));
+$values['firm_id']          = (string)((int)($appSettings['firm_id'] ?? 0));
+$values['current_store_id'] = (string)((int)($appSettings['current_store_id'] ?? 0));
 
 $firmOptions = [];
 $firmResult = @$conn->query("SELECT firm_id, name FROM firm ORDER BY firm_id LIMIT 100");
@@ -50,6 +56,17 @@ if ($values['firm_id'] === '0' && !empty($firmOptions) && $firmOptions[0]['value
     $values['firm_id'] = (string)$firmOptions[0]['value'];
 }
 
+$storeOptions = [];
+$storeResult = @$conn->query("SELECT store_id, name FROM store ORDER BY name LIMIT 500");
+if ($storeResult) {
+    while ($sr = $storeResult->fetch_assoc()) {
+        $storeOptions[] = ['value' => $sr['store_id'], 'label' => $sr['name']];
+    }
+}
+if (empty($storeOptions)) {
+    $storeOptions[] = ['value' => '0', 'label' => '— нет записей —'];
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['startup_page'] = (string)($_POST['startup_page'] ?? 'clients');
     $values['page_size']    = (string)(int)($_POST['page_size'] ?? 20);
@@ -61,7 +78,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['nds_rate']     = (string)(int)($_POST['nds_rate'] ?? 22);
     $values['no_nds']       = (string)(int)(!empty($_POST['no_nds']) ? 1 : 0);
     $values['regcode_flag'] = (string)(int)(!empty($_POST['regcode_flag']) ? 1 : 0);
-    $values['firm_id']      = (string)(int)($_POST['firm_id'] ?? 0);
+    $values['show_hidden']  = (string)(int)(!empty($_POST['show_hidden']) ? 1 : 0);
+    $values['neg_ost_flag'] = (string)(int)(!empty($_POST['neg_ost_flag']) ? 1 : 0);
+    $values['firm_id']          = (string)(int)($_POST['firm_id'] ?? 0);
+    $values['current_store_id'] = (string)(int)($_POST['current_store_id'] ?? 0);
 
     $pageSize  = (int)$values['page_size'];
     $pageWidth = (int)$values['page_width'];
@@ -109,7 +129,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             save_app_setting($conn, 'nds_rate', $values['nds_rate']);
             save_app_setting($conn, 'no_nds', $values['no_nds']);
             save_app_setting($conn, 'regcode_flag', $values['regcode_flag']);
+            save_app_setting($conn, 'show_hidden', $values['show_hidden']);
+            save_app_setting($conn, 'neg_ost_flag', $values['neg_ost_flag']);
             save_app_setting($conn, 'firm_id', $values['firm_id']);
+            save_app_setting($conn, 'current_store_id', $values['current_store_id']);
 
             $localConfig = "<?php\nreturn [\n";
             $localConfig .= "    'DB_HOST' => " . var_export($values['db_host'], true) . ",\n";
@@ -144,7 +167,20 @@ $startupOptions = [
 ];
 
 ob_start();
-?>
+?><style>
+  .setup-table { width:100%; border-collapse:collapse; }
+  .setup-table td { vertical-align:bottom; padding:10px 8px 10px 0; }
+  .setup-table td:last-child { padding-right:0; }
+  .setup-table .field { margin-bottom:0; }
+  .fieldset { border: 1px solid #6b7785; border-radius: 4px; padding: 12px 11px 4px; margin: 0 0 10px 0; }
+  .fieldset-legend { font-weight: 700; color: #ffe9a8; padding: 0 6px; }
+  .checkbox-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .checkbox-label input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+  .fieldset-db { margin-top:6px; }
+  .form-actions--bottom { margin-top: 2px; margin-bottom: 4px; }
+  .form-modal { max-width: 800px !important; }
+  .form { max-width: none; }
+</style>
 <h2 class="page-title"><img src="img/setup.png" alt="" /> Параметры настройки</h2>
 <form class="form" method="post" action="setup_form.php" autocomplete="off" data-form-modal>
 <?php if (!empty($errors)): ?>
@@ -159,18 +195,29 @@ ob_start();
 
 <fieldset class="fieldset">
   <legend class="fieldset-legend">Основные</legend>
-  <?= render_field('Показывать при включении', render_select('startup_page', $startupOptions, $values['startup_page'], ['id' => 'startup_page']), false, ['for' => 'startup_page']) ?>
-  <?= render_field('Фирма', render_select('firm_id', $firmOptions, $values['firm_id'], ['id' => 'firm_id']), true, ['for' => 'firm_id']) ?>
-  <div style="display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap">
-    <div><?= render_field('Ставка НДС', render_input('number', 'nds_rate', $values['nds_rate'], ['id' => 'nds_rate', 'min' => '0', 'max' => '100', 'step' => '1', 'style' => 'width:100px']), false, ['for' => 'nds_rate']) ?></div>
-    <div><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="no_nds" value="1"' . ($values['no_nds'] === '1' ? ' checked' : '') . ' /> Цены без НДС</label>', false, ['for' => 'no_nds']) ?></div>
-    <div><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="regcode_flag" value="1"' . ($values['regcode_flag'] === '1' ? ' checked' : '') . ' /> Регистрационные коды</label>', false, ['for' => 'regcode_flag']) ?></div>
-  </div>
-  <?= render_field('Количество строк на странице', render_input('number', 'page_size', $values['page_size'], ['id' => 'page_size', 'min' => '5', 'step' => '1', 'style' => 'width:80px']), false, ['for' => 'page_size']) ?>
-  <?= render_field('Макс. ширина страницы (px)', render_input('number', 'page_width', $values['page_width'], ['id' => 'page_width', 'min' => '800', 'step' => '10', 'style' => 'width:80px']), false, ['for' => 'page_width']) ?>
+  <table class="setup-table">
+    <tr>
+      <td><?= render_field('Показывать при включении', render_select('startup_page', $startupOptions, $values['startup_page'], ['id' => 'startup_page']), false, ['for' => 'startup_page']) ?></td>
+      <td><?= render_field('Фирма', render_select('firm_id', $firmOptions, $values['firm_id'], ['id' => 'firm_id']), true, ['for' => 'firm_id']) ?></td>
+      <td><?= render_field('Текущий участок', render_select('current_store_id', $storeOptions, $values['current_store_id'], ['id' => 'current_store_id']), false, ['for' => 'current_store_id']) ?></td>
+    </tr>
+    <tr>
+      <td><?= render_field('Ставка НДС', render_input('number', 'nds_rate', $values['nds_rate'], ['id' => 'nds_rate', 'min' => '0', 'max' => '100', 'step' => '1', 'style' => 'width:100px']), false, ['for' => 'nds_rate']) ?></td>
+      <td colspan="2"><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="no_nds" value="1"' . ($values['no_nds'] === '1' ? ' checked' : '') . ' /> Цены без НДС</label>', false, ['for' => 'no_nds']) ?></td>
+    </tr>
+    <tr>
+      <td><?= render_field('Количество строк на странице', render_input('number', 'page_size', $values['page_size'], ['id' => 'page_size', 'min' => '5', 'step' => '1', 'style' => 'width:100px']), false, ['for' => 'page_size']) ?></td>
+      <td colspan="2"><?= render_field('Макс. ширина страницы (px)', render_input('number', 'page_width', $values['page_width'], ['id' => 'page_width', 'min' => '800', 'step' => '10', 'style' => 'width:120px']), false, ['for' => 'page_width']) ?></td>
+    </tr>
+    <tr>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="regcode_flag" value="1"' . ($values['regcode_flag'] === '1' ? ' checked' : '') . ' /> Регистрационные коды</label>', false, ['for' => 'regcode_flag']) ?></td>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="show_hidden" value="1"' . ($values['show_hidden'] === '1' ? ' checked' : '') . ' /> Показывать все записи</label>', false, ['for' => 'show_hidden']) ?></td>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="neg_ost_flag" value="1"' . ($values['neg_ost_flag'] === '1' ? ' checked' : '') . ' /> Запрет отрицательных остатков</label>', false, ['for' => 'neg_ost_flag']) ?></td>
+    </tr>
+  </table>
 </fieldset>
 
-<fieldset class="fieldset">
+<fieldset class="fieldset fieldset-db">
   <legend class="fieldset-legend">Подключение к БД</legend>
   <div style="display:flex;gap:24px;flex-wrap:wrap">
     <div><?= render_field('Хост', render_input('text', 'db_host', $values['db_host'], ['id' => 'db_host', 'style' => 'width:220px']), true, ['for' => 'db_host']) ?></div>
@@ -184,7 +231,7 @@ ob_start();
 
 <div class="form-actions form-actions--bottom">
   <button type="submit" class="btn btn-primary"><img src="img/ok.png" alt="" /> Сохранить</button>
-  <button type="button" class="btn btn-secondary" data-form-close>Отмена</button>
+  <button type="button" class="btn btn-secondary" data-form-close><img src="img/cancel.png" alt="" /> Отмена</button>
 </div>
 </form>
 <?php
@@ -203,12 +250,6 @@ if ($isAjax) {
 $pageTitle = 'Параметры настройки';
 render_head_start($pageTitle);
 ?>
-  <style>
-    .fieldset { border: 1px solid #3a4c5e; border-radius: 4px; padding: 12px 16px 4px; margin-bottom: 16px; }
-    .fieldset-legend { font-weight: 700; color: #ffe9a8; padding: 0 6px; }
-    .checkbox-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-    .checkbox-label input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
-  </style>
 <?php render_head_end(); ?>
   <div class="page page--form">
     <?php $activeMenu = 'setup_form.php'; include 'menu.php'; ?>

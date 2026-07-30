@@ -176,8 +176,10 @@ render_head_end(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'checkboxCallback' => function($rid) use ($marks) {
-                return '<input type="checkbox" class="row-check" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
+                return '<input type="checkbox" class="row-check" value="' . $rid . '" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
             },
         ]); ?>
       </table>
@@ -189,264 +191,40 @@ render_head_end(); ?>
   </div>
 
 <?php
-render_script_includes(['scripts' => ['assets/access.js']]);
+render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.js']]);
 ?>
-  <script>
-  (function () {
-    const toolbar = document.querySelector('.toolbar');
-    const tbody   = document.querySelector('table tbody');
-    const rowOpenBtn   = document.getElementById('rowOpenBtn');
-    const rowCopyBtn   = document.getElementById('rowCopyBtn');
-    const rowDeleteBtn = document.getElementById('rowDeleteBtn');
-    const sortBtn   = document.getElementById('sortBtn');
-    const columnsBtn = document.getElementById('columnsBtn');
-    const searchForm  = document.getElementById('searchForm');
-    const searchCondBtn  = document.getElementById('searchCondBtn');
-    const searchToggleBtn= document.getElementById('searchToggleBtn');
-    const selWrap   = document.getElementById('selectedActions');
-    const selCount  = document.getElementById('selectedCount');
-
-    const currentPage  = parseInt(toolbar.dataset.page  || '1', 10);
-    const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
-    const currentTotal = parseInt(toolbar.dataset.total || '0', 10);
-
-    SelectionToolbar.initTableSelection('country.php', document.querySelector('.toolbar').getAttribute('data-search') || '');
-
-    function updateRowActionButtons() {
-      const id = rowSel.getSelectedId();
-      const enabled = id > 0;
-      const af = window.__accessFlags || {};
-      rowOpenBtn.disabled   = !enabled || !!af.change_flag;
-      rowCopyBtn.disabled   = !enabled || !!af.insert_flag;
-      rowDeleteBtn.disabled = !enabled || !!af.delete_flag;
-    }
-
-    const rowSel = RowSelect.init({
-      tbody: tbody,
-      rowClass: 'selected',
-      onChange: updateRowActionButtons,
-      currentPage: currentPage,
-      totalPages: currentPages,
-      navigate: navigate
-    });
-
-    function selectRow(rowId) { rowSel.selectById(rowId, true); }
-
-    function navigate(params) {
-      const url = new URL(window.location.href);
-      params(url.searchParams);
-      window.location.href = url.pathname + '?' + url.searchParams.toString();
-    }
-
-    const SORT_COLS = <?= json_encode(array_map(function ($c) { return ['key' => $c['name'], 'label' => $c['label']]; }, $COLUMN_DEFAULTS), JSON_UNESCAPED_UNICODE) ?>;
-    const SEARCH_COLS = <?= json_encode(array_values(array_filter(array_map(function ($c) { return $c['search'] ? ['key' => $c['name'], 'label' => $c['label']] : null; }, $COLUMN_DEFAULTS))), JSON_UNESCAPED_UNICODE) ?>;
-    const currentSortLevels = <?= json_encode($sortLevels, JSON_UNESCAPED_UNICODE) ?>;
-
-    SelectionToolbar.init({
-      pageUrl: 'country.php',
-      getInvertUrl: function () {
-        var other = new URLSearchParams(location.search);
-        other.delete('ids');
-        return 'country.php?action=invertSelection&' + other.toString();
-      },
-      getExportUrl: function () {
-        return null;
-      },
-      getPrintUrl: function () {
-        return null;
-      }
-    });
-
-    document.querySelectorAll('.row-check').forEach(function (cb) {
-      cb.addEventListener('click', function (e) { e.stopPropagation(); });
-    });
-
-    function closeAllPanels() {
-      document.querySelectorAll('.col-filter-panel, .search-cond-panel, .search-cond-pop, .columns-panel').forEach(function (p) { p.remove(); });
-      document.querySelectorAll('.sort-modal-backdrop.open').forEach(function (p) { p.classList.remove('open'); });
-    }
-
-    SearchPanel.init({
-      form: searchForm,
-      condBtn: searchCondBtn,
-      toggleBtn: searchToggleBtn,
-      columns: SEARCH_COLS,
-      pageUrl: 'country.php',
-      popupCheckboxes: true,
-      emptyClass: 'search-cond-placeholder',
-      closeAllPanels: closeAllPanels,
-      labels: {
-        cols: 'Колонки',
-        cond: 'Условие',
-        emptyCols: 'Выберите колонки…'
-      },
-      onApply: function (state) {
-        var params = new URLSearchParams(location.search);
-        if (state.cols.size > 0) params.set('cols', Array.from(state.cols).join(','));
-        else params.delete('cols');
-        params.set('cond', state.cond);
-        params.set('sf', '1');
-        var q = (searchForm.querySelector('input[name="q"]') || { value: '' }).value.trim();
-        if (q !== '') params.set('q', q); else params.delete('q');
-        params.delete('page');
-        location.href = 'country.php?' + params.toString();
-      },
-      onToggle: function (state) {
-        var params = new URLSearchParams(location.search);
-        var q = searchForm.querySelector('input[name="q"]').value.trim();
-        if (q !== '') {
-          params.set('q', q);
-          if (state.cols.size > 0) params.set('cols', Array.from(state.cols).join(','));
-          params.set('cond', state.cond);
-          params.set('sf', '1');
-        } else {
-          params.delete('q');
-          params.delete('cols');
-          params.delete('cond');
-          params.delete('sf');
-        }
-        params.delete('page');
-        location.href = 'country.php?' + params.toString();
-      },
-      onSubmit: function () {
-        searchToggleBtn.click();
-      }
-    });
-
-    SortPanel.init({
-      btn: sortBtn,
-      columns: SORT_COLS,
-      pageUrl: 'country.php',
-      mode: 'modal',
-      currentSort: currentSortLevels,
-      directions: [
-        { key: 'asc',  label: 'По возрастанию' },
-        { key: 'desc', label: 'По убыванию' },
-      ],
-    });
-
-    ColumnsPanel.init({
-      btn: columnsBtn,
-      saveUrl: 'country_columns_save.php',
-      tbl: 'country',
-      closeAllPanels: closeAllPanels,
-      initialColumns: <?= json_encode(array_map(function ($c) {
-        return ['name' => $c['name'], 'label' => $c['label'], 'visible' => !empty($c['visible'])];
-      }, $columnsConfig), JSON_UNESCAPED_UNICODE) ?>,
-      defaultColumns: <?= json_encode(array_map(function ($c) {
-        return ['name' => $c['name'], 'label' => $c['label'], 'visible' => true];
-      }, $COLUMN_DEFAULTS), JSON_UNESCAPED_UNICODE) ?>
-    });
-
-    window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
-    window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'country' => 200, 'note' => 500], JSON_UNESCAPED_UNICODE) ?>;
-    window.__accessFlags = <?= json_encode($accessFlags) ?>;
-    if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
-  })();
-  </script>
-  <?php render_form_modal_script([
-    'form_prefix'   => 'country_form',
-    'base_url'      => 'country.php',
-    'lookup_tables' => [],
-  ]); ?>
-  <script>
-  (function () {
-    const toolbar = document.querySelector('.toolbar');
-    const tbody   = document.querySelector('table tbody');
-    const rowOpenBtn   = document.getElementById('rowOpenBtn');
-    const rowCopyBtn   = document.getElementById('rowCopyBtn');
-    const rowDeleteBtn = document.getElementById('rowDeleteBtn');
-    const selWrap   = document.getElementById('selectedActions');
-    const selCount  = document.getElementById('selectedCount');
-
-    const currentPage  = parseInt(toolbar.dataset.page  || '1', 10);
-    const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
-
-    document.querySelectorAll('tbody tr').forEach(function (tr) {
-      const id = parseInt(tr.dataset.rowId, 10);
-      tr.addEventListener('click', function (e) {
-        if (e.target.closest('input.row-check')) return;
-        selectRow(id);
-      });
-      tr.addEventListener('dblclick', function () {
-        if (window.__accessFlags && window.__accessFlags.change_flag) return;
-        window.__openFormModal('country_form.php?mode=edit&id=' + id);
-      });
-    });
-
-    rowOpenBtn.addEventListener('click', function () {
-      const id = rowSel.getSelectedId();
-      if (id !== 0) window.__openFormModal('country_form.php?mode=edit&id=' + id);
-    });
-    rowCopyBtn.addEventListener('click', function () {
-      const id = rowSel.getSelectedId();
-      if (id !== 0) window.__openFormModal('country_form.php?mode=copy&id=' + id);
-    });
-    rowDeleteBtn.addEventListener('click', function () {
-      const id = rowSel.getSelectedId();
-      if (id !== 0) window.__openFormModal('country_form.php?mode=delete&id=' + id);
-    });
-
-    const tableWrapEl = document.querySelector('.table-wrap');
-
-    (function applyInitialFocus() {
-      const rows = rowSel.getRows();
-      if (rows.length === 0) return;
-      const raw = (toolbar.dataset.focus || '').toString();
-      if (raw === 'first') { rowSel.selectByIndex(0); return; }
-      if (raw === 'last')  { rowSel.selectByIndex(rows.length - 1); return; }
-      const id = parseInt(raw, 10);
-      if (id > 0 && rowSel.selectById(id, false)) return;
-      rowSel.selectByIndex(0);
-    })();
-
-    bindTableKeyboardShortcuts({
-      formPrefix: 'country_form',
-      rowSel: rowSel,
-      currentPage: currentPage,
-      currentPages: currentPages,
-      navigate: navigate,
-      tableWrapEl: tableWrapEl,
-      accessFlags: window.__accessFlags
-    });
-
-    __refreshSelectionUI();
-  })();
-
-  if (window.__accessFlags && (window.__accessFlags.save_flag || window.__accessFlags.change_flag)) { /* skip */ } else {
-  InlineEdit.init({
-    tbody: document.querySelector('table tbody'),
-    saveUrl: 'country_field_save.php',
-    fields: <?php
-      $inlineFields = [];
-      $valCases = '';
-      foreach ($visibleColumns as $vc) {
-        $cn = $vc['name'];
-        if (!empty($vc['readonly']) || $cn === 'id') continue;
-        $isLookup = !empty($vc['param']);
-        $inlineFields[$cn] = [
-          'dbField' => $cn,
-          'type'    => $isLookup ? 'lookup' : 'text',
-          'label'   => $vc['label'],
-        ];
-        $label = json_encode($vc['label'], JSON_UNESCAPED_UNICODE);
-        $cnEnc = json_encode($cn, JSON_UNESCAPED_UNICODE);
-          if ($isLookup) {
-            $valCases .= "    case $cnEnc: if (parseInt(value,10)<=0) return 'Выберите значение из списка'; break;\n";
-          }
-      }
-    ?><?= json_encode($inlineFields, JSON_UNESCAPED_UNICODE) ?>,
-    validate: function (field, value) {
-      switch (field) {
-<?= $valCases ?>
-      }
-      return null;
-    },
-    onOpenForm: window.__openFormModal
-  });
-  }
-
-  ColumnResize.init({ saveUrl: 'country_column_width_save.php', tbl: 'country' });
-  </script>
-<?php render_page_footer();
+<script>
+window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
+window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'country' => 200, 'note' => 500], JSON_UNESCAPED_UNICODE) ?>;
+</script>
+<?php
+require_once __DIR__ . '/lib/table-page-scripts.php';
+render_table_page_scripts([
+    'pageUrl'         => 'country.php',
+    'formPrefix'      => 'country_form',
+    'tableKey'        => 'country',
+    'fieldSaveUrl'    => 'country_field_save.php',
+    'columnsSaveUrl'  => 'country_columns_save.php',
+    'columnResizeUrl' => 'country_column_width_save.php',
+    'visibleColumns'  => $visibleColumns,
+    'defaultColumns'  => $COLUMN_DEFAULTS,
+    'accessFlags'     => $accessFlags,
+    'exportUrl'       => 'country_export.php',
+    'printUrl'        => 'country_print.php',
+    'marksTbl'        => 'country',
+    'searchPanelConfig' => [
+        'popupCheckboxes' => true,
+        'emptyClass' => 'search-cond-placeholder',
+        'labels' => [
+            'cols' => 'Колонки',
+            'cond' => 'Условие',
+            'emptyCols' => 'Выберите колонки…',
+        ],
+    ],
+    'formModalConfig' => [
+        'lookup_tables' => [],
+    ],
+    'lookupData'      => [],
+]);
+render_page_footer();
 

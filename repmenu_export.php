@@ -23,7 +23,6 @@ $tp->renderExport($format, $rows, [
         'group' => fn($r) => (string)($r['group_name'] ?? ''),
         'name'  => fn($r) => (string)($r['name'] ?? ''),
         'fname' => fn($r) => (string)($r['fname'] ?? ''),
-        'quant' => fn($r) => (int)($r['quant'] ?? 0),
         'note'  => fn($r) => (string)($r['note'] ?? ''),
     ],
 ]);

@@ -5,14 +5,19 @@ require_once __DIR__ . '/config/tmc_page.php';
 
 $tp = new TablePage($conn, $tmcPageConfig);
 
+$printServiceMode = (string)($_GET['type'] ?? 'product');
+if (!in_array($printServiceMode, ['product', 'service'], true)) $printServiceMode = 'product';
+$tp->appendWhere("p.service_flag = ?", [$printServiceMode === 'service' ? '1' : '0'], 's');
+
 $tp->applyFilterWithLabel($conn, 'categ_id',   'p.categ_id',   'Категория',   'categ',   'categ_id',   'categ');
 $tp->applyFilterWithLabel($conn, 'group_id',   'p.group_id',   'Группа',      '`group`', 'group_id',  'name');
 $tp->applyFilterWithLabel($conn, 'sgroup_id',  'p.sgroup_id',  'Подгруппа',   'sgroup',  'sgroup_id', 'name');
 $tp->applyFilterWithLabel($conn, 'country_id', 'p.country_id', 'Страна',      'country', 'country_id','country');
 
 $rows = $tp->fetchAll($conn);
+$printTitle = $printServiceMode === 'service' ? 'Услуги' : 'Товары';
 $tp->renderPrintPage($rows, ['totalCount' => count($rows)], [
-    'title' => 'Товары',
+    'title' => $printTitle,
     'colValues' => [
         'id'        => fn($r) => (int)$r['product_id'],
         'name'      => fn($r) => (string)($r['name'] ?? ''),

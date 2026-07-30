@@ -10,7 +10,7 @@ if ($rpId <= 0) {
     exit;
 }
 
-$stmt = $conn->prepare("SELECT m.number, m.gr_id, m.name, m.fname, m.quant, m.HIDE_FLAG, m.note, rg.name AS group_name FROM repmenu m LEFT JOIN repgroup rg ON rg.gr_id = m.gr_id WHERE m.rp_id = ?");
+$stmt = $conn->prepare("SELECT m.number, m.gr_id, m.name, m.fname, m.HIDE_FLAG, m.note, rg.name AS group_name FROM repmenu m LEFT JOIN repgroup rg ON rg.gr_id = m.gr_id WHERE m.rp_id = ?");
 $stmt->bind_param('i', $rpId);
 $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
@@ -33,7 +33,6 @@ $vars = [
     'Number'    => (string)$row['number'],
     'Name'      => (string)$row['name'],
     'GroupName' => (string)$row['group_name'],
-    'Quant'     => (string)$row['quant'],
     'Note'      => (string)$row['note'],
     'PrintDate' => date('d.m.Y'),
 ];

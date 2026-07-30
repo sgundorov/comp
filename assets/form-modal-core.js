@@ -101,11 +101,68 @@
     }
   }
 
+  function initTabAutoSave(tabIndices) {
+    var tc = document.querySelector('.tab-headers');
+    if (!tc || tc.__autoSaveBound) return;
+    tc.__autoSaveBound = true;
+    var saving = false;
+    tc.addEventListener('click', function(e) {
+      var hdr = e.target.closest('.tab-header');
+      if (!hdr) return;
+      var idx = parseInt(hdr.dataset.tabIndex, 10);
+      if (tabIndices.indexOf(idx) === -1) return;
+      var readyEl = document.querySelector('input[name="auto_save_ready"]');
+      if (!readyEl) return;
+      if (saving) return;
+      saving = true;
+      var form = document.querySelector('form[data-form-modal]');
+      if (!form) { saving = false; return; }
+      var fd = new FormData(form);
+      fd.set('auto_save', '1');
+      fetch(form.getAttribute('action') || window.location.pathname, {
+        method: 'POST', body: fd,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok || !data.id) { saving = false; return; }
+        var baseUrl = form.getAttribute('action') || window.location.pathname;
+        var editUrl = baseUrl.split('?')[0] + '?mode=edit&id=' + data.id + (window.location.search || '');
+        var body = document.getElementById('formModalBody');
+        if (body && typeof window.openFormModal === 'function') {
+          body.innerHTML = '';
+          var _idx = idx;
+          window.openFormModal(editUrl, { onRestore: function() {} });
+          var poll = setInterval(function() {
+            var tab = body.querySelector('.tab-header[data-tab-index="' + _idx + '"]');
+            if (tab) {
+              clearInterval(poll);
+              var _tc = body.querySelector('.tab-container');
+              if (_tc) {
+                _tc.querySelectorAll('.tab-header').forEach(function(t){ t.classList.remove('active'); });
+                _tc.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });
+                tab.classList.add('active');
+                var pane = _tc.querySelector('.tab-pane[data-tab-index="' + _idx + '"]');
+                if (pane) pane.classList.add('active');
+              }
+            }
+          }, 100);
+        } else {
+          window.location.href = editUrl;
+        }
+        saving = false;
+      })
+      .catch(function() { saving = false; });
+    }, true);
+  }
+
   window.FormModalCore = {
     appendAjax: appendAjax,
     bindFormTabTrap: bindFormTabTrap,
     focusFirstField: focusFirstField,
     handleLookupAdd: handleLookupAdd,
-    setFocusAfterSave: setFocusAfterSave
+    setFocusAfterSave: setFocusAfterSave,
+    initTabAutoSave: initTabAutoSave
   };
 })();

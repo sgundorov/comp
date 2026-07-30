@@ -20,30 +20,32 @@
 
       ths = Array.from(ths).filter(function (th) { return !th.hasAttribute('data-no-resize'); });
 
-      function setTableWidth(w) {
+      function setTableWidth(w, forceMin) {
         var rw = Math.round(w);
         table.style.width = rw + 'px';
-        table.style.minWidth = rw + 'px';
-        table.style.maxWidth = rw + 'px';
+        if (forceMin) {
+          table.style.minWidth = rw + 'px';
+        }
       }
 
       // Apply colgroup widths immediately so saved pixel widths
       // take effect without requiring a handle click (fixes embedded
       // tables in hidden tabs where browser distributes 100% width
       // differently than the colgroup pixel values).
-      var allCols = table.querySelectorAll('colgroup col');
+      var dataCols = table.querySelectorAll('colgroup col:not(.col-check)');
       var totalW = 0;
-      allCols.forEach(function (col) {
+      dataCols.forEach(function (col) {
         var w = parseInt(col.style.width, 10);
         if (!isNaN(w) && w > 0) { totalW += w; }
       });
-      if (totalW > 0) {
-        // Don't lock to a width smaller than the CSS min-width
-        // (1200px for .data-table). Embedded subtables have
-        // min-width:auto so this clamp is a no-op for them.
-        var minW = parseInt(getComputedStyle(table).minWidth, 10);
-        if (!isNaN(minW) && totalW < minW) totalW = minW;
-        setTableWidth(totalW);
+      var checkW = (function () {
+        var col = table.querySelector('colgroup col.col-check');
+        var w = col ? parseInt(col.style.width, 10) : 0;
+        return w > 0 ? w : 32;
+      })();
+      var totalWfull = totalW + checkW;
+      if (totalWfull > 0) {
+        setTableWidth(totalWfull, true);
       }
 
       ths.forEach(function (th) {
@@ -59,9 +61,15 @@
           var colEl = table.querySelector('colgroup col.' + cn[0]);
           if (!colEl) return;
 
-          var allCols = [].slice.call(table.querySelectorAll('colgroup col'));
+          var allCols = [].slice.call(table.querySelectorAll('colgroup col:not(.col-check)'));
           var targetIdx = allCols.indexOf(colEl);
           if (targetIdx < 0) return;
+
+          var checkW = (function () {
+            var col = table.querySelector('colgroup col.col-check');
+            var w = col ? parseInt(col.style.width, 10) : 0;
+            return w > 0 ? w : 32;
+          })();
 
           var colWidths = [];
           var totalW = 0;
@@ -76,7 +84,7 @@
               colWidths[i] = null;
             }
           });
-          if (totalW > 0) setTableWidth(totalW);
+          if (totalW > 0) setTableWidth(totalW + checkW, true);
 
           var startX = e.clientX;
           var startW = colWidths[targetIdx];
@@ -94,7 +102,7 @@
               var cw = i === targetIdx ? newW : colWidths[i];
               if (cw != null) col.style.width = Math.round(cw) + 'px';
             });
-            setTableWidth(newTotal);
+            setTableWidth(newTotal + checkW, true);
           }
 
           function onMouseUp(ev) {
@@ -109,7 +117,7 @@
               var cw = i === targetIdx ? finalW : colWidths[i];
               if (cw != null) col.style.width = Math.round(cw) + 'px';
             });
-            setTableWidth(Math.round(totalW + finalW - startW));
+            setTableWidth(Math.round(totalW + finalW - startW) + checkW, true);
             saveWidth(th, finalW);
           }
 

@@ -11,13 +11,25 @@ require_once __DIR__ . '/lib/table-page-scripts.php';
 $accessFlags = render_access_control($conn, 'Group');
 
 $TBL = 'group';
-$PAGE_TITLE = 'Группы товаров';
+$serviceMode = (string)($_GET['type'] ?? 'product');
+if (!in_array($serviceMode, ['product', 'service'], true)) $serviceMode = 'product';
+$isService = ($serviceMode === 'service');
+$serviceFlag = $isService ? '1' : '0';
+$PAGE_TITLE = $isService ? 'Группы услуг' : 'Группы товаров';
 $PAGE_URL   = 'group.php';
 $FORM_PREFIX = 'group_form';
 
 ensure_marks_table($conn);
 
 $tp = new TablePage($conn, $groupPageConfig);
+
+// Reset 'note' column_visibility entry — use full defaults if DB row is corrupt
+$st = $conn->prepare("DELETE FROM column_visibility WHERE tbl = 'group' AND column_name = 'note'");
+if ($st) { $st->execute(); $st->close(); }
+$tp->loadColumnsConfig($conn);
+$tp->loadColumnWidths($conn);
+
+$tp->appendWhere("g.service_flag = ?", [$serviceFlag], 's');
 
 handle_marks_actions($conn, $tp, $TBL);
 
@@ -42,6 +54,11 @@ render_head_start($PAGE_TITLE); ?>
     .form .tab-header:hover:not(.active) { color: #fff; background: var(--btn-hover); }
     .form .tab-pane { display: none; width: 100%; }
     .form .tab-pane.active { display: block; width: 100%; }
+
+    .toolbar-separator { display: inline-block; width: 1px; height: 24px; background: var(--line); margin: 0 6px; vertical-align: middle; }
+    .toolbar-radio { display: inline-flex; align-items: center; gap: 4px; color: #ccc; font-size: 13px; cursor: pointer; padding: 0 4px; vertical-align: middle; user-select: none; }
+    .toolbar-radio input[type="radio"] { margin: 0; cursor: pointer; }
+    .toolbar-radio:hover { color: #fff; }
   </style>
 <?php
 $tp->renderHeadEnd();
@@ -56,6 +73,7 @@ $exportQs = http_build_query(array_filter([
     'cols' => $tp->searchActive && count($tp->searchCols) > 0 ? implode(',', $tp->searchCols) : null,
     'cond' => $tp->searchActive ? $tp->searchCond : null,
     'sf'   => $tp->searchActive ? '1' : null,
+    'type' => $isService ? 'service' : null,
     'sort' => $tp->sortQs !== '' ? $tp->sortQs : null,
 ], function ($v) { return $v !== null && $v !== ''; }));
 
@@ -68,9 +86,14 @@ foreach ([
     $exportFormats[] = $item + ['url' => $fullUrl];
 }
 
+$serviceRadioHtml = '<span class="toolbar-separator"></span>'
+    . '<label class="toolbar-radio"><input type="radio" name="service_mode" value="product"' . (!$isService ? ' checked' : '') . ' /> Группы товаров</label>'
+    . '<label class="toolbar-radio"><input type="radio" name="service_mode" value="service"' . ($isService ? ' checked' : '') . ' /> Группы услуг</label>';
+
 $tp->renderToolbar([
     'formPrefix' => $FORM_PREFIX,
     'exportFormats' => $exportFormats,
+    'afterPrintHtml' => $serviceRadioHtml,
 ]);
 
 $tp->renderFilterBanner();
@@ -91,7 +114,7 @@ $tp->renderFilterBanner();
     }
     return ['', ''];
 }, [
-    'defaultWidths' => ['id' => 46, 'name' => 250, 'note' => 500],
+    'defaultWidths' => ['id' => 46, 'name' => 125, 'pos' => 60, 'note' => 500],
     'rows' => $rows,
 ]); ?>
   </table>
@@ -106,7 +129,7 @@ $tp->renderFilterBanner();
 ?>
   <script>
     window.__columnWidths = <?= json_encode($tp->columnWidths, JSON_NUMERIC_CHECK) ?>;
-    window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'name' => 250, 'note' => 500], JSON_UNESCAPED_UNICODE) ?>;
+    window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'name' => 125, 'pos' => 60, 'note' => 500], JSON_UNESCAPED_UNICODE) ?>;
   </script>
   <?php render_table_page_scripts([
       'pageUrl'         => $PAGE_URL,
@@ -120,13 +143,31 @@ $tp->renderFilterBanner();
       'accessFlags'     => $accessFlags,
       'exportUrl'       => 'group_export.php',
       'printUrl'        => 'group_print.php',
-      'preserveParams'  => ['sort'],
+      'preserveParams'  => ['sort', 'type'],
       'marksTbl'        => $TBL,
       'formModalConfig' => [
           'autoInitTables' => ['sg'],
-          'extra_open' => 'if (typeof initSgTable === "function") initSgTable();',
-          'extra_restore' => 'var _sg = window.__sgTable; var _sgPage = _sg ? _sg.currentPage : 1; var _sgData = _sg ? _sg.data : []; var _sgPS = _sg ? _sg.pageSize : 15; initSgTable(); if (window.__sgTable) { window.__sgTable.parentId = parseInt((document.querySelector("input[name=id]") || {}).value || "0", 10); if (data && data._deleted) { var _sgIdx = -1; for (var _sgi = 0; _sgi < _sgData.length; _sgi++) { if (_sgData[_sgi].id == data.id) { _sgIdx = _sgi; break; } } window.__sgTable.refresh({ desiredIdx: _sgIdx, currentPage: _sgPage, totalPages: Math.ceil(_sgData.length / _sgPS) || 1 }); } else if (data && data.id) { window.__sgTable.refresh({ focusId: data.id }); } } if (data && data.pos !== undefined) { var posEl = document.querySelector("[name=pos]"); if (posEl) posEl.value = data.pos; }',
+          'extra_open' => 'if (typeof initSgTable === "function") initSgTable(); if (window.__sgTable) window.__sgTable.refresh();',
+          'extra_restore' => 'var _sg = window.__sgTable; var _sgPage = _sg ? _sg.currentPage : 1; var _sgData = _sg ? _sg.data.slice() : []; var _sgPS = _sg ? _sg.pageSize : 15; window.__sgTable = null; initSgTable(); if (window.__sgTable) { window.__sgTable.parentId = parseInt((document.querySelector("input[name=id]") || {}).value || "0", 10); if (data && data.sgroup_list) { window.__sgTable.data = data.sgroup_list; var _pages = Math.ceil(data.sgroup_list.length / _sgPS) || 1; if (window.__sgTable.currentPage > _pages) window.__sgTable.currentPage = _pages; if ((data.mode === "new" || data.mode === "copy") && data.id) { var _newId = Number(data.id); window.__sgTable.selectedId = _newId; for (var _sgi = 0; _sgi < window.__sgTable.data.length; _sgi++) { if (Number(window.__sgTable.data[_sgi].id) === _newId) { window.__sgTable.currentPage = Math.floor(_sgi / _sgPS) + 1; break; } } } else if (data._deleted) { var _delIdx = -1; for (var _sgi = 0; _sgi < _sgData.length; _sgi++) { if (Number(_sgData[_sgi].id) === Number(data.id)) { _delIdx = _sgi; break; } } if (_delIdx >= 0 && window.__sgTable.data.length > 0) { var _nextIdx = _delIdx < window.__sgTable.data.length ? _delIdx : _delIdx - 1; if (_nextIdx < 0) _nextIdx = 0; window.__sgTable.selectedId = Number(window.__sgTable.data[_nextIdx].id); window.__sgTable.currentPage = Math.floor(_nextIdx / _sgPS) + 1; } else { window.__sgTable.selectedId = 0; } } window.__sgTable.render(); } else if (data && data._deleted) { window.__sgTable.refresh({ desiredIdx: -1, currentPage: _sgPage, totalPages: Math.ceil((_sgData.length - 1) / _sgPS) || 1 }); } else if (data && data.id) { window.__sgTable.refresh({ focusId: data.id }); } } if (data && data.pos !== undefined) { var posEl = document.querySelector("[name=pos]"); if (posEl) posEl.value = data.pos; } savedTableSelections = {};',
       ],
+      'extraCode' => '
+        (function() {
+          var sf = "' . $serviceFlag . '";
+          var addBtn = document.querySelector("button[data-form-open]");
+          if (addBtn && addBtn.getAttribute("data-form-open").indexOf("service_flag") < 0) {
+            addBtn.setAttribute("data-form-open", addBtn.getAttribute("data-form-open") + "&service_flag=" + sf);
+          }
+          var modeRadios = document.querySelectorAll("input[name=service_mode]");
+          modeRadios.forEach(function(radio) {
+            radio.addEventListener("change", function() {
+              var p = new URLSearchParams(location.search);
+              p.set("type", radio.value);
+              p.delete("page");
+              location.href = "group.php?" + p.toString();
+            });
+          });
+        })();
+      ',
   ]); ?>
 <?php
 $sgTable = new EmbeddedTable([

@@ -7,7 +7,7 @@ if (!defined('REPMENU_COLUMNS_LOADED')) {
             ['name' => 'id',     'label' => 'Номер',        'sort_expr' => 'm.number',     'search' => true,  'filter' => false, 'export' => true, 'param' => null, 'readonly' => true],
             ['name' => 'name',   'label' => 'Название',      'sort_expr' => 'm.name',       'search' => true,  'filter' => false, 'export' => true, 'param' => null],
             ['name' => 'fname',  'label' => 'Файл шаблон',   'sort_expr' => 'm.fname',      'search' => true,  'filter' => false, 'export' => true, 'param' => null],
-            ['name' => 'quant',  'label' => 'Количество',    'sort_expr' => 'm.quant',      'search' => true,  'filter' => false, 'export' => true, 'param' => null],
+
             ['name' => 'note',   'label' => 'Примечание',    'sort_expr' => 'm.note',       'search' => true,  'filter' => false, 'export' => true, 'param' => null],
         ];
     }
@@ -17,7 +17,6 @@ if (!defined('REPMENU_COLUMNS_LOADED')) {
             'id'    => 60,
             'name'  => 200,
             'fname' => 150,
-            'quant' => 80,
             'note'  => 200,
         ];
     }
@@ -27,7 +26,6 @@ if (!defined('REPMENU_COLUMNS_LOADED')) {
             'id'    => '60px',
             'name'  => '',
             'fname' => '',
-            'quant' => '80px',
             'note'  => '',
         ];
     }

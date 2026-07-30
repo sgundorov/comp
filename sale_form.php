@@ -17,12 +17,13 @@ $isAjax = (
 $mode = (string)($_GET['mode'] ?? $_POST['mode'] ?? 'edit');
 $id   = (int)($_GET['id']   ?? $_POST['id']   ?? 0);
 $typeop = (int)($_GET['typeop'] ?? $_POST['typeop'] ?? 120);
-if (!in_array($typeop, [10, 20, 100, 110, 120, 127], true)) $typeop = 120;
+if (!in_array($typeop, [40, 20, 100, 110, 120, 127], true)) $typeop = 120;
 
 $prihodFlag = 0;
 $pfRow = $conn->query("SELECT COALESCE(prihod_flag,0) AS pf FROM typeop WHERE typeop_id = $typeop")->fetch_assoc();
 if ($pfRow) $prihodFlag = (int)$pfRow['pf'];
 if (!in_array($mode, ['new', 'edit', 'copy', 'delete'], true)) $mode = 'edit';
+$ndsRate = (int)($appSettings['nds_rate'] ?? 22);
 
 $errors = [];
 $focusField = '';
@@ -41,11 +42,21 @@ $values = [
     'pos'          => 0,
     'date_plat'    => '',
     'zakaz_num'    => '',
+    'sum_nds'      => '0.00',
     'sotr_id'      => 0,
     'sotr2_id'     => 0,
     'note'         => '',
     'accept_flag'  => 0,
 ];
+
+if ($mode === 'new') {
+    if (!empty($appSettings['current_store_id']) && (int)$appSettings['current_store_id'] > 0) {
+        $values['store_id'] = (int)$appSettings['current_store_id'];
+    }
+    if ($CurSotrID > 0) {
+        $values['sotr_id'] = $CurSotrID;
+    }
+}
 
 if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
     $stmt = $conn->prepare("SELECT number, date, time, client_id, store_id, store2_id, discount, sum_discount, sum, sum_plat, sum_balans, pos, date_plat, zakaz_num, sotr_id, sotr2_id, note, accept_flag FROM docum WHERE docum_id = ? AND typeop = ?");
@@ -96,19 +107,25 @@ if ($mode === 'delete' && $values['accept_flag'] === 1) {
     exit;
 }
 
+if ($mode === 'new' || $mode === 'copy') {
+    $nr = $conn->query("SELECT COALESCE(MAX(number), 0) + 1 AS next_num FROM docum WHERE typeop = $typeop");
+    if ($nr && ($nrow = $nr->fetch_assoc())) $values['number'] = (int)$nrow['next_num'];
+}
+
 // ---- docum2 items ----
 $docum2Data = [];
 $docum2ColDefaults = docum2_columns_defaults();
 $docum2ColConfig = [];
 $docum2ColWidths = [];
-$docum2DefaultWidths = ['product_name' => 'auto', 'quant' => '80px', 'price' => '90px', 'discount' => '80px', 'sum' => '100px', 'note' => '250px'];
+$docum2DefaultWidths = ['product_name' => 'auto', 'quant' => '80px', 'price' => '90px', 'discount' => '80px', 'sum' => '100px', 'sum_nds' => '80px', 'note' => '250px'];
 $d2w = function($name) use ($docum2ColWidths, $docum2DefaultWidths) {
     return isset($docum2ColWidths[$name]) ? $docum2ColWidths[$name] . 'px' : ($docum2DefaultWidths[$name] ?? 'auto');
 };
 function fmt_qty($v) { return fmt_num($v, 3); }
 function fmt_price($v) { return fmt_num($v, 2); }
 if ($id > 0) {
-    $itemsRes = $conn->query("SELECT docum2_id AS id, product_id, code, product_name, quant, price, discount, sum, sum_discount, note FROM docum2 WHERE docum_id = $id ORDER BY docum2_id");
+    $itemsRes = $conn->query("SELECT docum2_id AS id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note FROM docum2 WHERE docum_id = $id ORDER BY docum2_id");
+    $sumNds = 0;
     if ($itemsRes) while ($ir = $itemsRes->fetch_assoc()) {
         $item = [
             'id' => (int)$ir['id'],
@@ -120,10 +137,13 @@ if ($id > 0) {
             'discount' => fmt_price($ir['discount']),
             'sum' => fmt_price($ir['sum']),
             'sum_discount' => fmt_price($ir['sum_discount']),
+            'sum_nds' => fmt_price($ir['sum_nds']),
             'note' => (string)$ir['note'],
         ];
+        $sumNds += (float)$ir['sum_nds'];
         $docum2Data[] = $item;
     }
+    $values['sum_nds'] = fmt_price($sumNds);
     $docum2ColWidths = load_columns_widths($conn, 'docum2');
     $d2w = function($name) use ($docum2ColWidths, $docum2DefaultWidths) {
         return isset($docum2ColWidths[$name]) ? $docum2ColWidths[$name] . 'px' : ($docum2DefaultWidths[$name] ?? 'auto');
@@ -156,7 +176,8 @@ $docum2ColDefaultsJs = json_encode(array_map(function($c) {
     return ['name' => $c['name'], 'label' => $c['label'], 'visible' => true];
 }, $docum2ColDefaults), JSON_UNESCAPED_UNICODE);
 $productList = [];
-$prs = $conn->query("SELECT product_id, product_name, article AS code, price_out AS price FROM product WHERE hide_flag = 0 ORDER BY product_name");
+$hideFilter = (empty($appSettings['show_hidden']) || $appSettings['show_hidden'] !== '1') ? 'hide_flag = 0' : '1';
+$prs = $conn->query("SELECT product_id, product_name, article AS code, price_out AS price FROM product WHERE " . $hideFilter . " ORDER BY product_name");
 if ($prs) while ($pr = $prs->fetch_assoc()) {
     $productList[] = ['id' => (int)$pr['product_id'], 'name' => (string)$pr['product_name'], 'code' => (string)$pr['code'], 'price' => (string)$pr['price']];
 }
@@ -170,9 +191,15 @@ if (!in_array($typeop, [127, 100], true)) {
     $d2Columns[] = ['key' => 'discount', 'label' => 'Скидка', 'align' => 'right'];
 }
 $d2Columns[] = ['key' => 'sum', 'label' => 'Сумма', 'align' => 'right'];
+if ($ndsRate > 0) {
+    $d2Columns[] = ['key' => 'sum_nds', 'label' => 'НДС', 'align' => 'right'];
+}
 $d2Columns[] = ['key' => 'note', 'label' => 'Примечание'];
 
 $d2ColWidths = ['product_name' => 'auto', 'quant' => '80px', 'price' => '90px', 'discount' => '80px', 'sum' => '100px', 'note' => '250px'];
+if ($ndsRate > 0) {
+    $d2ColWidths['sum_nds'] = '80px';
+}
 foreach ($docum2ColWidths as $name => $w) {
     if (isset($d2ColWidths[$name])) $d2ColWidths[$name] = $w . 'px';
 }
@@ -185,7 +212,10 @@ $d2Table = new EmbeddedTable([
     'parentField'      => 'docum_id',
     'childFormUrl'     => 'docum2_form.php',
     'childFormName'    => 'docum2',
+    'columnResizeUrl'  => 'docum2_column_width_save.php',
+    'columnResizeTbl'  => 'docum2',
     'hasExport'        => true,
+    'hasImport'        => true,
     'hasPrint'         => true,
     'hasSearch'        => true,
     'lookupData' => [
@@ -203,6 +233,7 @@ $d2RenderData = array_map(function($item) {
         'quant' => $item['quant'],
         'price' => $item['price'],
         'sum' => $item['sum'],
+        'sum_nds' => $item['sum_nds'] ?? '0',
         'note' => $item['note'],
     ];
     if (!in_array($GLOBALS['typeop'], [127, 100], true)) {
@@ -228,8 +259,10 @@ $platTable = new EmbeddedTable([
     'colWidths'        => $platColWidths,
     'saveUrl'          => 'plat_field_save.php',
     'parentField'      => 'doc_id',
-    'childFormUrl'     => 'plat_form.php?doc_type=' . $typeop . '&client_id=' . $values['client_id'] . '&sotr_id=' . $CurSotrID . '&zat_id=' . $zatIdForPlat . '&return_url=' . urlencode('sale_form.php?mode=edit&id=' . (int)$id . '&typeop=' . $typeop),
+    'childFormUrl'     => 'plat_form.php?doc_type=' . $typeop . '&client_id=' . $values['client_id'] . '&sotr_id=' . $CurSotrID . '&zat_id=' . $zatIdForPlat . '&' . ($prihodFlag ? 'sum_out' : 'sum_in') . '=' . urlencode(max(0, (float)$values['sum'] - (float)$values['sum_plat'])) . '&number=' . urlencode($values['number']) . '&return_url=' . urlencode('sale_form.php?mode=edit&id=' . (int)$id . '&typeop=' . $typeop),
     'childFormName'    => 'plat',
+    'columnResizeUrl'  => 'plat_column_width_save.php',
+    'columnResizeTbl'  => 'plat',
     'hasExport'        => false,
     'hasPrint'         => false,
     'hasSearch'        => true,
@@ -251,11 +284,6 @@ $platListData = array_map(function($p) {
     ];
 }, $platList);
 
-if ($mode === 'new' || $mode === 'copy') {
-    $nr = $conn->query("SELECT COALESCE(MAX(number), 0) + 1 AS next_num FROM docum WHERE typeop = $typeop");
-    if ($nr && ($nrow = $nr->fetch_assoc())) $values['number'] = (int)$nrow['next_num'];
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['number']       = (int)($_POST['number'] ?? 0);
     $values['date']         = trim((string)($_POST['date'] ?? ''));
@@ -275,21 +303,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['pos']          = (int)($_POST['pos'] ?? 0);
     $values['note']         = trim((string)($_POST['note'] ?? ''));
 
-    if ($values['date'] === '') {
-        $errors[] = 'Поле «Дата» обязательно для заполнения.';
-        $focusField = 'sale-date';
-    }
-    if ($values['client_id'] <= 0 && !in_array($typeop, [100, 127])) {
-        $errors[] = 'Поле «Контрагент» обязательно для заполнения.';
-        $focusField = $focusField ?: 'client-id';
-    }
-    if ($values['store_id'] <= 0) {
-        $errors[] = 'Поле «Участок» обязательно для заполнения.';
-        $focusField = $focusField ?: 'store-id';
-    }
-    if ($typeop === 100 && $values['store2_id'] <= 0) {
-        $errors[] = 'Поле «Куда» обязательно для заполнения.';
-        $focusField = $focusField ?: 'store2-id';
+    if (empty($_POST['auto_save'])) {
+        if ($values['date'] === '') {
+            $errors[] = 'Поле «Дата» обязательно для заполнения.';
+            $focusField = 'sale-date';
+        }
+        if ($values['client_id'] <= 0 && !in_array($typeop, [100, 127])) {
+            $errors[] = 'Поле «Контрагент» обязательно для заполнения.';
+            $focusField = $focusField ?: 'client-id';
+        }
+        if ($values['store_id'] <= 0) {
+            $errors[] = 'Поле «Участок» обязательно для заполнения.';
+            $focusField = $focusField ?: 'store-id';
+        }
+        if ($typeop === 100 && $values['store2_id'] <= 0) {
+            $errors[] = 'Поле «Куда» обязательно для заполнения.';
+            $focusField = $focusField ?: 'store2-id';
+        }
     }
 
     if (empty($errors)) {
@@ -358,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!empty($_POST['auto_save'])) {
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['ok' => true]);
+            echo json_encode(['ok' => true, 'id' => $newId]);
             exit;
         }
         if ($isAjax) {
@@ -378,7 +408,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 render:
 $clientList = [];
-$crs = $conn->query("SELECT client_id, name FROM client ORDER BY name");
+$hideSql = (empty($appSettings['show_hidden']) || $appSettings['show_hidden'] !== '1') ? ' WHERE hide_flag = 0' : '';
+$crs = $conn->query("SELECT client_id, name FROM client" . $hideSql . " ORDER BY name");
 if ($crs) while ($cr = $crs->fetch_assoc()) $clientList[] = ['id' => (int)$cr['client_id'], 'name' => (string)$cr['name']];
 
 $storeList = [];
@@ -400,8 +431,8 @@ foreach ($sotrList as $so) { if ($so['id'] === $values['sotr2_id']) { $currentSo
 $currentStore2Name = '';
 foreach ($storeList as $st) { if ($st['id'] === $values['store2_id']) { $currentStore2Name = $st['name']; break; } }
 
-$DOC_LABELS = [10 => 'Возврат от покупателя', 20 => 'Приход', 100 => 'Внутреннее перемещение', 110 => 'Возврат поставщику', 120 => 'Продажа', 127 => 'Списание'];
-$DOC_ICONS  = [10 => 'sale.png', 20 => 'prihod.png', 100 => 'move.png', 110 => 'prihod.png', 120 => 'sale.png', 127 => 'spisan.png'];
+$DOC_LABELS = [40 => 'Возврат от покупателя', 20 => 'Приход', 100 => 'Внутреннее перемещение', 110 => 'Возврат поставщику', 120 => 'Продажа', 127 => 'Списание'];
+$DOC_ICONS  = [40 => 'sale.png', 20 => 'prihod.png', 100 => 'move.png', 110 => 'prihod.png', 120 => 'sale.png', 127 => 'spisan.png'];
 $docLabel = $DOC_LABELS[$typeop];
 $pageIcon = 'img/' . $DOC_ICONS[$typeop];
 $titleNum = $values['number'] > 0 ? '№ ' . $values['number'] : '(новый)';
@@ -587,18 +618,25 @@ ob_start();
         <td>&nbsp;</td>
       </tr>
       <tr>
+        <?php if ($ndsRate > 0): ?><td class="form-label">Сумма НДС</td><?php endif; ?>
         <td class="form-label">По документу №</td>
-        <td class="form-label">&nbsp;</td>
         <td class="form-label">&nbsp;</td>
       </tr>
       <tr>
+        <?php if ($ndsRate > 0): ?>
+        <td><?= render_input('text', 'sum_nds', dv($values['sum_nds']), [
+                'id' => 'sale-sum-nds',
+                'readonly' => true,
+                'tabindex' => '-1',
+                'style' => 'max-width:120px',
+            ]) ?></td>
+        <?php endif; ?>
         <td><?= render_input('text', 'zakaz_num', $values['zakaz_num'] === '0' ? '' : $values['zakaz_num'], [
                 'id' => 'sale-zakaz-num',
                 'readonly' => $ro,
                 'tabindex' => $ro ? '-1' : null,
                 'style' => 'max-width:120px',
             ]) ?></td>
-        <td>&nbsp;</td>
         <td>&nbsp;</td>
       </tr>
       <?php endif; ?>
@@ -626,18 +664,25 @@ ob_start();
       <?php endif; ?>
       <?php if (!in_array($typeop, [100, 127])): ?>
       <tr>
+        <?php if ($ndsRate > 0): ?><td class="form-label">Сумма НДС</td><?php endif; ?>
         <td class="form-label">По документу №</td>
-        <td class="form-label">&nbsp;</td>
         <td class="form-label">&nbsp;</td>
       </tr>
       <tr>
+        <?php if ($ndsRate > 0): ?>
+        <td><?= render_input('text', 'sum_nds', dv($values['sum_nds']), [
+                'id' => 'sale-sum-nds',
+                'readonly' => true,
+                'tabindex' => '-1',
+                'style' => 'max-width:120px',
+            ]) ?></td>
+        <?php endif; ?>
         <td><?= render_input('text', 'zakaz_num', $values['zakaz_num'] === '0' ? '' : $values['zakaz_num'], [
                 'id' => 'sale-zakaz-num',
                 'readonly' => $ro,
                 'tabindex' => $ro ? '-1' : null,
                 'style' => 'max-width:120px',
             ]) ?></td>
-        <td>&nbsp;</td>
         <td>&nbsp;</td>
       </tr>
       <?php endif; ?>
@@ -667,6 +712,7 @@ ob_start();
             ]) ?></td>
       </tr>
     </table>
+    <?= render_form_note() ?>
   </div>
 
   <div class="tab-pane" data-tab-index="1">
@@ -686,8 +732,6 @@ ob_start();
   </div>
 </div>
 
-<?= render_form_note() ?>
-
 <?= render_form_actions(
     $mode === 'delete'
         ? [render_btn_danger('img/delete.png', 'Удалить', ['type'=>'submit','formnovalidate'=>true]),
@@ -696,13 +740,18 @@ ob_start();
            render_btn_primary('img/save.png', 'Сохранить', ['type'=>'submit','formnovalidate'=>true]),
            render_btn_link_icon_text('img/cancel.png', 'Отменить', 'sale.php?typeop=' . $typeop, ['class'=>'btn-secondary'])]
 ) ?>
+<?php if ($mode === 'new' && $id <= 0): ?>
+<input type="hidden" name="auto_save_ready" value="1" />
+<?php endif; ?>
 </form>
+<script>if(typeof FormModalCore!=='undefined'&&FormModalCore.initTabAutoSave)FormModalCore.initTabAutoSave([1,2]);</script>
 <style>
+    .form-note { margin: 1.5px 0; }
     .lookup-wrap { position: relative; max-width: 430px; }
-    .form-modal { max-width: 990px; }
-    .page--form { max-width: 990px; }
-    .form { max-width: 990px; }
-    .tab-container { margin-bottom: 16px; width: 100%; }
+    .form-modal { max-width: 890px; }
+    .page--form { max-width: 890px; }
+    .form { max-width: 890px; }
+    .tab-container { margin-bottom: 8px; width: 100%; }
     .tab-headers { display: flex; border-bottom: 2px solid var(--accent); margin-bottom: 12px; }
     .tab-header { padding: 8px 20px; cursor: pointer; font-size: 14px; font-weight: bold; color: var(--muted); border: 1px solid transparent; border-bottom: none; border-radius: 4px 4px 0 0; user-select: none; }
     .tab-header.active { color: #fff; background: var(--accent); border-color: var(--accent); }
@@ -738,19 +787,12 @@ if ($isAjax) {
   <script src="assets/lookup.js"></script>
   <script src="assets/embedded-subtable.js"></script>
   <script>
-  // Standalone page init (not modal). Modal init is in sale.php.
-  (function() {
-    if (window.__openFormModal) return;
-    <?php $d2Table->renderScripts(); ?>
+  <?php $d2Table->renderScripts(); ?>
+  <?php $platTable->renderScripts(); ?>
+  if (typeof window.__openFormModal === 'undefined') {
     initD2Table();
-  })();
-  </script>
-  <script>
-  (function() {
-    if (window.__openFormModal) return;
-    <?php $platTable->renderScripts(); ?>
     initPlatTable();
-  })();
+  }
   </script>
 </body>
 </html>

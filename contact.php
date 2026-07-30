@@ -262,9 +262,13 @@ render_toolbar_wrapper_close(); ?>
                 return [$raw, $doHilight ? hilight($raw, $search, $searchCond) : $raw];
         }
         return ['', ''];
-    }, ['checkboxCallback' => function($rid) use ($marks) {
-        return '<input type="checkbox" class="row-check" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
-    }]); ?>
+    }, [
+        'searchActive' => $searchActive,
+        'searchCols' => $searchCols,
+        'checkboxCallback' => function($rid) use ($marks) {
+            return '<input type="checkbox" class="row-check" value="' . $rid . '" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
+        },
+    ]); ?>
   </table>
 </div>
 

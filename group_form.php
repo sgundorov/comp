@@ -2,7 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/table-helper.php';
-require_once __DIR__ . '/lib/EmbeddedTable.php';
+require_once __DIR__ . '/lib/TablePage.php';
 
 $accessFlags = get_access_flags($conn, 'Group');
 
@@ -33,7 +33,7 @@ $values = [
 $origName = '';
 
 if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
-    $stmt = $conn->prepare("SELECT g.name, g.pos, g.note FROM `group` g WHERE g.group_id = ?");
+    $stmt = $conn->prepare("SELECT g.name, g.pos, g.note, g.service_flag FROM `group` g WHERE g.group_id = ?");
     $stmt->bind_param('i', $id);
     $stmt->execute();
     $r = $stmt->get_result()->fetch_assoc();
@@ -41,6 +41,8 @@ if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
     if (!$r) {
         $errors[] = 'Запись не найдена.';
     } else {
+        $serviceFlag = (string)$r['service_flag'];
+        $isService = ($serviceFlag === '1');
         $origName = (string)$r['name'];
         $values['name'] = ($mode === 'copy') ? '' : (string)$r['name'];
         $values['pos'] = (string)$r['pos'];
@@ -58,18 +60,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($errors)) {
         if ($mode === 'delete') {
-            $stmt = $conn->prepare("DELETE FROM `group` WHERE group_id = ?");
-            $stmt->bind_param('i', $id);
-            $stmt->execute();
-            $stmt->close();
-            $conn->query("DELETE FROM marks WHERE tbl = 'group' AND row_id = " . (int)$id);
-            if ($isAjax) {
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'mode' => $mode]);
+            $sgCount = 0;
+            if ($id > 0) {
+                $q = $conn->query("SELECT COUNT(*) AS cnt FROM sgroup WHERE group_id = $id");
+                $sgCount = $q ? (int)$q->fetch_assoc()['cnt'] : 0;
+            }
+            $deleteSgroups = (string)($_POST['delete_sgroups'] ?? '') === '1';
+            if ($sgCount > 0 && !$deleteSgroups) {
+                $errors[] = 'В этой группе есть подгруппы. Удалить вместе с подгруппами?';
+                $focusField = 'delete_sgroups';
+            } else {
+                if ($sgCount > 0) {
+                    $conn->query("DELETE FROM marks WHERE tbl = 'sgroup' AND row_id IN (SELECT sgroup_id FROM sgroup WHERE group_id = $id)");
+                    $conn->query("DELETE FROM sgroup WHERE group_id = $id");
+                }
+                $stmt = $conn->prepare("DELETE FROM `group` WHERE group_id = ?");
+                $stmt->bind_param('i', $id);
+                $stmt->execute();
+                $stmt->close();
+                $conn->query("DELETE FROM marks WHERE tbl = 'group' AND row_id = " . (int)$id);
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => true, 'mode' => $mode]);
+                    exit;
+                }
+                header('Location: group.php');
                 exit;
             }
-            header('Location: group.php');
-            exit;
         }
         if ($mode === 'new' || $mode === 'copy') {
             $baseName = $values['name'];
@@ -127,43 +144,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $titles = [
-    'new'    => 'Группа товаров (новая)',
-    'edit'   => 'Группа товаров: ' . $origName,
-    'copy'   => 'Группа товаров: ' . $origName . ' (копия)',
-    'delete' => 'Группа товаров: ' . $origName . ' (удаление)',
+    'new'    => $serviceFlag === '1' ? 'Группа услуг (новая)' : 'Группа товаров (новая)',
+    'edit'   => ($serviceFlag === '1' ? 'Группа услуг: ' : 'Группа товаров: ') . $origName,
+    'copy'   => ($serviceFlag === '1' ? 'Группа услуг: ' : 'Группа товаров: ') . $origName . ' (копия)',
+    'delete' => ($serviceFlag === '1' ? 'Группа услуг: ' : 'Группа товаров: ') . $origName . ' (удаление)',
 ];
-$pageTitle = $titles[$mode] ?? 'Группа товаров';
+$pageTitle = $titles[$mode] ?? ($serviceFlag === '1' ? 'Группа услуг' : 'Группа товаров');
 
 $isReadonly = ($mode === 'delete');
 $embedReadonly = ($mode === 'delete');
 
 $sgroupData = [];
 if ($id > 0 && $mode !== 'new') {
-    $stmt = $conn->prepare("SELECT sgroup_id AS id, name, note FROM sgroup WHERE group_id = ? ORDER BY sgroup_id ASC");
-    $stmt->bind_param('i', $id);
+    $stmt = $conn->prepare("SELECT sgroup_id AS id, name, note FROM sgroup WHERE group_id = ? AND service_flag = ? ORDER BY sgroup_id ASC");
+    $stmt->bind_param('is', $id, $serviceFlag);
     $stmt->execute();
     $sgroupData = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 }
 
-$sgTable = new EmbeddedTable([
-    'prefix'           => 'sg',
-    'columns'          => [
-        ['key' => 'name', 'label' => 'Название подгруппы', 'align' => 'left'],
-        ['key' => 'note', 'label' => 'Примечание', 'align' => 'left'],
+$sgEmbed = [
+    'prefix'       => 'sg',
+    'colWidths'    => ['name' => '250px', 'note' => '200px'],
+    'saveUrl'      => 'sgroup_field_save.php',
+    'parentField'  => 'group_id',
+    'childFormUrl' => 'sgroup_form.php?service_flag=' . $serviceFlag,
+    'childFormName'=> 'sgroup',
+    'hasExport'    => true,
+    'hasPrint'     => true,
+    'exportUrl'    => 'sgroup_export.php',
+    'printUrl'     => 'sgroup_print.php',
+    'parentParam'  => 'group_id=',
+    'hasSearch'    => true,
+    'lookupData'   => [],
+    'columnResizeUrl' => 'sgroup_column_width_save.php',
+    'columnResizeTbl' => 'sgroup',
+    'readonly'     => $embedReadonly,
+];
+$sgTp = new TablePage($conn, [
+    'table'       => 'sgroup',
+    'key'         => 'id',
+    'search_cols' => ['name', 'note'],
+    'column_visibility_tbl' => '',
+    'columns'     => [
+        ['name' => 'name', 'label' => 'Название подгруппы'],
+        ['name' => 'note', 'label' => 'Примечание'],
     ],
-    'colWidths'  => ['name' => '250px', 'note' => 'auto'],
-    'saveUrl'          => 'sgroup_field_save.php',
-    'parentField'      => 'group_id',
-    'childFormUrl'     => 'sgroup_form.php',
-    'childFormName'    => 'sgroup',
-    'hasExport'        => true,
-    'hasPrint'         => true,
-    'exportUrl'        => 'sgroup_export.php',
-    'printUrl'         => 'sgroup_print.php',
-    'parentParam'      => 'group_id=',
-    'readonly'         => $embedReadonly,
-    'accessFlags'      => $accessFlags,
+    'defaultColumnWidths' => ['name' => '250px', 'note' => '200px'],
+    'lookupData' => [],
 ]);
 
 ob_start();
@@ -219,9 +247,21 @@ ob_start();
   </div>
 
   <div class="tab-pane" data-tab-index="1">
-    <?= $sgTable->render($sgroupData) ?>
+    <?= $sgTp->renderEmbedded($sgroupData, $sgEmbed) ?>
   </div>
 </div>
+
+<?php
+$hasSgroups = count($sgroupData) > 0;
+if ($mode === 'delete' && $hasSgroups):
+?>
+<div class="flash flash--warning">
+  <label style="cursor:pointer;display:flex;align-items:center;gap:8px">
+    <input type="checkbox" name="delete_sgroups" value="1" />
+    В этой группе есть подгруппы. Удалить вместе с подгруппами?
+  </label>
+</div>
+<?php endif; ?>
 
 <?= render_form_note() ?>
 
@@ -256,7 +296,9 @@ if ($isAjax) {
   </div>
   <script src="assets/embedded-subtable.js"></script>
   <script>
-    <?php $sgTable->renderScripts(); ?>
+    <?php $sgTp->renderEmbeddedScripts($sgEmbed); ?>
+    initSgTable();
+    window.__columnDefaultWidths = <?= json_encode($sgEmbed['colWidths'], JSON_UNESCAPED_UNICODE) ?>;
   </script>
 </body>
 </html>

@@ -100,7 +100,7 @@ render_head_end(); ?>
   <div class="page">
     <?php $activeMenu = 'unit.php'; include 'menu.php'; ?>
 
-    <h1 class="page-title"><img src="img/unit.png" alt="" /> Единица измерения</h1>
+    <h1 class="page-title"><img src="img/unit.png" alt="" /> Единицы измерения</h1>
 
     <?php
       $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs) {
@@ -156,8 +156,10 @@ render_head_end(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'checkboxCallback' => function($rid) use ($marks) {
-                return '<input type="checkbox" class="row-check" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
+                return '<input type="checkbox" class="row-check" value="' . $rid . '" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
             },
         ]); ?>
       </table>

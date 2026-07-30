@@ -145,10 +145,9 @@ render_head_end(); ?>
       foreach ([
           ['fmt' => 'csv', 'filename' => 'Категории контрагентов.csv', 'format' => 'CSV'],
           ['fmt' => 'xls', 'filename' => 'Категории контрагентов.xls', 'format' => 'XLS (Excel)'],
-          ['fmt' => 'pdf', 'filename' => 'Категории контрагентов.csv', 'format' => 'PDF'],
       ] as $item) {
           $fullUrl = 'cli_categ_export.php?format=' . $item['fmt'] . ($exportQs !== '' ? '&' . $exportQs : '');
-          $exportDropdownHtml .= '<a class="dropdown-item" href="#" data-export-url="' . h($fullUrl) . '" data-export-filename="' . h($item['filename']) . '" data-export-format="' . h($item['format']) . '">' . h($item['format'] === 'CSV' ? 'Экспорт в CSV' : ($item['format'] === 'PDF' ? 'Экспорт в Excel' : 'Экспорт в Excel')) . '</a>';
+          $exportDropdownHtml .= '<a class="dropdown-item" href="#" data-export-url="' . h($fullUrl) . '" data-export-filename="' . h($item['filename']) . '" data-export-format="' . h($item['format']) . '">' . h($item['format'] === 'CSV' ? 'Экспорт в CSV' : 'Экспорт в Excel') . '</a>';
       }
       $printDropdownHtml = render_print_dropdown_items('cli_categ', $exportQs, (int)$page, $marksCount > 0);
     ?>
@@ -201,8 +200,10 @@ render_head_end(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'checkboxCallback' => function($rid) use ($marks) {
-                return '<input type="checkbox" class="row-check" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
+                return '<input type="checkbox" class="row-check" value="' . $rid . '" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
             },
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 if ($cn === 'color') {

@@ -155,7 +155,7 @@ render_form_modal(); ?>
     <?php render_toolbar_wrapper_close(); ?>
     <div class="table-wrap">
       <table class="data-table">
-        <?php render_table_colgroup($visibleColumns, $columnWidths, ['id' => '60px', 'name' => '200px', 'fname' => '150px', 'quant' => '80px', 'note' => '250px']); ?>
+        <?php render_table_colgroup($visibleColumns, $columnWidths, ['id' => '60px', 'name' => '200px', 'fname' => '150px', 'note' => '250px']); ?>
         <?php render_table_thead($visibleColumns, $COL_META, $sortLevels, $allRowsMarked, $rowsTotalCount === 0); ?>
         <?php render_table_tbody($visibleColumns, $rows, $marks, $search, 'rp_id', function($r, $cn, $vc) use ($searchCond, $searchCols) {
             $s = $GLOBALS['search'] ?? '';
@@ -163,12 +163,13 @@ render_form_modal(); ?>
             switch ($cn) {
                 case 'id':    $raw = (string)(int)$r['number']; return [$raw, $raw];
                 case 'name':  $raw = (string)($r['name'] ?? ''); return [$raw, $doHilight ? hilight($raw, $s, $searchCond) : $raw];
-                case 'fname': $raw = (string)($r['fname'] ?? ''); return [$raw, $doHilight ? hilight($raw, $s, $searchCond) : $raw];
-                case 'quant': $v = (int)($r['quant'] ?? 0); $raw = (string)$v; return [$raw, $v > 0 ? $raw : ''];
+                case 'fname': $raw = (string)($r['fname'] ?? ''); $html = '<a href="repmenu_template_edit.php?id=' . (int)$r['rp_id'] . '" title="Редактировать шаблон">' . h($raw) . '</a>'; return [$raw, $html];
                 case 'note':  $raw = (string)($r['note'] ?? ''); return [$raw, $doHilight ? hilight($raw, $s, $searchCond) : $raw];
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 return ' data-col-idx="' . (int)$i . '"';
             },

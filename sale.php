@@ -11,14 +11,14 @@ require_once __DIR__ . '/lib/EmbeddedTable.php';
 $accessFlags = render_access_control($conn, 'Docum');
 
 $typeop = (int)($_GET['typeop'] ?? 120);
-if (!in_array($typeop, [10, 20, 100, 110, 120, 127], true)) $typeop = 120;
+if (!in_array($typeop, [40, 20, 100, 110, 120, 127], true)) $typeop = 120;
 
 $prihodFlag = 0;
 $pfRow = $conn->query("SELECT COALESCE(prihod_flag,0) AS pf FROM typeop WHERE typeop_id = $typeop")->fetch_assoc();
 if ($pfRow) $prihodFlag = (int)$pfRow['pf'];
 
-$DOC_LABELS = [10 => 'Возврат от покупателя', 20 => 'Приход', 100 => 'Внутреннее перемещение', 110 => 'Возврат поставщику', 120 => 'Продажа', 127 => 'Списание'];
-$DOC_ICONS  = [10 => 'sale.png', 20 => 'prihod.png', 100 => 'move.png', 110 => 'prihod.png', 120 => 'sale.png', 127 => 'spisan.png'];
+$DOC_LABELS = [40 => 'Возврат от покупателя', 20 => 'Приход', 100 => 'Внутреннее перемещение', 110 => 'Возврат поставщику', 120 => 'Продажа', 127 => 'Списание'];
+$DOC_ICONS  = [40 => 'sale.png', 20 => 'prihod.png', 100 => 'move.png', 110 => 'prihod.png', 120 => 'sale.png', 127 => 'spisan.png'];
 $PAGE_TITLE  = $DOC_LABELS[$typeop];
 $PAGE_ICON   = $DOC_ICONS[$typeop];
 
@@ -141,7 +141,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_GET['action'] ?? '') ===
                     SELECT COALESCE(SUM(d2.quant * IF(tp.prihod_flag = 1, 1, -1)), 0) AS total
                     FROM docum2 d2
                     JOIN docum d ON d.docum_id = d2.docum_id
-                    LEFT JOIN typeop tp ON tp.typeop_id = d2.typeop
+                    LEFT JOIN typeop tp ON tp.typeop_id = d.typeop
                     WHERE d2.accept_flag != 0
                       AND d2.product_id = ?
                       AND d.store_id = ?
@@ -273,9 +273,16 @@ if (!in_array($typeop, [127, 100], true)) {
     $_d2cols[] = ['key' => 'discount', 'label' => 'Скидка', 'align' => 'right'];
 }
 $_d2cols[] = ['key' => 'sum', 'label' => 'Сумма', 'align' => 'right'];
+$saleNdsRate = (int)($appSettings['nds_rate'] ?? 22);
+if ($saleNdsRate > 0) {
+    $_d2cols[] = ['key' => 'sum_nds', 'label' => 'НДС', 'align' => 'right'];
+}
 $_d2cols[] = ['key' => 'note', 'label' => 'Примечание'];
 
 $_d2w = ['product_name' => 'auto', 'quant' => '80px', 'price' => '90px', 'discount' => '80px', 'sum' => '100px', 'note' => '250px'];
+if ($saleNdsRate > 0) {
+    $_d2w['sum_nds'] = '80px';
+}
 
 $d2Table = new EmbeddedTable([
     'prefix'       => 'd2',
@@ -285,7 +292,10 @@ $d2Table = new EmbeddedTable([
     'parentField'  => 'docum_id',
     'childFormUrl' => 'docum2_form.php',
     'childFormName'=> 'docum2',
+    'columnResizeUrl' => 'docum2_column_width_save.php',
+    'columnResizeTbl' => 'docum2',
     'hasExport'    => true,
+    'hasImport'    => true,
     'hasPrint'     => true,
     'hasSearch'    => true,
     'totalsCallback' => 'applyDocum2Totals',
@@ -311,6 +321,8 @@ $platTable = new EmbeddedTable([
     'parentField'  => 'doc_id',
     'childFormUrl' => 'plat_form.php?doc_type=' . $typeop,
     'childFormName'=> 'plat',
+    'columnResizeUrl' => 'plat_column_width_save.php',
+    'columnResizeTbl' => 'plat',
     'hasExport'    => false,
     'hasPrint'     => false,
     'hasSearch'    => true,
@@ -460,6 +472,7 @@ render_head_end(); ?>
           'searchActive' => $searchActive,
           'searchCols' => $searchCols,
           'rowReadonly' => function($r, $cn) { return $cn !== 'note' && (int)($r['accept_flag'] ?? 0) === 1; },
+          'trExtraAttrs' => function($r) { return (int)($r['accept_flag'] ?? 0) === 0 ? ' style="color:#ffe9a8"' : ''; },
       ]); ?>
     </table>
     </div>
@@ -743,6 +756,11 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         var spEl = document.getElementById('sale-sum-plat');
         if (spEl) { spEl.value = d.sum_plat; spEl.style.color = d.sum_plat_red ? '#e57373' : ''; spEl.style.fontWeight = d.sum_plat_red ? 'bold' : ''; }
       }
+      var snds = d && d.total_sum_nds !== undefined ? d.total_sum_nds : (d && d.sum_nds !== undefined ? d.sum_nds : undefined);
+      if (snds !== undefined) {
+        var el = document.getElementById('sale-sum-nds');
+        if (el) el.value = snds || '';
+      }
     }
 
     <?php $d2Table->renderScripts(); ?>
@@ -750,12 +768,15 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
     function restoreStashedForm(data) {
       if (!stashed) return;
       var savedTableSelections = stashed._tableSelections || {};
-      formBody.innerHTML = stashed.html;
+      var html = stashed.html;
+      var scripts = [];
+      html = html.replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, function(m, code) { if (code.trim()) scripts.push(code); return ''; });
+      formBody.innerHTML = html;
+      scripts.forEach(function(code) { try { eval(code); } catch(e) { console.error('form script', e); } });
       initFormLookups();
       try { initD2Table(); } catch(e) { console.error('initD2Table', e); }
       initSaleFormTabSwitch();
       try { initPlatTable(); } catch(e) { console.error('initPlatTable', e); }
-      evalFormScripts();
       var old = stashed;
       stashed = null;
       if (savedTableSelections) {
@@ -835,12 +856,15 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (!data || typeof data.html !== 'string') throw new Error('bad response');
-          formBody.innerHTML = data.html;
+          var html = data.html;
+          var scripts = [];
+          html = html.replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, function(m, code) { if (code.trim()) scripts.push(code); return ''; });
+          formBody.innerHTML = html;
+          scripts.forEach(function(code) { try { eval(code); } catch(e) { console.error('form script', e); } });
           initFormLookups();
           try { initD2Table(); } catch(e) { console.error('initD2Table', e); }
           initSaleFormTabSwitch();
           try { initPlatTable(); } catch(e) { console.error('initPlatTable', e); }
-          evalFormScripts();
           var form = formBody.querySelector('form[data-form-modal]');
           bindForm(form);
           FormModalCore.bindFormTabTrap(form);
@@ -982,7 +1006,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && formModal.classList.contains('open')) {
         e.preventDefault();
-        if (stashed) { restoreStashedForm(null); } else { closeFormModal(); location.reload(); }
+        if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); }
       }
       if (e.key === 'Enter' && formModal.classList.contains('open') && !stashed && !e.target.closest('.cell-edit-panel') && e.target.tagName !== 'TEXTAREA') {
         var f = formBody.querySelector('form[data-form-modal]');
@@ -995,14 +1019,14 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         const cancelA = e.target.closest('a.btn-secondary');
         if (cancelA && cancelA.closest('.form-actions')) {
           e.preventDefault(); e.stopImmediatePropagation();
-          if (stashed) { restoreStashedForm(null); } else { closeFormModal(); location.reload(); } return;
+          if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); } return;
         }
       }
       let a = e.target.closest('a[href*="sale_form.php"]');
       if (a) { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return; e.preventDefault(); e.stopImmediatePropagation(); openFormModal(a.getAttribute('href')); return; }
       const trig = e.target.closest('[data-form-open]');
       if (trig) { e.preventDefault(); openFormModal(trig.getAttribute('data-form-open')); return; }
-      if (e.target.closest('[data-form-close]')) { e.preventDefault(); if (stashed) { restoreStashedForm(null); } else { closeFormModal(); location.reload(); } return; }
+      if (e.target.closest('[data-form-close]')) { e.preventDefault(); if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); } return; }
       if (e.target.closest('[data-lookup-add]')) { e.preventDefault(); syncFormValues(); var openFn = openFormModal; FormModalCore.handleLookupAdd(e.target.closest('[data-lookup-add]'), function (fn) { stashed = { html: formBody.innerHTML, onRestore: fn, activeId: document.activeElement ? document.activeElement.id : null }; }, openFn); return; }
     });
 
@@ -1022,38 +1046,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
 
       headers.forEach(function(h) {
         h.addEventListener('click', function() {
-          var idx = parseInt(this.getAttribute('data-tab-index'), 10);
-          if (idx === 1) {
-            var idInput = document.querySelector('input[name="id"]');
-            var curId = idInput ? idInput.value : '0';
-            if (!curId || curId === '0') {
-              var form = document.querySelector('form[data-form-modal]');
-              if (!form) { switchTab(idx); return; }
-              var fd = new FormData(form);
-              fd.set('ajax', '1');
-              fd.set('action', 'apply');
-              var xhr = new XMLHttpRequest();
-              xhr.open('POST', form.getAttribute('action') || 'sale_form.php', true);
-              xhr.onload = function() {
-                if (xhr.status === 200) {
-                  try {
-                    var data = JSON.parse(xhr.responseText);
-                    if (data && data.ok && data.id && data.id !== '0') {
-                      var newId = String(data.id);
-                      var idInput2 = document.querySelector('input[name="id"]');
-                      if (idInput2) idInput2.value = newId;
-                      initD2Table();
-                      switchTab(1);
-                      return;
-                    }
-                  } catch(e) {}
-                }
-              };
-              xhr.send(fd);
-              return;
-            }
-          }
-          switchTab(idx);
+          switchTab(parseInt(this.getAttribute('data-tab-index'), 10));
         });
       });
 
@@ -1092,16 +1085,24 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
           var discountInput = formBody.querySelector('#d2-discount');
           var sumInput = formBody.querySelector('#d2-sum');
           var sumDiscInput = formBody.querySelector('#d2-sum-discount');
+          var sndsInput = formBody.querySelector('#d2-snds');
+          var ndsForm = formBody.querySelector('form[data-form-modal]');
+          var ndsRate = parseInt(ndsForm ? ndsForm.getAttribute('data-nds-rate') : '22', 10) || 0;
+          var noNds = (ndsForm ? ndsForm.getAttribute('data-no-nds') : '0') === '1';
           function recalc() {
             var q = parseFloat((quantInput ? quantInput.value : '1').replace(',', '.')) || 0;
             var p = parseFloat((priceInput ? priceInput.value : '0').replace(',', '.')) || 0;
             var d = parseFloat((discountInput ? discountInput.value : '0').replace(',', '.')) || 0;
+            var sum = q * p * (1 - d / 100);
+            var sumD = q * p * (d / 100);
+            var snds = noNds ? (sum * ndsRate / (100 + ndsRate)) : (sum * ndsRate / 100);
             function _rf(v) {
               if (v === 0) return '';
               return v.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
             }
-            if (sumInput) sumInput.value = _rf(q * p * (1 - d / 100));
-            if (sumDiscInput) sumDiscInput.value = _rf(q * p * (d / 100));
+            if (sumInput) sumInput.value = _rf(sum);
+            if (sumDiscInput) sumDiscInput.value = _rf(sumD);
+            if (sndsInput) { var ndsf = snds.toFixed(2); sndsInput.value = ndsf === '0.00' ? '' : ndsf.replace('.', ','); }
           }
           var handler = function(id, name) {
             var item = data.find(function(p) { return p.id === id; });

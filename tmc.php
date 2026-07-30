@@ -10,8 +10,11 @@ $accessFlags = render_access_control($conn, 'Product');
 
 $TBL = 'product';
 $PAGE_URL = 'tmc.php';
-$PAGE_TITLE = 'Товары';
-$PAGE_TITLE_FORM = 'Товар';
+$serviceMode = (string)($_GET['type'] ?? 'product');
+if (!in_array($serviceMode, ['product', 'service'], true)) $serviceMode = 'product';
+$isService = ($serviceMode === 'service');
+$PAGE_TITLE = $isService ? 'Услуги' : 'Товары';
+$PAGE_TITLE_FORM = $isService ? 'Услуга' : 'Товар';
 $FORM_PREFIX = 'tmc_form';
 
 ensure_marks_table($conn);
@@ -25,12 +28,8 @@ $stmt = @$conn->prepare("SELECT group_id, name FROM `group` ORDER BY name");
 if ($stmt) { $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $groupList[] = ['id' => (int)$r['group_id'], 'name' => (string)$r['name']]; $stmt->close(); }
 
 $sgroupList = [];
-$stmt = @$conn->prepare("SELECT sgroup_id, name FROM sgroup ORDER BY name");
-if ($stmt) { $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $sgroupList[] = ['id' => (int)$r['sgroup_id'], 'name' => (string)$r['name']]; $stmt->close(); }
-
-$countryList = [];
-$stmt = @$conn->prepare("SELECT country_id, country AS name FROM country ORDER BY country");
-if ($stmt) { $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $countryList[] = ['id' => (int)$r['country_id'], 'name' => (string)$r['name']]; $stmt->close(); }
+$stmt = @$conn->prepare("SELECT sgroup_id, group_id, name FROM sgroup ORDER BY name");
+if ($stmt) { $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $sgroupList[] = ['id' => (int)$r['sgroup_id'], 'group_id' => (int)$r['group_id'], 'name' => (string)$r['name']]; $stmt->close(); }
 
 $izgotList = [];
 $stmt = @$conn->prepare("SELECT izgot_id, izgot AS name FROM izgot ORDER BY izgot");
@@ -62,13 +61,16 @@ $COL_META        = $tp->colMeta;
 $columnWidths    = load_columns_widths($conn, $TBL);
 $urlCols = $searchCols;
 
-$tp->appendWhere("p.service_flag = ?", ['0'], 's');
+$tp->appendWhere("p.service_flag = ?", [$isService ? '1' : '0'], 's');
+
+if (empty($appSettings['show_hidden']) || $appSettings['show_hidden'] !== '1') {
+    $tp->appendWhereRaw("(p.hide_flag = 0 OR p.hide_flag IS NULL)");
+}
 
 $filterDefs = [
     'categ_id'   => ['col_expr' => 'p.categ_id',   'param' => 'categ_id',   'label' => 'Категория'],
     'group_id'   => ['col_expr' => 'p.group_id',   'param' => 'group_id',   'label' => 'Группа'],
     'sgroup_id'  => ['col_expr' => 'p.sgroup_id',  'param' => 'sgroup_id',  'label' => 'Подгруппа'],
-    'country_id' => ['col_expr' => 'p.country_id',  'param' => 'country_id', 'label' => 'Страна'],
 ];
 
 $activeFilters = [];
@@ -100,9 +102,6 @@ handle_marks_actions($conn, $tp, $TBL, function($action) use ($conn) {
         } elseif ($col === 'sgroup') {
             $stmt = @$conn->prepare("SELECT sgroup_id, name FROM sgroup ORDER BY name");
             if ($stmt) { $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $out[] = ['id' => (int)$r['sgroup_id'], 'name' => (string)$r['name']]; $stmt->close(); }
-        } elseif ($col === 'country') {
-            $stmt = @$conn->prepare("SELECT country_id, country AS name FROM country ORDER BY country");
-            if ($stmt) { $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $out[] = ['id' => (int)$r['country_id'], 'name' => (string)$r['name']]; $stmt->close(); }
         }
         echo json_encode($out, JSON_UNESCAPED_UNICODE);
         exit;
@@ -123,8 +122,8 @@ foreach ($filterDefs as $key => $fd) {
     $ids = $activeFilters[$key]['ids'];
     $names = [];
     if (count($ids) > 0) {
-        $table = $key === 'categ_id' ? 'categ' : ($key === 'country_id' ? 'country' : ($key === 'izgot_id' ? 'izgot' : substr($key, 0, -3)));
-        $nameCol = $key === 'categ_id' ? 'categ' : ($key === 'country_id' ? 'country' : ($key === 'izgot_id' ? 'izgot' : 'name'));
+        $table = $key === 'categ_id' ? 'categ' : ($key === 'izgot_id' ? 'izgot' : substr($key, 0, -3));
+        $nameCol = $key === 'categ_id' ? 'categ' : ($key === 'izgot_id' ? 'izgot' : 'name');
         $place = implode(',', array_fill(0, count($ids), '?'));
         $stmt = @$conn->prepare("SELECT $nameCol AS name FROM $table WHERE {$table}_id IN ($place) ORDER BY $nameCol");
         if ($stmt) {
@@ -145,7 +144,6 @@ $idColMap = [
     'categ_id'   => 'categ_id',
     'group_id'   => 'group_id',
     'sgroup_id'  => 'sgroup_id',
-    'country_id' => 'country_id',
 ];
 foreach ($idColMap as $key => $param) {
     $raw = $activeFilters[$key]['raw'];
@@ -226,6 +224,11 @@ render_head_start($PAGE_TITLE); ?>
     .col-filter-actions .col-filter-apply { background: var(--accent); border-color: var(--accent); }
     .col-filter-actions .col-filter-apply:hover { background: #cf6d1a; border-color: #cf6d1a; }
 
+    .toolbar-separator { display: inline-block; width: 1px; height: 24px; background: var(--line); margin: 0 6px; vertical-align: middle; }
+    .toolbar-radio { display: inline-flex; align-items: center; gap: 4px; color: #ccc; font-size: 13px; cursor: pointer; padding: 0 4px; vertical-align: middle; user-select: none; }
+    .toolbar-radio input[type="radio"] { margin: 0; cursor: pointer; }
+    .toolbar-radio:hover { color: #fff; }
+
   </style>
 <?php
 render_head_end();
@@ -235,11 +238,12 @@ render_form_modal(); ?>
 
     <?php $activeMenu = $PAGE_URL; include 'menu.php'; ?>
 
-    <h1 class="page-title"><img src="img/tmc.png" alt="" /> <?= h($PAGE_TITLE) ?></h1>
+    <h1 class="page-title"><img src="img/<?= $isService ? 'uslug' : 'tmc' ?>.png" alt="" /> <?= h($PAGE_TITLE) ?></h1>
 
     <?php
-      $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs, $activeFilters) {
+      $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs, $activeFilters, $serviceMode) {
           $qs = ['page' => $p];
+          if ($serviceMode !== 'product') $qs['type'] = $serviceMode;
           if ($searchActive) {
               if ($search !== '') $qs['q'] = $search;
               if (count($searchCols) > 0) $qs['cols'] = implode(',', $searchCols);
@@ -258,10 +262,10 @@ render_form_modal(); ?>
           'cols'       => $searchActive && count($searchCols) > 0 ? implode(',', $searchCols) : null,
           'cond'       => $searchActive ? $searchCond : null,
           'sf'         => $searchActive ? '1' : null,
+          'type'       => $isService ? 'service' : null,
           'categ_id'   => $categ_id['raw'] !== '' ? $categ_id['raw'] : null,
           'group_id'   => $group_id['raw'] !== '' ? $group_id['raw'] : null,
           'sgroup_id'  => $sgroup_id['raw'] !== '' ? $sgroup_id['raw'] : null,
-          'country_id' => $country_id['raw'] !== '' ? $country_id['raw'] : null,
           'sort'       => $sortQs !== '' ? $sortQs : null,
       ], function ($v) { return $v !== null && $v !== ''; }));
 
@@ -287,7 +291,10 @@ render_form_modal(); ?>
         'pages'        => (int)$pages,
         'focus'        => (string)($_GET['focus'] ?? '0'),
     ]);
-    render_toolbar_left($FORM_PREFIX, $marksCount, $exportDropdownHtml, $printDropdownHtml);
+    $serviceRadioHtml = '<span class="toolbar-separator"></span>'
+        . '<label class="toolbar-radio"><input type="radio" name="service_mode" value="product"' . (!$isService ? ' checked' : '') . ' /> Товары</label>'
+        . '<label class="toolbar-radio"><input type="radio" name="service_mode" value="service"' . ($isService ? ' checked' : '') . ' /> Услуги</label>';
+    render_toolbar_left($FORM_PREFIX, $marksCount, $exportDropdownHtml, $printDropdownHtml, '', $serviceRadioHtml);
     render_toolbar_right($search, $searchActive, $urlCols, $searchCond, $clearQs, 'tmc.php');
     render_toolbar_wrapper_close();
     ?>
@@ -296,7 +303,7 @@ render_form_modal(); ?>
 
     <div class="table-wrap">
       <table class="data-table">
-        <?php render_table_colgroup($visibleColumns, $columnWidths, ['id' => '46px', 'name' => '300px', 'article' => '80px', 'categ' => '150px', 'group' => '150px', 'sgroup' => '150px', 'country' => '120px', 'quant' => '80px', 'price_in' => '100px', 'price_out' => '100px', 'note' => '400px']); ?>
+        <?php render_table_colgroup($visibleColumns, $columnWidths, ['id' => '46px', 'name' => '300px', 'code' => '120px', 'article' => '80px', 'categ' => '150px', 'group' => '150px', 'sgroup' => '150px', 'quant' => '80px', 'price_out' => '100px', 'price_in' => '100px', 'note' => '400px']); ?>
         <?php render_table_thead($visibleColumns, $COL_META, $sortLevels, $allRowsMarked, $rowsTotalCount === 0, [
             'thAttrsCallback' => function($cn, $cm) use ($activeFilters) {
                 if ($cm && !empty($cm['filter'])) {
@@ -320,11 +327,11 @@ render_form_modal(); ?>
             switch ($cn) {
                 case 'id':        $raw = (string)(int)$r['product_id']; return [$raw, $raw];
                 case 'name':      $raw = (string)$r['name']; return [$raw, $doHilight ? hilight($raw, $s, $searchCond) : $raw];
+                case 'code':      $raw = (string)($r['code'] ?? ''); return [$raw, $doHilight ? hilight($raw, $s, $searchCond) : $raw];
                 case 'article':   $raw = (string)$r['article']; return [$raw, $doHilight ? hilight($raw, $s, $searchCond) : $raw];
                 case 'categ':     $rawId = (string)(int)($r['categ_id'] ?? 0); $name = (string)($r['categ_name'] ?? ''); $disp = ($name !== '' && $name !== '0') ? $name : ''; return [$rawId, $doHilight ? hilight($disp, $s, $searchCond) : $disp];
                 case 'group':     $rawId = (string)(int)($r['group_id'] ?? 0); $name = (string)($r['group_name'] ?? ''); $disp = ($name !== '' && $name !== '0') ? $name : ''; return [$rawId, $doHilight ? hilight($disp, $s, $searchCond) : $disp];
                 case 'sgroup':    $rawId = (string)(int)($r['sgroup_id'] ?? 0); $name = (string)($r['sgroup_name'] ?? ''); $disp = ($name !== '' && $name !== '0') ? $name : ''; return [$rawId, $doHilight ? hilight($disp, $s, $searchCond) : $disp];
-                case 'country':   $rawId = (string)(int)($r['country_id'] ?? 0); $name = (string)($r['country_name'] ?? ''); $disp = ($name !== '' && $name !== '0') ? $name : ''; return [$rawId, $doHilight ? hilight($disp, $s, $searchCond) : $disp];
                 case 'quant':     $v = (float)($r['quant'] ?? 0); $raw = $v == (int)$v ? (string)(int)$v : number_format($v, 3, '.', ''); $disp = ($v == 0) ? '' : ($v < 0 ? '<span style="color:#e57373">' . $raw . '</span>' : $raw); return [$raw, $disp];
                 case 'price_in':  $v = (float)($r['price_in'] ?? 0); $raw = number_format($v, 2, '.', ''); $disp = ($v == 0) ? '' : $raw; return [$raw, $disp];
                 case 'price_out': $v = (float)($r['price_out'] ?? 0); $raw = number_format($v, 2, '.', ''); $disp = ($v == 0) ? '' : $raw; return [$raw, $disp];
@@ -332,6 +339,8 @@ render_form_modal(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 return ' data-col-idx="' . (int)$i . '"';
             },
@@ -347,14 +356,14 @@ render_form_modal(); ?>
 render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'assets/export-modal.js', 'assets/column-filter.js']]);
 ?>
   <script>
+    window.__serviceMode = <?= json_encode($serviceMode) ?>;
     window.__categList = <?= json_encode($categList, JSON_UNESCAPED_UNICODE) ?>;
     window.__groupList = <?= json_encode($groupList, JSON_UNESCAPED_UNICODE) ?>;
     window.__sgroupList = <?= json_encode($sgroupList, JSON_UNESCAPED_UNICODE) ?>;
-    window.__countryList = <?= json_encode($countryList, JSON_UNESCAPED_UNICODE) ?>;
     window.__izgotList = <?= json_encode($izgotList, JSON_UNESCAPED_UNICODE) ?>;
     window.__unitList = <?= json_encode($unitList, JSON_UNESCAPED_UNICODE) ?>;
     window.__columnWidths = <?= json_encode($columnWidths, JSON_NUMERIC_CHECK) ?>;
-    window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'name' => 300, 'article' => 80, 'categ' => 150, 'group' => 150, 'sgroup' => 150, 'country' => 120, 'quant' => 80, 'price_in' => 100, 'price_out' => 100, 'note' => 400], JSON_UNESCAPED_UNICODE) ?>;
+    window.__columnDefaultWidths = <?= json_encode(['id' => 46, 'name' => 300, 'code' => 120, 'article' => 80, 'categ' => 150, 'group' => 150, 'sgroup' => 150, 'quant' => 80, 'price_out' => 100, 'price_in' => 100, 'note' => 400], JSON_UNESCAPED_UNICODE) ?>;
     window.__accessFlags = <?= json_encode($accessFlags) ?>;
     if (typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
   </script>
@@ -376,28 +385,43 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
         }
       });
 
+      var modeRadios = document.querySelectorAll('input[name="service_mode"]');
+      modeRadios.forEach(function (radio) {
+        radio.addEventListener('change', function () {
+          var p = new URLSearchParams(location.search);
+          p.set('type', radio.value);
+          p.delete('page');
+          location.href = 'tmc.php?' + p.toString();
+        });
+      });
+
       ColumnFilter.init({ thSelector: '.col-categ', pageUrl: 'tmc.php' });
       ColumnFilter.init({ thSelector: '.col-group', pageUrl: 'tmc.php' });
       ColumnFilter.init({ thSelector: '.col-sgroup', pageUrl: 'tmc.php' });
-      ColumnFilter.init({ thSelector: '.col-country', pageUrl: 'tmc.php' });
 
       SearchPanel.init({
         form: document.getElementById('searchForm'),
         condBtn: document.getElementById('searchCondBtn'),
         toggleBtn: document.getElementById('searchToggleBtn'),
         columns: [
-          { key: 'id',      label: 'ID' },
-          { key: 'name',    label: 'Наименование' },
-          { key: 'article', label: 'Артикул' },
-          { key: 'categ',   label: 'Категория' },
-          { key: 'group',   label: 'Группа' },
-          { key: 'sgroup',  label: 'Подгруппа' },
-          { key: 'country', label: 'Страна' },
-          { key: 'note',    label: 'Примечание' },
+          { key: 'id',           label: 'ID' },
+          { key: 'name',         label: 'Наименование' },
+          { key: 'code',         label: 'Штрихкод' },
+          { key: 'article',      label: 'Артикул' },
+          { key: 'categ',        label: 'Категория' },
+          { key: 'group',        label: 'Группа' },
+          { key: 'sgroup',       label: 'Подгруппа' },
+          { key: 'quant',        label: 'Количество' },
+          { key: 'price_in',     label: 'Закупочная цена' },
+          { key: 'price_out',    label: 'Розничная цена' },
+          { key: 'note',         label: 'Примечание' },
+          { key: 'description',  label: 'Описание' },
+          { key: 'hide_flag',    label: 'Не показывать' },
+          { key: 'noquant_flag', label: 'Без количества' },
         ],
         closeAllPanels: closeAllPanels,
         pageUrl: 'tmc.php',
-        preserveParams: ['categ_id', 'group_id', 'sgroup_id', 'country_id', 'sort'],
+        preserveParams: ['categ_id', 'group_id', 'sgroup_id', 'sort', 'type'],
       });
 
       SortPanel.init({
@@ -405,14 +429,14 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
         columns: [
           { key: 'id',       label: 'ID' },
           { key: 'name',     label: 'Наименование' },
+          { key: 'code',     label: 'Штрихкод' },
           { key: 'article',  label: 'Артикул' },
           { key: 'categ',    label: 'Категория' },
           { key: 'group',    label: 'Группа' },
           { key: 'sgroup',   label: 'Подгруппа' },
-          { key: 'country',  label: 'Страна' },
           { key: 'quant',    label: 'Количество' },
-          { key: 'price_in', label: 'Закупочная цена' },
           { key: 'price_out',label: 'Розничная цена' },
+          { key: 'price_in', label: 'Закупочная цена' },
           { key: 'note',     label: 'Примечание' },
         ],
         pageUrl: 'tmc.php',
@@ -427,7 +451,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
     (function () {
       var addBtn = document.querySelector('button[data-form-open="tmc_form.php?mode=new"]');
       if (addBtn) {
-        addBtn.dataset.formOpen = 'tmc_form.php?mode=new';
+        addBtn.dataset.formOpen = 'tmc_form.php?mode=new&type=<?= h($serviceMode) ?>';
       }
     })();
 
@@ -437,6 +461,29 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
     'form_prefix' => $FORM_PREFIX,
     'base_url' => $PAGE_URL,
     'lookup_tables' => ['categ', 'group', 'sgroup', 'country', 'izgot', 'unit'],
+    'extra_open' => '(function(){
+      var groupRoot = document.querySelector(\'[data-lookup="group"]\');
+      var sgroupRoot = document.querySelector(\'[data-lookup="sgroup"]\');
+      if (!groupRoot || !sgroupRoot) return;
+      var allSgroups = ' . json_encode($sgroupList, JSON_UNESCAPED_UNICODE) . ';
+      function getFiltered() {
+        var gi = groupRoot.querySelector("input[data-lookup-id]");
+        var gid = gi ? parseInt(gi.value, 10) : 0;
+        return gid > 0 ? allSgroups.filter(function(s){return s.group_id===gid;}) : allSgroups;
+      }
+      function syncApi() {
+        var f = getFiltered();
+        sgroupRoot.setAttribute("data-countries", JSON.stringify(f));
+        if (sgroupRoot.__lookupApi) sgroupRoot.__lookupApi.updateData(f);
+      }
+      if (groupRoot.__lookupApi) {
+        var origChoose = groupRoot.__lookupApi.choose;
+        groupRoot.__lookupApi.choose = function(id,name) { origChoose.call(groupRoot.__lookupApi,id,name); syncApi(); };
+      }
+      var sgroupBtn = sgroupRoot.querySelector("[data-lookup-open]");
+      if (sgroupBtn) sgroupBtn.addEventListener("mousedown", function(){ syncApi(); }, true);
+      syncApi();
+    })();',
 ]); ?>
 <script>
     ColumnsPanel.init({
@@ -502,7 +549,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
           if (!id) return;
           rowSel.selectById(id, true);
           if (typeof window.__openFormModal === 'function') {
-            window.__openFormModal('tmc_form.php?mode=edit&id=' + id);
+            window.__openFormModal('tmc_form.php?mode=edit&id=' + id + '&type=<?= h($serviceMode) ?>');
           }
         });
       }
@@ -511,7 +558,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
         const id = rowSel.getSelectedId();
         if (!id) return;
         if (typeof window.__openFormModal === 'function') {
-          window.__openFormModal('tmc_form.php?mode=' + mode + '&id=' + id);
+          window.__openFormModal('tmc_form.php?mode=' + mode + '&id=' + id + '&type=<?= h($serviceMode) ?>');
         }
       }
       if (openBtn)   openBtn  .addEventListener('click', function (e) { e.stopPropagation(); openForm('edit'); });
@@ -531,7 +578,8 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
         currentPages: currentPages,
         navigate: navigate,
         tableWrapEl: tableWrapEl,
-        accessFlags: window.__accessFlags
+        accessFlags: window.__accessFlags,
+        formExtraParams: '&type=<?= h($serviceMode) ?>'
       });
     })();
 
@@ -563,7 +611,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
           }
         ?><?= json_encode($inlineFields, JSON_UNESCAPED_UNICODE) ?>,
         getLookupData: function (field) {
-          var map = { categ: window.__categList, group: window.__groupList, sgroup: window.__sgroupList, country: window.__countryList };
+          var map = { categ: window.__categList, group: window.__groupList, sgroup: window.__sgroupList };
           return map[field] || [];
         },
         validate: function (field, value) {

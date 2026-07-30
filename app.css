@@ -91,7 +91,8 @@ a { color: inherit; }
   min-width: 220px;
   padding: 4px 0;
   background: #2f3e4e;
-  border: 1px solid var(--line);
+  border: 2px solid #6b7785;
+  border-radius: 2px;
   box-shadow: 0 8px 18px rgba(0,0,0,.25);
 }
 .menu-item:hover > .submenu { display: block; }
@@ -356,7 +357,7 @@ textarea[readonly] {
   width: 100%;
   max-width: 760px;
 }
-.page--form { padding: 10px 6px 7px; }
+.page--form { padding: 10px 6px 7px; border: 2px solid #6b7785; }
 .form-actions {
   display: flex;
   align-items: center;
@@ -369,7 +370,7 @@ textarea[readonly] {
 .form-actions--top { margin-top: 0; }
 .form-actions--bottom { margin-top: 14px; margin-bottom: 0; border-top: 1px solid var(--line); }
 .form-note {
-  margin: 6px 0 14px;
+  margin: 3px 0 3px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -440,7 +441,7 @@ textarea[readonly] {
   right: 0;
   top: 0;
   bottom: 0;
-  width: 16px;
+  width: 8px;
   cursor: col-resize;
   z-index: 5;
   user-select: none;
@@ -448,7 +449,7 @@ textarea[readonly] {
 .col-resize-handle::after {
   content: '';
   position: absolute;
-  right: 7px;
+  right: 2px;
   top: 4px;
   bottom: 4px;
   width: 2px;

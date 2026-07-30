@@ -62,6 +62,20 @@ if ($field === 'role') {
     $check->store_result();
     if ($check->num_rows === 0) { $check->close(); echo json_encode(['ok' => false, 'error' => 'Роль не найдена']); exit; }
     $check->close();
+
+    $adminRole = $conn->query("SELECT role_id FROM role WHERE role = 'Администратор' LIMIT 1");
+    $adminRoleId = $adminRole && ($ar = $adminRole->fetch_assoc()) ? (int)$ar['role_id'] : 0;
+    if ($adminRoleId > 0 && $value !== $adminRoleId) {
+        $er = $conn->query("SELECT role_id FROM sotr WHERE sotr_id = $id");
+        $empRoleId = $er && ($erow = $er->fetch_assoc()) ? (int)$erow['role_id'] : 0;
+        if ($empRoleId === $adminRoleId) {
+            $cnt = $conn->query("SELECT COUNT(*) AS c FROM sotr WHERE role_id = $adminRoleId");
+            if ($cnt && ($cr = $cnt->fetch_assoc()) && (int)$cr['c'] <= 1) {
+                echo json_encode(['ok' => false, 'error' => 'Нельзя изменить роль последнего Администратора']);
+                exit;
+            }
+        }
+    }
 }
 if ($field === 'user_status') {
     $value = $value === '1' ? '1' : '0';

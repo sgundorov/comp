@@ -21,9 +21,9 @@ $groupPageConfig = [
     'country_filter_expr'  => null,
     'key_expr'             => 'g.group_id',
     'col_filters' => [],
-    'select_sql'   => "SELECT g.group_id, g.name, g.pos, g.note FROM `group` g WHERE g.service_flag = 0",
-    'count_sql'    => "SELECT COUNT(*) AS cnt FROM `group` g WHERE g.service_flag = 0",
-    'id_select_sql'=> "SELECT g.group_id AS id FROM `group` g WHERE g.service_flag = 0",
+    'select_sql'   => "SELECT g.group_id, g.name, g.pos, g.note FROM `group` g",
+    'count_sql'    => "SELECT COUNT(*) AS cnt FROM `group` g",
+    'id_select_sql'=> "SELECT g.group_id AS id FROM `group` g",
     'base_url'     => 'group.php',
     'default_column_widths' => ['id' => 46, 'name' => 250, 'note' => 500],
 ];

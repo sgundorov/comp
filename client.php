@@ -27,6 +27,11 @@ handle_marks_actions($conn, $tp, 'client', function($action) use ($conn, $tp) {
 // --- Column filters ---
 $tp->processColumnFilters($conn);
 
+// --- Hide hidden clients ---
+if (empty($appSettings['show_hidden']) || $appSettings['show_hidden'] !== '1') {
+    $tp->appendWhereRaw("(c.hide_flag = 0 OR c.hide_flag IS NULL)");
+}
+
 // --- Tags filter (subquery — not handled by processColumnFilters) ---
 $tagFilter = (string)($_GET['tag_id'] ?? '');
 $tagFilterIds = [];
@@ -113,7 +118,7 @@ render_head_start('Контрагенты'); ?>
     .col-hide_flag .cell-value svg { display: inline-block; vertical-align: middle; }
     .data-table tbody tr.row-hidden td { color: #999; }
     .data-table tbody tr.row-problem td { color: #e74c3c; }
-    .data-table tbody tr.row-juridical td.col-name { color: #e6b800; }
+    .data-table tbody tr.row-juridical td.col-name { color: #ffe9a8; }
     .data-table tbody td.col-sum_nach,
     .data-table tbody td.col-sum_plat,
     .data-table tbody td.col-sum_balans,
@@ -202,21 +207,21 @@ if (count($filters) > 0) {
 <div class="table-wrap">
   <table class="data-table">
 <?php render_table_colgroup($visibleColumns, $columnWidths, [
-    'id' => 60, 'name' => 200, 'last_name' => 120, 'first_name' => 150,
-    'title' => 120, 'cli_categ_id' => 120,
-    'supplier_flag' => 60, 'problem_flag' => 60,
-    'juridical_flag' => 60, 'hide_flag' => 60,
-    'phone' => 120, 'cphone' => 120, 'email' => 160, 'site' => 160,
-    'city_id' => 120, 'country_id' => 120, 'postindex' => 80,
-    'address_jur' => 200, 'address' => 200,
-    'pasport' => 140, 'pasp_date' => 100, 'pasp_vydan' => 200, 'birthday' => 100,
-    'promo_id' => 120,
-    'inn' => 120, 'kpp' => 100, 'ogrn' => 120, 'jur_name' => 200,
-    'director' => 150, 'glavbuh' => 150,
-    'bank' => 200, 'bik' => 80, 'schet' => 140, 'kschet' => 140,
-    'okonh' => 100, 'okpo' => 100,
-    'disc_goods' => 60, 'sum_nach' => 80, 'sum_plat' => 80, 'sum_balans' => 80,
-    'bdate' => 100, 'dop1' => 200, 'tags' => 200, 'note' => 500,
+    'id' => '60px', 'name' => '200px', 'last_name' => '120px', 'first_name' => '150px',
+    'title' => '120px', 'cli_categ_id' => '120px',
+    'supplier_flag' => '60px', 'problem_flag' => '60px',
+    'juridical_flag' => '60px', 'hide_flag' => '60px',
+    'phone' => '120px', 'cphone' => '120px', 'email' => '160px', 'site' => '160px',
+    'city_id' => '120px', 'country_id' => '120px', 'postindex' => '80px',
+    'address_jur' => '200px', 'address' => '200px',
+    'pasport' => '140px', 'pasp_date' => '100px', 'pasp_vydan' => '200px', 'birthday' => '100px',
+    'promo_id' => '120px',
+    'inn' => '120px', 'kpp' => '100px', 'ogrn' => '120px', 'jur_name' => '200px',
+    'director' => '150px', 'glavbuh' => '150px',
+    'bank' => '200px', 'bik' => '80px', 'schet' => '140px', 'kschet' => '140px',
+    'okonh' => '100px', 'okpo' => '100px',
+    'disc_goods' => '60px', 'sum_nach' => '80px', 'sum_plat' => '80px', 'sum_balans' => '80px',
+    'bdate' => '100px', 'dop1' => '200px', 'tags' => '200px', 'note' => '500px',
 ]); ?>
         <?php render_table_thead($visibleColumns, $COL_META, $sortLevels, $allRowsMarked, $rowsTotalCount === 0, []); ?>
         <?php render_table_tbody($visibleColumns, $rows, $marks, $search, 'client_id', function($r, $cn, $vc) use ($search, $searchCols, $searchCond) {
@@ -368,6 +373,8 @@ if (count($filters) > 0) {
     }
     return ['', ''];
 }, [
+    'searchActive' => $searchActive,
+    'searchCols' => $searchCols,
     'trExtraAttrs' => function($r) {
         $classes = [];
         if (!empty($r['hide_flag']) && $r['hide_flag'] == '1') {
@@ -423,10 +430,10 @@ $allLabeledColumns = array_map(function($c) {
     return ['key' => $c['name'], 'label' => $c['label']];
 }, $tp->columns);
 
-// Default columns for ColumnsPanel (preserves original visibility)
+// Default columns for ColumnsPanel
 $defaultColumnsForPanel = array_map(function($c) {
     return ['name' => $c['name'], 'label' => $c['label'], 'visible' => !empty($c['visible'])];
-}, $tp->columns);
+}, $tp->columnsConfig);
 
 // JSON values for extra JS
 $columnWidthsJson = json_encode($tp->columnWidths, JSON_NUMERIC_CHECK);
@@ -575,7 +582,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
   <?php render_form_modal_script([
     'form_prefix'   => 'client_form',
     'base_url'      => 'client.php',
-    'autoInitTables' => ['rc'],
+    'autoInitTables' => ['rc', 'cd'],
     'extra_open'    => 'initFormLookups(); initTagPicker(); window.initFormTabs(); (function(){var j=document.getElementById("jur-name"),l=document.getElementById("last-name"),f=document.getElementById("first-name"),d=document.getElementById("name-display"),g=document.getElementById("juridical-flag");function u(){var jv=j?j.value:"",lv=l?l.value:"",fv=f?f.value:"";if(d)d.value=jv||(lv+" "+fv).trim();if(g)g.checked=!!jv;}if(j)j.addEventListener("input",u);if(l)l.addEventListener("input",u);if(f)f.addEventListener("input",u);u();})();',
     'extra_restore' => 'initFormLookups();',
   ]); ?>

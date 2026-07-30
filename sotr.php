@@ -169,7 +169,7 @@ render_form_modal(); ?>
 
     <?php $activeMenu = 'sotr.php'; include 'menu.php'; ?>
 
-    <h1 class="page-title"><img src="img/sotr.png" alt="" /> Сотрудник</h1>
+    <h1 class="page-title"><img src="img/sotr.png" alt="" /> Сотрудники</h1>
 
     <?php
       $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs, $roleFilter) {
@@ -263,6 +263,8 @@ render_form_modal(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => true,
+            'searchCols' => $searchCols,
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 return ' data-col-idx="' . (int)$i . '"';
             },
@@ -295,10 +297,12 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         pageUrl: 'sotr.php',
         search: document.querySelector('.toolbar').getAttribute('data-search') || '',
         getExportUrl: function () {
-          return null;
+          if (document.querySelectorAll('.row-check:checked').length === 0) return null;
+          return 'sotr_export.php?format=csv&all=1';
         },
         getPrintUrl: function () {
-          return null;
+          if (document.querySelectorAll('.row-check:checked').length === 0) return null;
+          return 'sotr_print.php?all=1';
         }
       });
 

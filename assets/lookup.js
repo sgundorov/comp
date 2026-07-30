@@ -33,7 +33,7 @@
 
   function bindLookup(opts) {
     const root      = opts.root;
-    const data      = opts.data || [];
+    var data      = opts.data || [];
     const readonly  = !!opts.readonly;
     const onSelect  = opts.onSelect || null;
     const positionPop = opts.positionPop || defaultPositionPop;
@@ -57,7 +57,8 @@
     function renderList(filter) {
       const f = (filter || '').toLowerCase().trim();
       popList.innerHTML = '';
-      const matches = data.filter(function (c) { return c.name.toLowerCase().includes(f); });
+      var sourceData = root.__filterFn ? root.__filterFn(data) : data;
+      const matches = sourceData.filter(function (c) { return c.name.toLowerCase().includes(f); });
       if (matches.length === 0) {
         const e = document.createElement('div');
         e.className = 'lookup-pop-empty';
@@ -174,7 +175,8 @@
       inputId: inputId,
       pop: pop,
       btnAdd: btnAdd,
-      choose: choose
+      choose: choose,
+      updateData: function (newData) { data = newData; if (pop.classList.contains('open')) renderList(popSearch ? popSearch.value : ''); }
     };
     root.__lookupApi = api;
     return api;

@@ -106,10 +106,12 @@ $stmt2->close();
 
 // --- Итоги ---
 $invSumNds = (float)$inv['sum_nds'];
+$ndsRate = (int)($appSettings['nds_rate'] ?? 22);
 $ndsStr = '';
-if ($invSumNds > 0) {
-    $ndsStr = 'В т.ч. НДС 20% — ' . number_format($invSumNds, 2, '.', ' ') . ' руб.';
+if ($invSumNds > 0 && $ndsRate > 0) {
+    $ndsStr = 'В т.ч. НДС ' . $ndsRate . '% — ' . number_format($invSumNds, 2, '.', ' ') . ' руб.';
 }
+$ndsPayment = $ndsRate > 0 ? 'НДС ' . $ndsRate . '%' : 'НДС не облагается';
 
 $templatePath = __DIR__ . '/' . ltrim($templateFile, '/');
 
@@ -171,7 +173,8 @@ $vars = [
     'SumNDS'   => number_format($totSumNds, 2, '.', ' '),
 
     // НДС
-    'NDS_Str' => $ndsStr,
+    'NDS_Str'     => $ndsStr,
+    'NDS_Payment' => $ndsPayment,
 
     // Сумма прописью
     'SumProp' => sum_propis((float)$inv['sum']),

@@ -83,7 +83,7 @@ render_form_modal(); ?>
 
     <?php $activeMenu = 'zat.php'; include 'menu.php'; ?>
 
-    <h1 class="page-title"><img src="img/zat.png" alt="" /> Операция с деньгами</h1>
+    <h1 class="page-title"><img src="img/zat.png" alt="" /> Виды операций с деньгами</h1>
 
     <?php
       $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs) {
@@ -152,6 +152,8 @@ render_form_modal(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 return ' data-col-idx="' . (int)$i . '"';
             },
@@ -209,7 +211,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         columns: [
           { key: 'id',   label: 'ID' },
           { key: 'name', label: 'Операция' },
-          { key: 'out_flag', label: 'Расход' },
+          { key: 'out_flag', label: 'Тип' },
           { key: 'note', label: 'Примечание' },
         ],
         pageUrl: 'zat.php',

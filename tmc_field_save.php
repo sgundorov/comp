@@ -68,11 +68,11 @@ if ($id <= 0 || $field === '') {
 
 $ALLOWED = [
     'name'     => ['type' => 's', 'db' => 'product_name',  'label' => 'Название'],
+    'code'     => ['type' => 's', 'db' => 'code',          'label' => 'Штрихкод'],
     'article'  => ['type' => 's', 'db' => 'article',       'label' => 'Артикул'],
     'categ'    => ['type' => 'i', 'db' => 'categ_id',      'label' => 'Категория',    'table' => 'categ', 'table_id' => 'categ_id', 'display' => 'categ'],
     'group'    => ['type' => 'i', 'db' => 'group_id',      'label' => 'Группа',       'table' => '`group`', 'table_id' => 'group_id', 'display' => 'name'],
     'sgroup'   => ['type' => 'i', 'db' => 'sgroup_id',     'label' => 'Подгруппа',    'table' => 'sgroup', 'table_id' => 'sgroup_id', 'display' => 'name'],
-    'country'  => ['type' => 'i', 'db' => 'country_id',    'label' => 'Страна',       'table' => 'country', 'table_id' => 'country_id', 'display' => 'country'],
     'quant'    => ['type' => 'd', 'db' => 'residue',       'label' => 'Количество'],
     'price_in' => ['type' => 'd', 'db' => 'price_in',      'label' => 'Закупочная цена'],
     'price_out'=> ['type' => 'd', 'db' => 'price_out',     'label' => 'Розничная цена'],

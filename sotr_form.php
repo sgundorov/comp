@@ -103,6 +103,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (count($errors) === 0) {
         if ($mode === 'delete') {
+            $adminRole = $conn->query("SELECT role_id FROM role WHERE role = 'Администратор' LIMIT 1");
+            $adminRoleId = $adminRole && ($ar = $adminRole->fetch_assoc()) ? (int)$ar['role_id'] : 0;
+            if ($adminRoleId > 0) {
+                $er = $conn->query("SELECT role_id FROM sotr WHERE sotr_id = $id");
+                $empRoleId = $er && ($erow = $er->fetch_assoc()) ? (int)$erow['role_id'] : 0;
+                if ($empRoleId === $adminRoleId) {
+                    $cnt = $conn->query("SELECT COUNT(*) AS c FROM sotr WHERE role_id = $adminRoleId");
+                    if ($cnt && ($cr = $cnt->fetch_assoc()) && (int)$cr['c'] <= 1) {
+                        $errors[] = 'Нельзя удалять последнего Администратора!';
+                    }
+                }
+            }
+            if (count($errors) === 0) {
             $stmt = $conn->prepare("DELETE FROM sotr WHERE sotr_id = ?");
             $stmt->bind_param('i', $id);
             $stmt->execute();
@@ -115,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             header('Location: sotr.php');
             exit;
+            }
         }
 
         if ($mode === 'new' || $mode === 'copy') {
@@ -139,6 +153,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($mode === 'edit') {
+            $adminRole = $conn->query("SELECT role_id FROM role WHERE role = 'Администратор' LIMIT 1");
+            $adminRoleId = $adminRole && ($ar = $adminRole->fetch_assoc()) ? (int)$ar['role_id'] : 0;
+            if ($adminRoleId > 0 && (int)$values['role_id'] !== $adminRoleId) {
+                $er = $conn->query("SELECT role_id FROM sotr WHERE sotr_id = $id");
+                $empRoleId = $er && ($erow = $er->fetch_assoc()) ? (int)$erow['role_id'] : 0;
+                if ($empRoleId === $adminRoleId) {
+                    $cnt = $conn->query("SELECT COUNT(*) AS c FROM sotr WHERE role_id = $adminRoleId");
+                    if ($cnt && ($cr = $cnt->fetch_assoc()) && (int)$cr['c'] <= 1) {
+                        $errors[] = 'Нельзя изменить роль последнего Администратора';
+                    }
+                }
+            }
+            if (count($errors) === 0) {
             $stmt = $conn->prepare("UPDATE sotr SET last_name=?, first_name=?, second_name=?, role_id=?, phone=?, sphone=?, email=?, address=?, login=?, passw=?, inn=?, title=?, note=? WHERE sotr_id=?");
             bind_auto($stmt, [$values['last_name'], $values['first_name'], $values['second_name'],
                 $values['role_id'],
@@ -159,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-
+}
 $roleList = load_role_list($conn);
 $roleOptions = '';
 foreach ($roleList as $r) {
@@ -204,145 +231,137 @@ ob_start();
 ) ?>
 <?php endif; ?>
 
-<div class="field-row">
-  <?= render_field('Фамилия',
-      render_input('text', 'last_name', $values['last_name'], [
-          'id' => 'f_last_name',
-          'required' => !$isReadonly,
-          'readonly' => $isReadonly,
-          'tabindex' => $isReadonly ? '-1' : null,
-      ]),
-      true,
-      ['readonly' => $isReadonly]
-  ) ?>
-  <?= render_field('Имя',
-      render_input('text', 'first_name', $values['first_name'], [
-          'id' => 'f_first_name',
-          'required' => !$isReadonly,
-          'readonly' => $isReadonly,
-          'tabindex' => $isReadonly ? '-1' : null,
-      ]),
-      true,
-      ['readonly' => $isReadonly]
-  ) ?>
-</div>
-
-<?= render_field('Отчество',
-    render_input('text', 'second_name', $values['second_name'], [
+<table class="form-table">
+  <tr>
+    <td class="form-label">Фамилия</td>
+    <td class="form-label">Имя</td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr class="col-3">
+    <td><?= render_input('text', 'last_name', $values['last_name'], [
+        'id' => 'f_last_name',
+        'required' => !$isReadonly,
+        'readonly' => $isReadonly,
+        'tabindex' => $isReadonly ? '-1' : null,
+    ]) ?></td>
+    <td><?= render_input('text', 'first_name', $values['first_name'], [
+        'id' => 'f_first_name',
+        'required' => !$isReadonly,
+        'readonly' => $isReadonly,
+        'tabindex' => $isReadonly ? '-1' : null,
+    ]) ?></td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr>
+    <td class="form-label">Отчество</td>
+    <td>&nbsp;</td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr>
+    <td colspan="3"><?= render_input('text', 'second_name', $values['second_name'], [
         'id' => 'f_second_name',
         'readonly' => $isReadonly,
         'tabindex' => $isReadonly ? '-1' : null,
-    ]),
-    false,
-    ['readonly' => $isReadonly]
-) ?>
-
-<div class="field-row">
-  <?= render_field('Сотовый телефон',
-      render_input('text', 'sphone', $values['sphone'], [
-          'id' => 'f_sphone',
-          'readonly' => $isReadonly,
-          'tabindex' => $isReadonly ? '-1' : null,
-      ]),
-      false,
-      ['readonly' => $isReadonly]
-  ) ?>
-  <?= render_field('Телефон',
-      render_input('text', 'phone', $values['phone'], [
-          'id' => 'f_phone',
-          'readonly' => $isReadonly,
-          'tabindex' => $isReadonly ? '-1' : null,
-      ]),
-      false,
-      ['readonly' => $isReadonly]
-  ) ?>
-</div>
-
-<div class="field-row">
-  <?= render_field('Роль',
-      render_lookup('role', 'role_id', $values['role_id'], $currentRoleName,
-          h(json_encode($roleList, JSON_UNESCAPED_UNICODE)),
-          'role_form.php?mode=new', $isReadonly, ['id' => 'f_role_id']),
-      true,
-      ['readonly' => $isReadonly]
-  ) ?>
-  <?= render_field('Email',
-      render_input('email', 'email', $values['email'], [
-          'id' => 'f_email',
-          'readonly' => $isReadonly,
-          'tabindex' => $isReadonly ? '-1' : null,
-      ]),
-      false,
-      ['readonly' => $isReadonly]
-  ) ?>
-</div>
-
-<?= render_field('Адрес',
-    render_input('text', 'address', $values['address'], [
+    ]) ?></td>
+  </tr>
+  <tr>
+    <td class="form-label">Сотовый телефон</td>
+    <td class="form-label">Телефон</td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr class="col-3">
+    <td><?= render_input('text', 'sphone', $values['sphone'], [
+        'id' => 'f_sphone',
+        'readonly' => $isReadonly,
+        'tabindex' => $isReadonly ? '-1' : null,
+    ]) ?></td>
+    <td><?= render_input('text', 'phone', $values['phone'], [
+        'id' => 'f_phone',
+        'readonly' => $isReadonly,
+        'tabindex' => $isReadonly ? '-1' : null,
+    ]) ?></td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr>
+    <td class="form-label">Роль</td>
+    <td class="form-label">Email</td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr class="col-3">
+    <td><?= render_lookup('role', 'role_id', $values['role_id'], $currentRoleName,
+        h(json_encode($roleList, JSON_UNESCAPED_UNICODE)),
+        'role_form.php?mode=new', $isReadonly, ['id' => 'f_role_id']) ?></td>
+    <td><?= render_input('email', 'email', $values['email'], [
+        'id' => 'f_email',
+        'readonly' => $isReadonly,
+        'tabindex' => $isReadonly ? '-1' : null,
+    ]) ?></td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr>
+    <td class="form-label">Адрес</td>
+    <td>&nbsp;</td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr>
+    <td colspan="3"><?= render_input('text', 'address', $values['address'], [
         'id' => 'f_address',
         'readonly' => $isReadonly,
         'tabindex' => $isReadonly ? '-1' : null,
-    ]),
-    false,
-    ['wide' => true, 'readonly' => $isReadonly]
-) ?>
-
-<div class="field-row">
-  <div class="field-row-body">
-  <?= render_field('Должность',
-      render_input('text', 'title', $values['title'], [
-          'id' => 'f_title',
-          'readonly' => $isReadonly,
-          'tabindex' => $isReadonly ? '-1' : null,
-      ]),
-      false,
-      ['readonly' => $isReadonly]
-  ) ?>
-  </div>
-  <div class="field-row-quarter">
-  <?= render_field('ИНН',
-      render_input('text', 'inn', $values['inn'], [
-          'id' => 'f_inn',
-          'readonly' => $isReadonly,
-          'tabindex' => $isReadonly ? '-1' : null,
-      ]),
-      false,
-      ['readonly' => $isReadonly]
-  ) ?>
-  </div>
-</div>
-
-<div class="field-row">
-  <?= render_field('Логин',
-      render_input('text', 'login', $values['login'], [
-          'id' => 'f_login',
-          'readonly' => $isReadonly,
-          'tabindex' => $isReadonly ? '-1' : null,
-      ]),
-      false,
-      ['readonly' => $isReadonly]
-  ) ?>
-  <?= render_field('Пароль',
-      render_input('password', 'passw', $values['passw'], [
-          'id' => 'f_passw',
-          'readonly' => $isReadonly,
-          'tabindex' => $isReadonly ? '-1' : null,
-      ]),
-      false,
-      ['readonly' => $isReadonly]
-  ) ?>
-</div>
-
-<?= render_field('Примечание', render_input('text', 'note', $values['note'], [
+    ]) ?></td>
+  </tr>
+  <tr>
+    <td class="form-label">Должность</td>
+    <td class="form-label">ИНН</td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr class="col-3">
+    <td><?= render_input('text', 'title', $values['title'], [
+        'id' => 'f_title',
+        'readonly' => $isReadonly,
+        'tabindex' => $isReadonly ? '-1' : null,
+    ]) ?></td>
+    <td><?= render_input('text', 'inn', $values['inn'], [
+        'id' => 'f_inn',
+        'readonly' => $isReadonly,
+        'tabindex' => $isReadonly ? '-1' : null,
+    ]) ?></td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr>
+    <td class="form-label">Логин</td>
+    <td class="form-label">Пароль</td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr class="col-3">
+    <td><?= render_input('text', 'login', $values['login'], [
+        'id' => 'f_login',
+        'readonly' => $isReadonly,
+        'tabindex' => $isReadonly ? '-1' : null,
+    ]) ?></td>
+    <td><?= render_input('password', 'passw', $values['passw'], [
+        'id' => 'f_passw',
+        'readonly' => $isReadonly,
+        'tabindex' => $isReadonly ? '-1' : null,
+    ]) ?></td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr>
+    <td class="form-label">Примечание</td>
+    <td>&nbsp;</td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr>
+    <td colspan="3"><?= render_input('text', 'note', $values['note'], [
         'id' => 'f_note',
         'readonly' => $isReadonly,
         'tabindex' => $isReadonly ? '-1' : null,
-    ]),
-    false,
-    ['wide' => true, 'readonly' => $isReadonly]
-) ?>
-
-<?= render_form_note() ?>
+    ]) ?></td>
+  </tr>
+  <tr>
+    <td colspan="3"><?= render_form_note() ?></td>
+  </tr>
+</table>
 
 <?= render_form_actions(
     $mode === 'delete'
@@ -352,6 +371,16 @@ ob_start();
            render_btn_link_icon_text('img/cancel.png', 'Отменить', 'sotr.php', ['class'=>'btn-secondary'])]
 ) ?>
 </form>
+<style>
+.form-table { width: 100%; border-collapse: collapse; }
+.form-table td { vertical-align: top; padding-bottom: 6px; padding-right: 8px; }
+.form-table td:last-child { padding-right: 0; }
+.form-table td.form-label { font-size: 12px; color: var(--muted); padding-bottom: 2px; }
+.form-table tr.col-3 td { width: 33%; }
+input.full { width: 100%; box-sizing: border-box; }
+.form-note { margin: 2px 0 2px; }
+.form-actions--bottom { margin-top: 2px; }
+</style>
 <?php
 $formHtml = ob_get_clean();
 

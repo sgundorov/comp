@@ -65,10 +65,15 @@ $menuAttr = function(string $href) use ($activeMenu, $menuAccessMap, &$menuDisab
 <nav class="top-menu">
   <img src="img/app.png" alt="" width="32" height="32" style="margin-right:8px;" />
   <div class="menu-item">
-    <span class="menu-link">Файлы</span>
+    <span class="menu-link">Справочники</span>
     <div class="submenu">
-      <a href="#" onclick="__openFormModal('setup_form.php?mode=edit');return false;"<?= $menuAttr('setup_form.php') ?>>Параметры настройки</a>
-      <a href="repmenu.php"<?= $menuAttr('repmenu.php') ?>>Настройка документов</a>
+      <a href="firm.php"<?= $menuAttr('firm.php') ?>>Фирмы</a>
+      <a href="city.php"<?= $menuAttr('city.php') ?>>Города</a>
+      <a href="country.php"<?= $menuAttr('country.php') ?>>Страны</a>
+      <a href="store.php"<?= $menuAttr('store.php') ?>>Участки</a>
+      <a href="zat.php"<?= $menuAttr('zat.php') ?>>Виды операций с деньгами</a>
+      <a href="status.php"<?= $menuAttr('status.php') ?>>Состояния заявок</a>
+      <a href="sotr.php"<?= $menuAttr('sotr.php') ?>>Сотрудники</a>
     </div>
   </div>
   <div class="menu-item">
@@ -85,26 +90,12 @@ $menuAttr = function(string $href) use ($activeMenu, $menuAccessMap, &$menuDisab
       <a href="sale.php?typeop=20"<?= $menuAttr('sale.php?typeop=20') ?>>Приход</a>
       <a href="sale.php?typeop=110"<?= $menuAttr('sale.php?typeop=110') ?>>Возврат поставщику</a>
       <a href="sale.php"<?= $menuAttr('sale.php') ?>>Продажа</a>
-      <a href="sale.php?typeop=10"<?= $menuAttr('sale.php?typeop=10') ?>>Возврат от покупателя</a>
+      <a href="sale.php?typeop=40"<?= $menuAttr('sale.php?typeop=40') ?>>Возврат от покупателя</a>
       <a href="sale.php?typeop=100"<?= $menuAttr('sale.php?typeop=100') ?>>Внутреннее перемещение</a>
       <a href="sale.php?typeop=127"<?= $menuAttr('sale.php?typeop=127') ?>>Списание</a>
     </div>
   </div>
-  <div class="menu-item">
-    <span class="menu-link">Справочники</span>
-    <div class="submenu">
-      <a href="firm.php"<?= $menuAttr('firm.php') ?>>Фирмы</a>
-      <a href="city.php"<?= $menuAttr('city.php') ?>>Города</a>
-      <a href="country.php"<?= $menuAttr('country.php') ?>>Страны</a>
-      <a href="store.php"<?= $menuAttr('store.php') ?>>Участки</a>
-      <a href="zat.php"<?= $menuAttr('zat.php') ?>>Виды операций с деньгами</a>
-      <a href="status.php"<?= $menuAttr('status.php') ?>>Состояния заявок</a>
-      <a href="sotr.php"<?= $menuAttr('sotr.php') ?>>Сотрудники</a>
-      <a href="role.php"<?= $menuAttr('role.php') ?>>Роли сотрудников</a>
-      <a href="object.php"<?= $menuAttr('object.php') ?>>Объекты доступа</a>
-      <a href="dostup.php"<?= $menuAttr('dostup.php') ?>>Права доступа</a>
-    </div>
-  </div>
+
   <div class="menu-item">
     <span class="menu-link">Контрагенты</span>
     <div class="submenu">
@@ -120,13 +111,23 @@ $menuAttr = function(string $href) use ($activeMenu, $menuAccessMap, &$menuDisab
     </div>
   </div>
   <div class="menu-item">
-    <span class="menu-link">Товары</span>
+    <span class="menu-link">Номенклатура</span>
     <div class="submenu">
-      <a href="tmc.php"<?= $menuAttr('tmc.php') ?>>Товары</a>
-      <a href="categ.php"<?= $menuAttr('categ.php') ?>>Категории товаров</a>
+      <a href="tmc.php"<?= $menuAttr('tmc.php') ?>>Товары и Услуги</a>
+      <a href="categ.php"<?= $menuAttr('categ.php') ?>>Категории</a>
       <a href="group.php"<?= $menuAttr('group.php') ?>>Группы, подгруппы</a>
       <a href="izgot.php"<?= $menuAttr('izgot.php') ?>>Производители</a>
       <a href="unit.php"<?= $menuAttr('unit.php') ?>>Единицы измерения</a>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-link">Администрирование</span>
+    <div class="submenu">
+      <a href="#" onclick="__openFormModal('setup_form.php?mode=edit');return false;"<?= $menuAttr('setup_form.php') ?>>Параметры настройки</a>
+      <a href="repmenu.php"<?= $menuAttr('repmenu.php') ?>>Настройка документов</a>
+      <a href="role.php"<?= $menuAttr('role.php') ?>>Роли сотрудников</a>
+      <a href="object.php"<?= $menuAttr('object.php') ?>>Объекты доступа</a>
+      <a href="dostup.php"<?= $menuAttr('dostup.php') ?>>Права доступа</a>
     </div>
   </div>
   <div class="menu-spacer"></div>

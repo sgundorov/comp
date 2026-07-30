@@ -192,8 +192,10 @@ render_head_end(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'checkboxCallback' => function($rid) use ($marks) {
-                return '<input type="checkbox" class="row-check" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
+                return '<input type="checkbox" class="row-check" value="' . $rid . '" data-id="' . $rid . '"' . (isset($marks[$rid]) ? ' checked' : '') . ' />';
             },
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 if ($cn === 'color') {

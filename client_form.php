@@ -353,6 +353,8 @@ if ($RegcodeFlag && $id > 0 && ($mode === 'edit' || $mode === 'delete')) {
     $rcs->close();
 }
 
+$embedReadonly = ($mode === 'delete');
+
 $embedConfig = [
     'prefix'       => 'rc',
     'colWidths'    => ['product' => '200px', 'regcod' => '120px', 'quant' => '60px', 'date' => '90px', 'signat' => '120px', 'days' => '50px', 'note' => '150px'],
@@ -391,6 +393,61 @@ $embeddedTable = $RegcodeFlag && $id > 0 && ($mode === 'edit' || $mode === 'dele
     ])
     : null;
 
+ensure_clidoc_table($conn);
+
+$clidocList = [];
+if ($id > 0 && ($mode === 'edit' || $mode === 'delete')) {
+    $cds = $conn->prepare("SELECT c.id, c.number, c.name, c.filename, c.note FROM clidoc c WHERE c.client_id = ? ORDER BY c.number ASC");
+    $cds->bind_param('i', $id);
+    $cds->execute();
+    $cdr = $cds->get_result();
+    while ($cd = $cdr->fetch_assoc()) {
+        $clidocList[] = [
+            'id'       => (int)$cd['id'],
+            'number'   => (int)$cd['number'],
+            'name'     => (string)$cd['name'],
+            'filename' => (string)$cd['filename'],
+            'note'     => (string)$cd['note'],
+        ];
+    }
+    $cds->close();
+}
+
+$cdEmbedConfig = [
+    'prefix'       => 'cd',
+    'colWidths'    => ['number' => '60px', 'name' => '250px', 'filename' => '150px', 'note' => '200px'],
+    'saveUrl'      => 'clidoc_field_save.php',
+    'parentField'  => 'client_id',
+    'childFormUrl' => 'clidoc_form.php',
+    'childFormName'=> 'clidoc',
+    'hasExport'    => true,
+    'hasPrint'     => true,
+    'exportUrl'    => 'clidoc_export.php',
+    'printUrl'     => 'clidoc_print.php',
+    'parentParam'  => 'client_id=',
+    'hasSearch'    => false,
+    'lookupData'   => [],
+    'columnResizeUrl' => 'clidoc_column_width_save.php',
+    'columnResizeTbl' => 'clidoc',
+    'readonly' => $embedReadonly,
+];
+$cdEmbeddedTable = $id > 0 && ($mode === 'edit' || $mode === 'delete')
+    ? new TablePage($conn, [
+        'table'       => 'clidoc',
+        'key'         => 'id',
+        'search_cols' => [],
+        'column_visibility_tbl' => '',
+        'columns'     => [
+            ['name' => 'number',   'label' => '№'],
+            ['name' => 'name',     'label' => 'Документ'],
+            ['name' => 'filename', 'label' => 'Файл'],
+            ['name' => 'note',     'label' => 'Примечание'],
+        ],
+        'defaultColumnWidths' => ['number' => '60px', 'name' => '250px', 'filename' => '150px', 'note' => '200px'],
+        'lookupData' => [],
+    ])
+    : null;
+
 $productList = [];
 $prs = $conn->query("SELECT product_id, product_name FROM product WHERE hide_flag = 0 ORDER BY product_name");
 if ($prs) while ($pr = $prs->fetch_assoc()) $productList[] = ['id' => (int)$pr['product_id'], 'name' => (string)$pr['product_name']];
@@ -404,7 +461,6 @@ $titles = [
 $pageTitle = $titles[$mode] ?? 'Контрагент';
 
 $isReadonly = ($mode === 'delete');
-$embedReadonly = ($mode === 'delete');
 
 ob_start();
 ?>
@@ -426,6 +482,7 @@ ob_start();
     <?php if ($RegcodeFlag): ?>
     <div class="tab-header" data-tab-index="3">Рег. коды</div>
     <?php endif; ?>
+    <div class="tab-header" data-tab-index="4">Документы</div>
   </div>
 
   <?php
@@ -435,7 +492,7 @@ ob_start();
   <div class="tab-pane active" data-tab-index="0">
     <table class="form-table">
       <tr><td class="form-label">Организация</td></tr>
-      <tr><td><?= render_input('text', 'jur_name', $values['jur_name'], ['id' => 'jur-name', 'class' => 'full', 'readonly' => $isReadonly]) ?></td></tr>
+      <tr><td colspan="3"><?= render_input('text', 'jur_name', $values['jur_name'], ['id' => 'jur-name', 'class' => 'full', 'readonly' => $isReadonly]) ?></td></tr>
       <tr>
         <td class="form-label">Фамилия</td>
         <td class="form-label">Имя</td>
@@ -449,7 +506,7 @@ ob_start();
       <tr>
         <td class="form-label">Категория</td>
         <td class="form-label">Телефон</td>
-        <td class="form-label">Моб. телефон</td>
+        <td class="form-label">Сотовый телефон</td>
       </tr>
       <tr>
         <td><?= render_lookup('cli_categ', 'cli_categ_id', $values['cli_categ_id'], $currentCliCategName, h(json_encode($cliCategList, JSON_UNESCAPED_UNICODE)), 'cli_categ_form.php?mode=new', $isReadonly, ['id' => 'cli-categ-id', 'data-name-input' => 'cli-categ-name']) ?></td>
@@ -466,21 +523,10 @@ ob_start();
         <td><?= render_input('text', 'site', $values['site'], ['id' => 'site', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
         <td>&nbsp;</td>
       </tr>
-      <tr><td class="form-label">Флаги</td></tr>
-      <tr>
-        <td>
-          <label class="checkbox-label"><input type="checkbox" name="supplier_flag" value="1"<?= $values['supplier_flag'] === '1' ? ' checked' : '' ?> <?= $isReadonly ? 'disabled' : '' ?> /> Поставщик</label>
-        </td>
-        <td>
-          <label class="checkbox-label"><input type="checkbox" name="problem_flag" value="1"<?= $values['problem_flag'] === '1' ? ' checked' : '' ?> <?= $isReadonly ? 'disabled' : '' ?> /> Проблемный</label>
-        </td>
-        <td>
-          <label class="checkbox-label"><input type="checkbox" name="hide_flag" value="1"<?= $values['hide_flag'] === '1' ? ' checked' : '' ?> <?= $isReadonly ? 'disabled' : '' ?> /> Скрыт</label>
-        </td>
-      </tr>
       <tr><td class="form-label">Примечание</td></tr>
       <tr><td colspan="3"><?= render_textarea('note', $values['note'], ['id' => 'note', 'class' => 'full', 'readonly' => $isReadonly, 'rows' => '5', 'style' => 'resize:vertical']) ?></td></tr>
     </table>
+    <?= render_form_note() ?>
   </div>
 
   <div class="tab-pane" data-tab-index="1">
@@ -506,6 +552,17 @@ ob_start();
         <td><?= render_input('text', 'kpp', $values['kpp'], ['id' => 'kpp', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
         <td><?= render_input('text', 'ogrn', $values['ogrn'], ['id' => 'ogrn', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
       </tr>
+      <tr><td class="form-label" colspan="2">Банк</td><td class="form-label">БИК</td></tr>
+      <tr>
+        <td colspan="2"><?= render_input('text', 'bank', $values['bank'], ['id' => 'bank', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
+        <td><?= render_input('text', 'bik', $values['bik'], ['id' => 'bik', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
+      </tr>
+      <tr><td class="form-label">Расчетный счет</td><td class="form-label">Корсчет</td><td>&nbsp;</td></tr>
+      <tr>
+        <td><?= render_input('text', 'schet', $values['schet'], ['id' => 'schet', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
+        <td><?= render_input('text', 'kschet', $values['kschet'], ['id' => 'kschet', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
+        <td>&nbsp;</td>
+      </tr>
       <tr><td class="form-label">Директор</td><td class="form-label">Главный бухгалтер</td><td>&nbsp;</td></tr>
       <tr>
         <td><?= render_input('text', 'director', $values['director'], ['id' => 'director', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
@@ -516,9 +573,9 @@ ob_start();
       <tr>
         <td><?= render_lookup('promo', 'promo_id', $values['promo_id'], $currentPromoName, h(json_encode($promoList, JSON_UNESCAPED_UNICODE)), 'promo_form.php?mode=new', $isReadonly, ['id' => 'promo-id', 'data-name-input' => 'promo-name']) ?></td>
       </tr>
-      <tr><td class="form-label">Виды деятельности</td></tr>
+      <tr><td class="form-label" colspan="3">Виды деятельности</td></tr>
       <tr>
-        <td id="tag-picker-container" class="search-cond-control" data-values="<?= h(implode(',', $currentTagIds)) ?>" data-items='<?= h(json_encode($tagList, JSON_UNESCAPED_UNICODE)) ?>'></td>
+        <td colspan="3"><div id="tag-picker-container" class="search-cond-control" data-values="<?= h(implode(',', $currentTagIds)) ?>" data-items='<?= h(json_encode($tagList, JSON_UNESCAPED_UNICODE)) ?>'></div></td>
       </tr>
     </table>
   </div>
@@ -532,9 +589,21 @@ ob_start();
     <?php endif; ?>
   </div>
   <?php endif; ?>
+  <div class="tab-pane" data-tab-index="4">
+    <div style="display:flex;gap:12px;">
+      <div style="flex:2;min-width:0;">
+        <?php if ($id > 0 && ($mode === 'edit' || $mode === 'delete')): ?>
+        <?= $cdEmbeddedTable->renderEmbedded($clidocList, $cdEmbedConfig) ?>
+        <?php else: ?>
+        <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">Сохраните контрагента, чтобы добавить документы</div>
+        <?php endif; ?>
+      </div>
+      <div style="flex:1;min-width:0;" id="cd-preview-panel">
+        <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;border:1px dashed var(--line);border-radius:4px;">Выберите строку для просмотра</div>
+      </div>
+    </div>
+  </div>
 </div>
-
-<?= render_form_note() ?>
 
 <style>
 #regcod-modal .lookup-pop { z-index: 2300; }
@@ -773,6 +842,34 @@ input.full, textarea.full { width: 100%; box-sizing: border-box; }
 <?php $embeddedTable->renderEmbeddedScripts($embedConfig); ?>
 initRcTable();
 window.__columnDefaultWidths = <?= json_encode($embedConfig['colWidths'], JSON_UNESCAPED_UNICODE) ?>;
+</script>
+<?php endif; ?>
+<?php if ($cdEmbeddedTable): ?>
+<script>
+<?php $cdEmbeddedTable->renderEmbeddedScripts($cdEmbedConfig); ?>
+initCdTable();
+(function(){
+  var tbl = window['__cdTable'];
+  if (!tbl) return;
+  var col = tbl.columns.find(function(c){return c.key==='filename';});
+  if (col) col.render = function(val,item){
+    if (!val) return '';
+    var parts = val.split('/');
+    return '<a href="' + val + '" target="_blank">' + parts[parts.length-1] + '</a>';
+  };
+  tbl.render();
+  tbl.onRowSelect = function(id){
+    var item = null;
+    for (var i=0;i<tbl.data.length;i++){if(tbl.data[i].id==id){item=tbl.data[i];break;}}
+    var panel=document.getElementById('cd-preview-panel');
+    if(!panel)return;
+    if(!item||!item.filename){panel.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;border:1px dashed var(--line);border-radius:4px;">Нет файла для просмотра</div>';return;}
+    var fn=item.filename,ext=fn.split('.').pop().toLowerCase();
+    if(['jpg','jpeg','png','gif','webp','svg','bmp'].indexOf(ext)>=0){panel.innerHTML='<div style="padding:4px;text-align:center;"><a href="'+fn+'" target="_blank"><img src="'+fn+'" style="max-width:100%;max-height:70vh;border-radius:4px;" /></a></div>';}
+    else{panel.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Предпросмотр недоступен</div>';}
+  };
+  if (tbl.selectedId) tbl.onRowSelect(tbl.selectedId);
+})();
 </script>
 <?php endif; ?>
 <?php

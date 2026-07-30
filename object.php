@@ -210,7 +210,7 @@ render_form_modal(); ?>
 
     <?php $activeMenu = 'object.php'; include 'menu.php'; ?>
 
-    <h1 class="page-title"><img src="img/object.png" alt="" /> Объект доступа</h1>
+    <h1 class="page-title"><img src="img/object.png" alt="" /> Объекты доступа</h1>
 
     <?php
       $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs, $typeFilter) {
@@ -295,6 +295,8 @@ render_form_modal(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 return ' data-col-idx="' . (int)$i . '"';
             },
@@ -326,10 +328,10 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         pageUrl: 'object.php',
         search: document.querySelector('.toolbar').getAttribute('data-search') || '',
         getExportUrl: function () {
-          return null;
+          return 'object_export.php?format=csv&all=1';
         },
         getPrintUrl: function () {
-          return null;
+          return 'object_print.php?all=1';
         }
       });
 

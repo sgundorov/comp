@@ -94,7 +94,8 @@ class TableComponent {
         $cn = $vc['name'] ?? $vc['key'] ?? '';
         if ($cn === '') continue;
         $savedW = $this->columnWidths[$cn] ?? null;
-        $w = $savedW !== null ? $savedW . 'px' : ($this->defaultColumnWidths[$cn] ?? '150px');
+        $dflt = $this->defaultColumnWidths[$cn] ?? '150px';
+        $w = $savedW !== null ? $savedW . 'px' : (is_numeric($dflt) ? $dflt . 'px' : $dflt);
     ?>
       <col class="col-<?= h($cn) ?>" style="width: <?= $w ?>;" />
     <?php endforeach; ?>

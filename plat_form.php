@@ -29,6 +29,7 @@ $values = [
     'plat_type' => 'Наличные',
     'doc_id'    => '',
     'doc_type'  => 0,
+    'doc_number'=> '',
     'sotr_id'   => 0,
     'note'      => '',
 ];
@@ -40,7 +41,7 @@ if ($mode === 'new') {
     $values['client_id'] = (int)($_GET['client_id'] ?? 0);
     $sumRemainIn  = (string)($_GET['sum_in'] ?? '');
     $sumRemainOut = (string)($_GET['sum_out'] ?? '');
-    if ($values['doc_type'] == 120) {
+    if ($sumRemainIn !== '') {
         $values['sum_in']  = $sumRemainIn;
         $values['sum_out'] = '';
     } else {
@@ -50,22 +51,87 @@ if ($mode === 'new') {
     $values['sum']       = (string)($_GET['sum'] ?? '');
     $values['sotr_id']   = (int)($_GET['sotr_id'] ?? $CurSotrID);
     if (!empty($_GET['zat_id'])) $values['zat_id'] = (int)$_GET['zat_id'];
+    $values['doc_number'] = (string)($_GET['number'] ?? '');
     $docIdVal = (int)$values['doc_id'];
     $docTypeVal = (int)$values['doc_type'];
-    if ($docIdVal > 0 && $values['client_id'] <= 0 && in_array($docTypeVal, [5, 10, 20, 110, 120, 127], true)) {
-        $parentTable = in_array($docTypeVal, [5, 10], true) ? 'invoice' : 'docum';
-        $parentKey = in_array($docTypeVal, [5, 10], true) ? 'invoice_id' : 'docum_id';
-        $pStmt = $conn->prepare("SELECT client_id FROM $parentTable WHERE $parentKey = ?");
-        $pStmt->bind_param('i', $docIdVal);
-        $pStmt->execute();
-        $pRow = $pStmt->get_result()->fetch_assoc();
-        $pStmt->close();
-        if ($pRow) $values['client_id'] = (int)$pRow['client_id'];
+    if ($docIdVal > 0 && $values['client_id'] <= 0 && in_array($docTypeVal, [5, 10, 20, 40, 110, 120, 127], true)) {
+        if ($docTypeVal === 10) {
+            $pStmt = $conn->prepare("SELECT client_id FROM invoice WHERE invoice_id = ?");
+            $pStmt->bind_param('i', $docIdVal);
+            $pStmt->execute();
+            $pRow = $pStmt->get_result()->fetch_assoc();
+            $pStmt->close();
+            if ($pRow) {
+                $values['client_id'] = (int)$pRow['client_id'];
+            } else {
+                $pStmt = $conn->prepare("SELECT client_id FROM docum WHERE docum_id = ?");
+                $pStmt->bind_param('i', $docIdVal);
+                $pStmt->execute();
+                $pRow = $pStmt->get_result()->fetch_assoc();
+                $pStmt->close();
+                if ($pRow) $values['client_id'] = (int)$pRow['client_id'];
+            }
+        } else {
+            $parentTable = in_array($docTypeVal, [5], true) ? 'invoice' : 'docum';
+            $parentKey = in_array($docTypeVal, [5], true) ? 'invoice_id' : 'docum_id';
+            $pStmt = $conn->prepare("SELECT client_id FROM $parentTable WHERE $parentKey = ?");
+            $pStmt->bind_param('i', $docIdVal);
+            $pStmt->execute();
+            $pRow = $pStmt->get_result()->fetch_assoc();
+            $pStmt->close();
+            if ($pRow) $values['client_id'] = (int)$pRow['client_id'];
+        }
+    }
+    if ($docIdVal > 0 && (float)$values['sum_in'] <= 0 && (float)$values['sum_out'] <= 0) {
+        if (in_array($docTypeVal, [5, 10], true)) {
+            $ir = $conn->prepare("SELECT COALESCE((SELECT SUM(i2.sum) FROM invoice2 i2 WHERE i2.invoice_id = i.invoice_id), 0) AS sum, COALESCE(i.sum_plat,0) AS sum_plat FROM invoice i WHERE i.invoice_id = ?");
+            $ir->bind_param('i', $docIdVal);
+            $ir->execute();
+            $invRow = $ir->get_result()->fetch_assoc();
+            $ir->close();
+            if ($invRow) {
+                $rem = (float)$invRow['sum'] - (float)$invRow['sum_plat'];
+                if ($rem > 0) $values['sum_in'] = (string)$rem;
+            }
+        }
+        if ((float)$values['sum_in'] <= 0 && (float)$values['sum_out'] <= 0 && in_array($docTypeVal, [10, 20, 40, 100, 110, 120, 127], true)) {
+            $dr = $conn->prepare("SELECT COALESCE((SELECT SUM(d2.sum) FROM docum2 d2 WHERE d2.docum_id = d.docum_id), 0) AS sum, COALESCE(d.sum_plat,0) AS sum_plat, COALESCE(tp.prihod_flag,0) AS prihod_flag FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = ?");
+            $dr->bind_param('i', $docIdVal);
+            $dr->execute();
+            $docRow = $dr->get_result()->fetch_assoc();
+            $dr->close();
+            if ($docRow) {
+                if ($docRow['prihod_flag']) {
+                    $remOut = (float)$docRow['sum'] + (float)$docRow['sum_plat'];
+                    if ($remOut > 0) $values['sum_out'] = (string)$remOut;
+                } else {
+                    $rem = (float)$docRow['sum'] - (float)$docRow['sum_plat'];
+                    if ($rem > 0) $values['sum_in'] = (string)$rem;
+                }
+            }
+        }
+    }
+    if ($docIdVal > 0 && $values['doc_number'] === '') {
+        if (in_array($docTypeVal, [5, 10], true)) {
+            $nStmt = $conn->prepare("SELECT number FROM invoice WHERE invoice_id = ?");
+            $nStmt->bind_param('i', $docIdVal);
+            $nStmt->execute();
+            $nRow = $nStmt->get_result()->fetch_assoc();
+            $nStmt->close();
+            if ($nRow) $values['doc_number'] = (string)(int)$nRow['number'];
+        } elseif (in_array($docTypeVal, [10, 20, 40, 100, 110, 120, 127], true)) {
+            $nStmt = $conn->prepare("SELECT number FROM docum WHERE docum_id = ?");
+            $nStmt->bind_param('i', $docIdVal);
+            $nStmt->execute();
+            $nRow = $nStmt->get_result()->fetch_assoc();
+            $nStmt->close();
+            if ($nRow) $values['doc_number'] = (string)(int)$nRow['number'];
+        }
     }
 }
 
 if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
-    $stmt = $conn->prepare("SELECT datetime, client_id, zat_id, sum_in, sum_out, sum, out_flag, plat_type, doc_id, doc_type, sotr_id, note FROM plat WHERE plat_id = ?");
+    $stmt = $conn->prepare("SELECT datetime, client_id, zat_id, sum_in, sum_out, sum, out_flag, plat_type, doc_id, doc_number, doc_type, sotr_id, note FROM plat WHERE plat_id = ?");
     $stmt->bind_param('i', $id);
     $stmt->execute();
     $r = $stmt->get_result()->fetch_assoc();
@@ -85,6 +151,7 @@ if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
         $values['out_flag']  = (int)$r['out_flag'];
         $values['plat_type'] = (string)$r['plat_type'];
         $values['doc_id']    = (int)$r['doc_id'] > 0 ? (string)(int)$r['doc_id'] : '';
+        $values['doc_number'] = (string)($r['doc_number'] ?? '');
         $values['doc_type']  = (int)$r['doc_type'];
         $values['sotr_id']   = (int)$r['sotr_id'];
         $values['note']      = (string)$r['note'];
@@ -100,6 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['sum_out']   = str_replace(',', '.', trim((string)($_POST['sum_out'] ?? '')));
     $values['plat_type'] = trim((string)($_POST['plat_type'] ?? 'Наличные'));
     $values['doc_id']    = trim((string)($_POST['doc_id'] ?? ''));
+    $values['doc_number'] = trim((string)($_POST['doc_number'] ?? ''));
     $values['doc_type']  = (int)($_POST['doc_type'] ?? 0);
     $values['sotr_id']   = (int)($_POST['sotr_id'] ?? 0);
     $values['note']      = trim((string)($_POST['note'] ?? ''));
@@ -153,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $delDocId = (int)$values['doc_id'];
             $delSumPlat = 0;
             $delDocType = (int)$values['doc_type'];
-            if ($delDocId > 0 && in_array($delDocType, [10, 20, 110, 120, 127], true)) {
+            if ($delDocId > 0 && in_array($delDocType, [10, 20, 40, 110, 120, 127], true)) {
                 $parentTable = $delDocType === 10 ? 'invoice' : 'docum';
                 $parentKey = $delDocType === 10 ? 'invoice_id' : 'docum_id';
                 $sp = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
@@ -183,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $prihodFlag = (int)($spRedRow['prihod_flag'] ?? 0);
                 $sumPlatRed = $prihodFlag ? ($spSum > -$delSumPlat) : ($delSumPlat < $spSum);
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $id, 'name' => '#' . $id, 'sum_plat' => number_format($delSumPlat, 2, '.', ''), 'sum_plat_red' => $sumPlatRed]);
+                echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $id, 'name' => '#' . $id, 'sum_plat' => number_format($delSumPlat, 2, '.', ''), 'sum_plat_red' => $sumPlatRed, '_deleted' => true]);
                 exit;
             }
             header('Location: plat.php');
@@ -195,11 +263,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $docIdVal = $values['doc_id'] !== '' ? (int)$values['doc_id'] : 0;
 
         if ($mode === 'new' || $mode === 'copy') {
-            $stmt = $conn->prepare("INSERT INTO plat (datetime, date, time, client_id, zat_id, sum_in, sum_out, sum, out_flag, plat_type, doc_id, doc_type, sotr_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            bind_auto($stmt, [$datetimeStr, $d, $t, $values['client_id'], $values['zat_id'], $sumInVal, $sumOutVal, $sum, $outFlag, $values['plat_type'], $docIdVal, $values['doc_type'], $values['sotr_id'], $values['note']]);
+            $stmt = $conn->prepare("INSERT INTO plat (datetime, date, time, client_id, zat_id, sum_in, sum_out, sum, out_flag, plat_type, doc_id, doc_number, doc_type, sotr_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            bind_auto($stmt, [$datetimeStr, $d, $t, $values['client_id'], $values['zat_id'], $sumInVal, $sumOutVal, $sum, $outFlag, $values['plat_type'], $docIdVal, $values['doc_number'], $values['doc_type'], $values['sotr_id'], $values['note']]);
         } else {
-            $stmt = $conn->prepare("UPDATE plat SET datetime = ?, date = ?, time = ?, client_id = ?, zat_id = ?, sum_in = ?, sum_out = ?, sum = ?, out_flag = ?, plat_type = ?, doc_id = ?, doc_type = ?, sotr_id = ?, note = ? WHERE plat_id = ?");
-            bind_auto($stmt, [$datetimeStr, $d, $t, $values['client_id'], $values['zat_id'], $sumInVal, $sumOutVal, $sum, $outFlag, $values['plat_type'], $docIdVal, $values['doc_type'], $values['sotr_id'], $values['note'], $id]);
+            $stmt = $conn->prepare("UPDATE plat SET datetime = ?, date = ?, time = ?, client_id = ?, zat_id = ?, sum_in = ?, sum_out = ?, sum = ?, out_flag = ?, plat_type = ?, doc_id = ?, doc_number = ?, doc_type = ?, sotr_id = ?, note = ? WHERE plat_id = ?");
+            bind_auto($stmt, [$datetimeStr, $d, $t, $values['client_id'], $values['zat_id'], $sumInVal, $sumOutVal, $sum, $outFlag, $values['plat_type'], $docIdVal, $values['doc_number'], $values['doc_type'], $values['sotr_id'], $values['note'], $id]);
         }
 
         if (!$stmt->execute()) {
@@ -212,7 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $saveSumPlat = 0;
         $saveDocType = (int)$values['doc_type'];
-        if ($docIdVal > 0 && in_array($saveDocType, [5, 10, 20, 110, 120, 127], true)) {
+        if ($docIdVal > 0 && in_array($saveDocType, [5, 10, 20, 40, 110, 120, 127], true)) {
             $parentTable = in_array($saveDocType, [5, 10], true) ? 'invoice' : 'docum';
             $parentKey = in_array($saveDocType, [5, 10], true) ? 'invoice_id' : 'docum_id';
             $sp = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
@@ -264,6 +332,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+foreach (['sum_in', 'sum_out', 'sum'] as $k) {
+    $v = $values[$k];
+    if ($v !== '' && (float)$v == 0) $values[$k] = '';
+}
+
 render:
 $titles = [
     'new'    => 'Операция с деньгами (новая)',
@@ -304,6 +377,16 @@ if ($srs) while ($sr = $srs->fetch_assoc()) {
     $sotrList[] = ['id' => (int)$sr['sotr_id'], 'name' => (string)$sr['name']];
 }
 
+$typeopList = [];
+$trs = $conn->query("SELECT typeop_id, typeop FROM typeop ORDER BY typeop");
+if ($trs) while ($tr = $trs->fetch_assoc()) {
+    $typeopList[] = ['id' => (int)$tr['typeop_id'], 'name' => (string)$tr['typeop']];
+}
+$currentTypeopName = '';
+foreach ($typeopList as $t) {
+    if ($t['id'] === $values['doc_type']) { $currentTypeopName = $t['name']; break; }
+}
+
 $currentClientName = '';
 foreach ($clientList as $c) {
     if ($c['id'] === $values['client_id']) { $currentClientName = $c['name']; break; }
@@ -327,7 +410,6 @@ ob_start();
 <form class="form<?= $mode === 'delete' ? ' form--delete' : '' ?>" method="post" action="plat_form.php" autocomplete="off" data-form-modal>
 <?= render_input('hidden', 'mode', $mode) ?>
 <?= render_input('hidden', 'id', $id) ?>
-<?= render_input('hidden', 'doc_type', $values['doc_type']) ?>
 <?= render_input('hidden', 'cli_name', '', ['id' => 'plat-cli-name']) ?>
 <?= render_input('hidden', 'zat_name', '', ['id' => 'plat-zat-name']) ?>
 <?= render_input('hidden', 'sotr_name', '', ['id' => 'plat-sotr-name']) ?>
@@ -380,14 +462,12 @@ ob_start();
 <div class="field-row">
   <?= render_field('Сумма прихода', render_input('text', 'sum_in', $values['sum_in'], [
           'id' => 'plat-sum-in',
-          'placeholder' => '0.00',
           'readonly' => $isReadonly,
           'tabindex' => $isReadonly ? '-1' : null,
           'style' => 'max-width:130px',
       ]), false, ['readonly' => $isReadonly]) ?>
   <?= render_field('Сумма расхода', render_input('text', 'sum_out', $values['sum_out'], [
           'id' => 'plat-sum-out',
-          'placeholder' => '0.00',
           'readonly' => $isReadonly,
           'tabindex' => $isReadonly ? '-1' : null,
           'style' => 'max-width:130px',
@@ -427,12 +507,17 @@ ob_start();
   </div>
 </div>
 
-<?= render_field('Документ №', render_input('text', 'doc_id', $values['doc_id'], [
-        'id' => 'plat-doc-id',
-        'readonly' => $isReadonly,
-        'tabindex' => $isReadonly ? '-1' : null,
-        'style' => 'max-width:100px',
-    ]), false, ['readonly' => $isReadonly]) ?>
+<div class="field-row" style="gap:10px">
+  <input type="hidden" name="doc_id" value="<?= h($values['doc_id']) ?>" />
+  <?= render_field('Документ №', render_input('text', 'doc_number', $values['doc_number'], [
+        'id' => 'plat-doc-number',
+        'readonly' => true,
+        'tabindex' => '-1',
+        'style' => 'max-width:120px',
+    ]), false) ?>
+  <?= render_field('Тип документа', render_lookup('typeop', 'doc_type', $values['doc_type'], $currentTypeopName,
+        h(json_encode($typeopList, JSON_UNESCAPED_UNICODE)), '', true), false) ?>
+</div>
 
 <?= render_field('Сотрудник',
     render_lookup('sotr', 'sotr_id', $values['sotr_id'], $currentSotrName,
@@ -516,23 +601,24 @@ ob_start();
   function updateSum() {
     var sumIn = parseFloat(document.getElementById('plat-sum-in').value.replace(',', '.')) || 0;
     var sumOut = parseFloat(document.getElementById('plat-sum-out').value.replace(',', '.')) || 0;
-    document.getElementById('plat-sum').value = (sumIn - sumOut).toFixed(2);
+    var val = sumIn - sumOut;
+    document.getElementById('plat-sum').value = val === 0 ? '' : val.toFixed(2);
   }
   var sumInEl = document.getElementById('plat-sum-in');
   var sumOutEl = document.getElementById('plat-sum-out');
   if (sumInEl && !sumInEl.readOnly) { sumInEl.addEventListener('input', updateSum); }
   if (sumOutEl && !sumOutEl.readOnly) { sumOutEl.addEventListener('input', updateSum); }
+  updateSum();
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
+      var modal = document.getElementById('formModal');
+      if (modal && modal.classList.contains('open')) return;
+      if (!document.querySelector('form[data-form-modal]')) return;
       var anyOpen = document.querySelectorAll('.lookup-pop.open');
       if (anyOpen.length > 0) return;
       e.preventDefault();
-      if (window.parent && window.parent !== window) {
-        try { window.parent.postMessage({ type: 'form-cancel' }, '*'); } catch (err) {}
-      } else {
-        window.location.href = 'plat.php';
-      }
+      window.location.href = 'plat.php';
     }
   });
 })();

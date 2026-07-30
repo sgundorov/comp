@@ -206,7 +206,7 @@ render_head_end(); ?>
       <input type="date" id="dateFrom" value="<?= h($dateFrom) ?>" style="max-width:140px;font-size:12px;padding:2px 4px" />
       <span style="color:var(--muted)">—</span>
       <input type="date" id="dateTo" value="<?= h($dateTo) ?>" style="max-width:140px;font-size:12px;padding:2px 4px" />
-      <button type="button" class="icon-btn" id="dateApplyBtn" title="Применить фильтр по дате" onclick="applyDateFilter()"><img src="img/find.png" alt="" /></button>
+      <button type="button" class="icon-btn" id="dateApplyBtn" title="Применить фильтр по дате" onclick="applyDateFilter()"><img src="img/filter.png" alt="" /></button>
     </div>
 
     <?php render_toolbar_right($search, $searchActive, $urlCols, $searchCond, $clearQs, 'plat.php'); ?>
@@ -243,7 +243,9 @@ render_head_end(); ?>
           }]
       ); ?>
       <?php render_table_tbody($visibleColumns, $rows, $marks, $search, 'plat_id', 'cellValue', [
-          'hasCheckbox' => true,
+           'searchActive' => $searchActive,
+           'searchCols' => $searchCols,
+           'hasCheckbox' => true,
           'trExtraAttrs' => function($r) {
               if ((int)($r['out_flag'] ?? 0) === 1) return ' class="row--out"';
               return '';

@@ -101,6 +101,8 @@ if ($field === '_import_marked_count') {
 }
 
 if ($field === '_import_marked') {
+    $ndsRate = (int)($appSettings['nds_rate'] ?? 22);
+    $noNds   = ($appSettings['no_nds'] ?? '0') === '1';
     $invId = $invoiceId;
     if ($invId <= 0) {
         header('Content-Type: application/json; charset=utf-8');
@@ -123,7 +125,7 @@ if ($field === '_import_marked') {
     $inserted = 0;
     if (!empty($ids)) {
         $pStmt = $conn->prepare("SELECT product_id, product_name, article, price_out FROM product WHERE product_id = ?");
-        $iStmt = $conn->prepare("INSERT INTO invoice2 (invoice_id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note, guarantee, guarant_unit) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, 0, '', 0, '')");
+        $iStmt = $conn->prepare("INSERT INTO invoice2 (invoice_id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note, guarantee, guarant_unit) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, '', 0, '')");
         foreach ($ids as $pid) {
             $pStmt->bind_param('i', $pid);
             $pStmt->execute();
@@ -134,7 +136,8 @@ if ($field === '_import_marked') {
                 $pname = (string)$pRow['product_name'];
                 $sum = $price * (1 - $discount / 100);
                 $sumDisc = $price * ($discount / 100);
-                bind_auto($iStmt, [$invId, $pid, $code, $pname, $price, $discount, $sum, $sumDisc]);
+                $sumNds = $noNds ? ($sum * $ndsRate / (100 + $ndsRate)) : ($sum * $ndsRate / 100);
+                bind_auto($iStmt, [$invId, $pid, $code, $pname, $price, $discount, $sum, $sumDisc, $sumNds]);
                 $iStmt->execute();
                 $inserted++;
             }
@@ -166,10 +169,16 @@ if ($field === '_apply_discount') {
         exit;
     }
     $discPct = $discount / 100;
-    $stmt = $conn->prepare("UPDATE invoice2 SET discount = ?, sum = price * (1 - ?), sum_discount = price * ?, sum_nds = 0 WHERE invoice_id = ?");
-    bind_auto($stmt, [$discount, $discPct, $discPct, $invId]);
+    $ndsRate = (int)($appSettings['nds_rate'] ?? 22);
+    $noNds   = ($appSettings['no_nds'] ?? '0') === '1';
+    $stmt = $conn->prepare("UPDATE invoice2 SET discount = ?, sum = quant * price * (1 - ?), sum_discount = quant * price * ?, sum_nds = (CASE WHEN ? = 1 THEN quant * price * (1 - ?) * ? / (100 + ?) ELSE quant * price * (1 - ?) * ? / 100 END) WHERE invoice_id = ?");
+    bind_auto($stmt, [$discount, $discPct, $discPct, $noNds ? 1 : 0, $discPct, $ndsRate, $ndsRate, $discPct, $ndsRate, $invId]);
     $stmt->execute();
     $stmt->close();
+    $hStmt = $conn->prepare("UPDATE invoice SET discount = ? WHERE invoice_id = ?");
+    $hStmt->bind_param('di', $discount, $invId);
+    $hStmt->execute();
+    $hStmt->close();
     $totals = recalc_invoice_totals($conn, $invId);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array_merge(['ok' => true], $totals));
@@ -261,7 +270,9 @@ if ($invoice2Id > 0) {
         $discount = (float)$row['discount'];
         $sum = $quant * $price * (1 - $discount / 100);
         $sum_discount = $quant * $price * ($discount / 100);
-        $sum_nds = 0;
+        $ndsRate = (int)($appSettings['nds_rate'] ?? 22);
+        $noNds   = ($appSettings['no_nds'] ?? '0') === '1';
+        $sum_nds = $noNds ? ($sum * $ndsRate / (100 + $ndsRate)) : ($sum * $ndsRate / 100);
         $uStmt = $conn->prepare("UPDATE invoice2 SET sum = ?, sum_discount = ?, sum_nds = ? WHERE invoice2_id = ?");
         bind_auto($uStmt, [$sum, $sum_discount, $sum_nds, $invoice2Id]);
         $uStmt->execute();

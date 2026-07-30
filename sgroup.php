@@ -14,8 +14,8 @@ $sgroupIsService = ($sgroupKind === 'service');
 $sgroupServiceFlag = $sgroupIsService ? '1' : '0';
 $PAGE_URL = $sgroupIsService ? 'sgroup.php?kind=service' : 'sgroup.php';
 $FORM_PREFIX = 'sgroup_form';
-$PAGE_TITLE = $sgroupIsService ? 'Экспорт в Excel' : 'Подгруппы товаров';
-$PAGE_TITLE_FORM = $sgroupIsService ? 'Экспорт в Excel' : 'Подгруппа товаров';
+$PAGE_TITLE = $sgroupIsService ? 'Подгруппы услуг' : 'Подгруппы товаров';
+$PAGE_TITLE_FORM = $sgroupIsService ? 'Подгруппа услуг' : 'Подгруппа товаров';
 
 ensure_marks_table($conn);
 
@@ -343,6 +343,8 @@ render_form_modal(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 return ' data-col-idx="' . (int)$i . '"';
             },
@@ -419,8 +421,8 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
     (function () {
       var addBtn = document.querySelector('button[data-form-open="sgroup_form.php?mode=new"]');
       if (addBtn) {
-        var kind = <?= json_encode($sgroupIsService ? 'service' : '') ?>;
-        if (kind) addBtn.dataset.formOpen = 'sgroup_form.php?mode=new&kind=' + kind;
+        var sf = <?= json_encode($sgroupServiceFlag) ?>;
+        if (sf === '1') addBtn.dataset.formOpen = 'sgroup_form.php?mode=new&service_flag=1';
       }
     })();
 
@@ -491,7 +493,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
           if (!id) return;
           rowSel.selectById(id, true);
           if (typeof window.__openFormModal === 'function') {
-            window.__openFormModal('sgroup_form.php?mode=edit&id=' + id + '&kind=' + <?= json_encode($sgroupIsService ? 'service' : '') ?>);
+            window.__openFormModal('sgroup_form.php?mode=edit&id=' + id + '&service_flag=' + <?= json_encode($sgroupServiceFlag) ?>);
           }
         });
       }
@@ -500,7 +502,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         const id = rowSel.getSelectedId();
         if (!id) return;
         if (typeof window.__openFormModal === 'function') {
-          window.__openFormModal('sgroup_form.php?mode=' + mode + '&id=' + id + '&kind=' + <?= json_encode($sgroupIsService ? 'service' : '') ?>);
+          window.__openFormModal('sgroup_form.php?mode=' + mode + '&id=' + id + '&service_flag=' + <?= json_encode($sgroupServiceFlag) ?>);
         }
       }
       if (openBtn)   openBtn  .addEventListener('click', function (e) { e.stopPropagation(); openForm('edit'); });
@@ -520,7 +522,8 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         currentPages: currentPages,
         navigate: navigate,
         tableWrapEl: tableWrapEl,
-        accessFlags: window.__accessFlags
+        accessFlags: window.__accessFlags,
+        formExtraParams: '&service_flag=' + <?= json_encode($sgroupServiceFlag) ?>
       });
     })();
 

@@ -24,14 +24,14 @@ $values = [
     'gr_id'    => (string)((int)($_GET['gr_id'] ?? 0) ?: 0),
     'name'     => '',
     'fname'    => '',
-    'quant'    => '1',
+
     'hide_flag'=> '0',
     'note'     => '',
 ];
 $origName = '';
 
 if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
-    $stmt = $conn->prepare("SELECT m.number, m.gr_id, m.name, m.fname, m.quant, m.HIDE_FLAG, m.note FROM repmenu m WHERE m.rp_id = ?");
+    $stmt = $conn->prepare("SELECT m.number, m.gr_id, m.name, m.fname, m.HIDE_FLAG, m.note FROM repmenu m WHERE m.rp_id = ?");
     $stmt->bind_param('i', $id);
     $stmt->execute();
     $r = $stmt->get_result()->fetch_assoc();
@@ -44,7 +44,7 @@ if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
         $values['gr_id']     = (string)$r['gr_id'];
         $values['name']      = ($mode === 'copy') ? '' : (string)$r['name'];
         $values['fname']     = (string)$r['fname'];
-        $values['quant']     = (string)$r['quant'];
+
         $values['hide_flag'] = (string)$r['HIDE_FLAG'];
         $values['note']      = (string)$r['note'];
     }
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['gr_id']     = (string)($_POST['gr_id'] ?? '0');
     $values['name']      = trim((string)($_POST['name'] ?? ''));
     $values['fname']     = trim((string)($_POST['fname'] ?? ''));
-    $values['quant']     = (string)($_POST['quant'] ?? '1');
+
     $values['hide_flag'] = (string)($_POST['hide_flag'] ?? '0');
     $values['note']      = trim((string)($_POST['note'] ?? ''));
 
@@ -106,14 +106,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         if ($mode === 'new' || $mode === 'copy') {
-            $stmt = @$conn->prepare("INSERT INTO repmenu (number, gr_id, name, fname, quant, HIDE_FLAG, note) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt = @$conn->prepare("INSERT INTO repmenu (number, gr_id, name, fname, HIDE_FLAG, note) VALUES (?, ?, ?, ?, ?, ?)");
             if ($stmt) {
                 bind_auto($stmt, [
                     (int)$values['number'],
                     (int)$values['gr_id'],
                     $values['name'],
                     $values['fname'],
-                    (int)$values['quant'],
                     (int)$values['hide_flag'],
                     $values['note'],
                 ]);
@@ -133,14 +132,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         if ($mode === 'edit') {
-            $stmt = @$conn->prepare("UPDATE repmenu SET number = ?, gr_id = ?, name = ?, fname = ?, quant = ?, HIDE_FLAG = ?, note = ? WHERE rp_id = ?");
+            $stmt = @$conn->prepare("UPDATE repmenu SET number = ?, gr_id = ?, name = ?, fname = ?, HIDE_FLAG = ?, note = ? WHERE rp_id = ?");
             if ($stmt) {
                 bind_auto($stmt, [
                     (int)$values['number'],
                     (int)$values['gr_id'],
                     $values['name'],
                     $values['fname'],
-                    (int)$values['quant'],
                     (int)$values['hide_flag'],
                     $values['note'],
                     $id,
@@ -241,17 +239,6 @@ ob_start();
     <input type="file" id="repmenu-fname-input" style="display:none" onchange="var f=this.files[0];if(!f)return;var fd=new FormData();fd.append('file',f);fetch('repmenu_upload.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(d){if(d.ok){document.getElementById('repmenu-fname').value=d.path;}else{alert(d.error||'Ошибка загрузки');}});" />
     <?php endif; ?>
   </div>
-</div>
-
-<div class="repmenu-field">
-  <label class="repmenu-label" for="repmenu-quant">Количество</label>
-  <?= render_input('number', 'quant', $values['quant'], [
-      'id' => 'repmenu-quant',
-      'readonly' => $isReadonly,
-      'tabindex' => $isReadonly ? '-1' : null,
-      'style' => 'max-width:80px',
-      'min' => '0',
-  ]) ?>
 </div>
 
 <div class="repmenu-field">

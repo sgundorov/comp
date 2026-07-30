@@ -316,6 +316,38 @@ $_actionsOk = !$_readonly && (!$af || true);
         window['__<?= $p ?>Table'].refresh();
       });
 
+      <?php if ($this->hasImport): ?>
+      var importBtn = formBody.querySelector('#<?= $p ?>-import-btn');
+      if (importBtn) {
+        importBtn.addEventListener('click', function () {
+          var url = '<?= $this->saveUrl ?>';
+          var fd = new FormData();
+          fd.set('field', '_import_marked_count');
+          fetch(url, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (!data || !data.ok) return;
+              if (data.count <= 0) {
+                alert('Нет отмеченных товаров!');
+                return;
+              }
+              if (!confirm('Импортировать ' + data.count + ' товар(ов)?')) return;
+              var fd2 = new FormData();
+              fd2.set('field', '_import_marked');
+              fd2.set('<?= $this->parentField ?>', String(groupId));
+              fetch(url, { method: 'POST', body: fd2, headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (r2) { return r2.json(); })
+                .then(function (data2) {
+                  if (data2 && data2.ok) {
+                    var tbl = window['__<?= $p ?>Table'];
+                    if (tbl) tbl.refresh();
+                  }
+                });
+            });
+        });
+      }
+      <?php endif; ?>
+
       var searchInput = formBody.querySelector('#<?= $p ?>-search-input');
       var searchBtn = formBody.querySelector('#<?= $p ?>-search-btn');
       var searchCondBtn = formBody.querySelector('#<?= $p ?>-search-cond-btn');

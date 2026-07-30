@@ -327,6 +327,13 @@ render_head_end(); ?>
       <?php render_table_tbody($visibleColumns, $rows, $marks, $search, 'invoice_id', 'cellValue', [
           'searchActive' => $searchActive,
           'searchCols' => $searchCols,
+          'tdExtraAttrs' => function($cn, $vc, $r, $i) {
+              $a = ' data-col-idx="' . (int)$i . '"';
+              if ($cn === 'sum_plat' && (float)($r['sum_plat'] ?? 0) < (float)($r['sum'] ?? 0)) {
+                  $a .= ' style="color:#c0392b;font-weight:bold"';
+              }
+              return $a;
+          },
       ]); ?>
     </table>
     </div>
@@ -543,12 +550,18 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
       if (!quantInput && !priceInput && !discountInput) return;
       var sumInput = formBody.querySelector('#inv2-sum');
       var sumDiscInput = formBody.querySelector('#inv2-sum-discount');
+      var sndsInput = formBody.querySelector('#inv2-snds');
+      var frm = formBody.querySelector('form[data-form-modal]');
+      var ndsRate = parseInt(frm ? frm.getAttribute('data-nds-rate') : '22', 10) || 0;
+      var noNds = (frm ? frm.getAttribute('data-no-nds') : '0') === '1';
       window.__recalcInvoice2 = function () {
         var q = parseFloat((quantInput ? quantInput.value : '1').replace(',', '.')) || 0;
         var p = parseFloat((priceInput ? priceInput.value : '0').replace(',', '.')) || 0;
         var d = parseFloat((discountInput ? discountInput.value : '0').replace(',', '.')) || 0;
-        if (sumInput) { var _sf = (q * p * (1 - d / 100)).toFixed(2); sumInput.value = _sf === '0.00' ? '' : _sf.replace('.', ','); }
+        var _sum = q * p * (1 - d / 100);
+        if (sumInput) { var _sf = _sum.toFixed(2); sumInput.value = _sf === '0.00' ? '' : _sf.replace('.', ','); }
         if (sumDiscInput) { var _sdf = (q * p * (d / 100)).toFixed(2); sumDiscInput.value = _sdf === '0.00' ? '' : _sdf.replace('.', ','); }
+        if (sndsInput) { var _snds = noNds ? (_sum * ndsRate / (100 + ndsRate)) : (_sum * ndsRate / 100); var _ndsf = _snds.toFixed(2); sndsInput.value = _ndsf === '0.00' ? '' : _ndsf.replace('.', ','); }
       };
       [quantInput, priceInput, discountInput].forEach(function (el) {
         if (el) el.addEventListener('input', window.__recalcInvoice2);
@@ -601,26 +614,6 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
           hdr.classList.add('active');
           var pane = container.querySelector('.tab-pane[data-tab-index="' + idx + '"]');
           if (pane) pane.classList.add('active');
-          if ((idx === 1 || idx === 2)) {
-            var invIdEl = formBody.querySelector('input[name="id"]');
-            var modeEl = formBody.querySelector('input[name="mode"]');
-            var invoiceId = invIdEl ? parseInt(invIdEl.value, 10) : 0;
-            var curMode = modeEl ? modeEl.value : '';
-            if (!invoiceId && (curMode === 'new' || curMode === 'copy')) {
-              var f = formBody.querySelector('form[data-form-modal]');
-              if (!f) return;
-              var fd = new FormData(f);
-              fd.set('ajax', '1');
-              fd.set('action', 'apply');
-              fetch(f.getAttribute('action') || FORM_URL, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                  if (data && data.ok && data.id) {
-                    openFormModal(f.getAttribute('action') + '&mode=edit&id=' + data.id);
-                  }
-                });
-            }
-          }
         });
       });
     }
@@ -858,17 +851,8 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
             .then(function (data) {
               if (data && data.ok) {
                 applyInvoice2Totals(data);
-                var f2 = new FormData();
-                f2.set('field', '_list');
-                f2.set('invoice_id', String(invoiceId));
-                fetch('invoice2_field_save.php', { method: 'POST', body: f2, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                  .then(function(r) { return r.json(); })
-                  .then(function(list) {
-                    if (Array.isArray(list)) {
-                      var inv2Table = window['__inv2Table'];
-                      if (inv2Table) inv2Table.setData(list);
-                    }
-                  });
+                var inv2Table = window['__inv2Table'];
+                if (inv2Table) inv2Table.refresh();
               }
             });
         });
@@ -902,11 +886,20 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
       });
     }
 
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('[data-form-close]') && formModal.classList.contains('open')) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        window.invoice2Dirty = false;
+        if (stashed) { restoreStashedForm(null); } else { closeFormModal(); }
+      }
+    });
+
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && formModal.classList.contains('open')) {
         e.preventDefault();
         window.invoice2Dirty = false;
-        if (stashed) { restoreStashedForm(null); } else { closeFormModal(); location.reload(); }
+        if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); }
       }
     });
 
@@ -916,14 +909,14 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
         if (cancelA && cancelA.closest('.form-actions')) {
           e.preventDefault(); e.stopImmediatePropagation();
           window.invoice2Dirty = false;
-          if (stashed) { restoreStashedForm(null); } else { closeFormModal(); location.reload(); } return;
+          if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); } return;
         }
       }
       let a = e.target.closest('a[href*="invoice_form.php"]');
       if (a) { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return; e.preventDefault(); e.stopImmediatePropagation(); openFormModal(a.getAttribute('href')); return; }
       const trig = e.target.closest('[data-form-open]');
       if (trig) { e.preventDefault(); openFormModal(trig.getAttribute('data-form-open')); return; }
-      if (e.target.closest('[data-form-close]')) { e.preventDefault(); window.invoice2Dirty = false; if (stashed) { restoreStashedForm(null); } else { closeFormModal(); location.reload(); } return; }
+      if (e.target.closest('[data-form-close]')) { e.preventDefault(); window.invoice2Dirty = false; if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); } return; }
       if (e.target.closest('[data-lookup-add]')) { e.preventDefault(); var openFn = openFormModal; FormModalCore.handleLookupAdd(e.target.closest('[data-lookup-add]'), function (fn) { stashed = { html: formBody.innerHTML, onRestore: fn, activeId: document.activeElement ? document.activeElement.id : null, invoice2Dirty: window.invoice2Dirty }; }, openFn); return; }
     });
 
@@ -1045,13 +1038,14 @@ $inv2Table = new EmbeddedTable([
     'totalsCallback' => 'applyInvoice2Totals',
     'columnResizeUrl' => 'invoice_column_width_save.php',
     'columnResizeTbl' => 'invoice2',
-    'colWidths' => array_merge(['quant' => '100px', 'price' => '100px', 'discount' => '100px', 'sum' => '100px'], load_columns_widths($conn, 'invoice2')),
+    'colWidths' => array_merge(['quant' => '100px', 'price' => '100px', 'discount' => '100px', 'sum' => '100px', 'sum_nds' => '80px'], load_columns_widths($conn, 'invoice2')),
     'columns' => [
         ['name' => 'product_name', 'label' => 'Товар', 'type' => 'lookup', 'param' => 'product_id'],
         ['name' => 'quant', 'label' => 'Кол-во', 'type' => 'text'],
         ['name' => 'price', 'label' => 'Цена', 'type' => 'text'],
         ['name' => 'discount', 'label' => 'Скидка', 'type' => 'text'],
         ['name' => 'sum', 'label' => 'Сумма', 'type' => 'text', 'readonly' => true],
+        ['name' => 'sum_nds', 'label' => 'НДС', 'type' => 'text', 'readonly' => true],
         ['name' => 'note', 'label' => 'Примечание', 'type' => 'textarea'],
     ],
     'columnLabels' => [
@@ -1060,6 +1054,7 @@ $inv2Table = new EmbeddedTable([
         'price' => 'Цена',
         'discount' => 'Скидка',
         'sum' => 'Сумма',
+        'sum_nds' => 'НДС',
         'note' => 'Примечание',
     ],
     'accessFlags' => $accessFlags,
@@ -1070,6 +1065,9 @@ $platTable = new EmbeddedTable([
     'parentField' => 'doc_id',
     'childFormUrl' => 'plat_form.php?doc_type=' . $invoiceDoctypeId,
     'childFormName' => 'PlatForm',
+    'colWidths' => ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'out_flag' => '80px', 'note' => 'auto'],
+    'columnResizeUrl' => 'plat_column_width_save.php',
+    'columnResizeTbl' => 'plat',
     'pageSize' => 15,
     'hasExport' => true,
     'hasPrint' => true,

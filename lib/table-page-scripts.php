@@ -123,7 +123,7 @@ function render_table_page_scripts(array $cfg): void {
       const selCount  = document.getElementById('selectedCount');
       const toolbar   = document.querySelector('.toolbar');
       const search    = toolbar.getAttribute('data-search') || '';
-      const markedSet = new Set(Array.from(rowChecks).filter(cb => cb.checked).map(cb => parseInt(cb.value, 10)));
+      const markedSet = new Set(Array.from(rowChecks).filter(cb => cb.checked).map(cb => parseInt(cb.value || cb.dataset.id, 10)));
       let globalCount = parseInt(toolbar.getAttribute('data-marks-count') || '0', 10);
 
       document.querySelectorAll('.submenu a').forEach(function (a) {
@@ -160,7 +160,7 @@ function render_table_page_scripts(array $cfg): void {
       });
 
       rowChecks.forEach(cb => cb.addEventListener('change', function () {
-        const id  = parseInt(cb.value, 10);
+        const id  = parseInt(cb.value || cb.dataset.id, 10);
         const to  = cb.checked;
         cb.disabled = true;
         fetch(window.__marksUrl('toggleSelect'), {
@@ -382,7 +382,9 @@ foreach ($searchPanelKeys as $k) {
       });
     })();
 
+<?php if ($columnResizeUrl): ?>
     ColumnResize.init({ saveUrl: '<?= h($columnResizeUrl) ?>', tbl: '<?= h($tableKey) ?>', selector: 'table.data-table' });
+<?php endif; ?>
     </script>
     <?php
     if ($extraCode) {

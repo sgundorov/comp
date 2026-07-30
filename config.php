@@ -33,6 +33,7 @@ mysqli_report(MYSQLI_REPORT_OFF);
 
 ensure_app_settings_table($conn);
 ensure_plat_doc_type($conn);
+ensure_clidoc_table($conn);
 $appSettings = load_app_settings($conn);
 defined('PAGE_SIZE') or define('PAGE_SIZE', max(1, (int)($appSettings['page_size'] ?? 20)));
 $GLOBALS['pageWidth'] = max(800, (int)($appSettings['page_width'] ?? 1100));
@@ -342,6 +343,26 @@ function ensure_client_tag_table(mysqli $conn): void {
         PRIMARY KEY (client_id, tag_id),
         KEY idx_client (client_id),
         KEY idx_tag (tag_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+function ensure_clidoc_table(mysqli $conn): void {
+    static $done = [];
+    $key = $conn->thread_id ?? 0;
+    if (!empty($done[$key])) return;
+    $done[$key] = true;
+    @mysqli_query($conn, "CREATE TABLE IF NOT EXISTS clidoc (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        type INT NOT NULL DEFAULT 0,
+        client_id INT NOT NULL DEFAULT 0,
+        number INT NOT NULL DEFAULT 0,
+        name VARCHAR(255) NOT NULL DEFAULT '',
+        filename VARCHAR(255) NOT NULL DEFAULT '',
+        note TEXT DEFAULT NULL,
+        date DATE NOT NULL,
+        time TIME NOT NULL,
+        UNIQUE KEY type_client_number (type, client_id, number),
+        KEY idx_client (client_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 

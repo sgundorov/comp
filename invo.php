@@ -226,6 +226,8 @@ render_form_modal(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 $a = ' data-col-idx="' . (int)$i . '"';
                 if ($cn === 'sum_plat' && (float)($r['sum_plat'] ?? 0) < (float)($r['sum'] ?? 0)) {

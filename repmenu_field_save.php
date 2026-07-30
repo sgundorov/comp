@@ -13,7 +13,7 @@ if ($id <= 0 || $field === '' || $field === '_list' || $field === '_delete') {
     exit;
 }
 
-$allowed = ['number', 'gr_id', 'name', 'fname', 'quant', 'HIDE_FLAG', 'note'];
+$allowed = ['number', 'gr_id', 'name', 'fname', 'HIDE_FLAG', 'note'];
 if (!in_array($field, $allowed, true)) {
     echo json_encode(['ok' => false, 'error' => 'Unknown field'], JSON_UNESCAPED_UNICODE);
     exit;

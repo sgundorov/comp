@@ -3,7 +3,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/config/sale_columns.php';
 require_once __DIR__ . '/config/sale_page.php';
 
-$DOC_LABELS = [10 => 'Возврат от покупателя', 20 => 'Приход', 110 => 'Возврат поставщику', 120 => 'Продажа', 127 => 'Списание'];
+$DOC_LABELS = [40 => 'Возврат от покупателя', 20 => 'Приход', 110 => 'Возврат поставщику', 120 => 'Продажа', 127 => 'Списание'];
 
 $format = strtolower((string)($_GET['format'] ?? ''));
 $validFormats = ['csv', 'xls', 'pdf'];
@@ -14,7 +14,7 @@ if (!in_array($format, $validFormats, true)) {
 }
 
 $typeop = (int)($_GET['typeop'] ?? 120);
-if (!in_array($typeop, [10, 20, 100, 110, 120, 127], true)) $typeop = 120;
+if (!in_array($typeop, [40, 20, 100, 110, 120, 127], true)) $typeop = 120;
 
 $salePageConfig['marks_session'] = 'sale_select_' . $typeop;
 $salePageConfig['marks_tbl'] = 'docum_' . $typeop;

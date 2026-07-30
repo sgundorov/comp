@@ -6,14 +6,15 @@ function docum2_columns_defaults() {
         ['name' => 'price',        'label' => 'Цена'],
         ['name' => 'discount',     'label' => 'Скидка'],
         ['name' => 'sum',          'label' => 'Сумма'],
+        ['name' => 'sum_nds',      'label' => 'НДС'],
         ['name' => 'note',         'label' => 'Примечание'],
     ];
 }
 
 function docum2_columns_widths_export() {
-    return ['product_name' => 250, 'quant' => 80, 'price' => 90, 'discount' => 80, 'sum' => 100, 'note' => 200];
+    return ['product_name' => 250, 'quant' => 80, 'price' => 90, 'discount' => 80, 'sum' => 100, 'sum_nds' => 80, 'note' => 200];
 }
 
 function docum2_columns_widths_print() {
-    return ['product_name' => '', 'quant' => '80px', 'price' => '90px', 'discount' => '80px', 'sum' => '100px', 'note' => '200px'];
+    return ['product_name' => '', 'quant' => '80px', 'price' => '90px', 'discount' => '80px', 'sum' => '100px', 'sum_nds' => '80px', 'note' => '200px'];
 }

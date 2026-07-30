@@ -26,7 +26,7 @@ $r = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$r || $r['passw'] !== $password) {
-    $response['error'] = 'Неверный логин или пароль';
+    $response['error'] = 'Неправильный логин или пароль';
     echo json_encode($response);
     exit;
 }

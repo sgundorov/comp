@@ -155,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['pos']          = (int)($_POST['pos'] ?? 0);
     $values['note']         = trim((string)($_POST['note'] ?? ''));
 
-    if ($mode !== 'delete') {
+    if ($mode !== 'delete' && empty($_POST['auto_save'])) {
         if ($values['date'] === '') {
             $errors[] = 'Поле «Дата» обязательно для заполнения.';
             $focusField = 'inv-date';
@@ -281,7 +281,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!empty($_POST['auto_save'])) {
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['ok' => true]);
+            echo json_encode(['ok' => true, 'id' => $newId]);
             exit;
         }
         if ($isAjax) {
@@ -307,7 +307,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 render:
 $clientList = [];
-$crs = $conn->query("SELECT client_id, name FROM client ORDER BY name");
+$hideSql = (empty($appSettings['show_hidden']) || $appSettings['show_hidden'] !== '1') ? ' WHERE hide_flag = 0' : '';
+$crs = $conn->query("SELECT client_id, name FROM client" . $hideSql . " ORDER BY name");
 if ($crs) while ($cr = $crs->fetch_assoc()) $clientList[] = ['id' => (int)$cr['client_id'], 'name' => (string)$cr['name']];
 
 $storeList = [];
@@ -346,7 +347,8 @@ $stateOptions = ['Черновик', 'Выставлен', 'Оплачен', 'О
 function dv($v) { return fmt_num($v, 3); }
 
 $inv2ProductList = [];
-$pr = $conn->query("SELECT product_id, product_name, code FROM product ORDER BY product_name");
+$hideSql = (empty($appSettings['show_hidden']) || $appSettings['show_hidden'] !== '1') ? ' WHERE hide_flag = 0' : '';
+$pr = $conn->query("SELECT product_id, product_name, code FROM product" . $hideSql . " ORDER BY product_name");
 if ($pr) while ($p = $pr->fetch_assoc()) {
     $inv2ProductList[] = ['id' => (int)$p['product_id'], 'name' => $p['product_name']];
 }
@@ -358,7 +360,7 @@ $inv2Table = new EmbeddedTable([
     'childFormUrl' => 'invoice2_form.php' . ($invoiceIsOffer ? '?kind=offer' : ''),
     'columnResizeUrl' => 'invoice_column_width_save.php',
     'columnResizeTbl' => 'invoice2',
-    'colWidths' => array_merge(['quant' => '100px', 'price' => '100px', 'discount' => '100px', 'sum' => '100px'], load_columns_widths($conn, 'invoice2')),
+    'colWidths' => array_merge(['quant' => '100px', 'price' => '100px', 'discount' => '100px', 'sum' => '100px', 'sum_nds' => '80px'], load_columns_widths($conn, 'invoice2')),
     'childFormName' => 'Invoice2Form',
     'pageSize' => 15,
     'hasExport' => true,
@@ -373,6 +375,7 @@ $inv2Table = new EmbeddedTable([
         ['name' => 'price', 'label' => 'Цена', 'type' => 'text'],
         ['name' => 'discount', 'label' => 'Скидка', 'type' => 'text'],
         ['name' => 'sum', 'label' => 'Сумма', 'type' => 'text', 'readonly' => true],
+        ['name' => 'sum_nds', 'label' => 'НДС', 'type' => 'text', 'readonly' => true],
         ['name' => 'note', 'label' => 'Примечание', 'type' => 'textarea'],
     ],
     'columnLabels' => [
@@ -381,6 +384,7 @@ $inv2Table = new EmbeddedTable([
         'price' => 'Цена',
         'discount' => 'Скидка',
         'sum' => 'Сумма',
+        'sum_nds' => 'НДС',
         'note' => 'Примечание',
     ],
     'lookupData' => ['product_id' => $inv2ProductList],
@@ -391,8 +395,11 @@ $platTable = new EmbeddedTable([
     'prefix' => 'plat',
     'saveUrl' => 'plat_field_save.php',
     'parentField' => 'doc_id',
-    'childFormUrl' => 'plat_form.php?doc_type=' . $invoiceDoctypeId,
+    'childFormUrl' => 'plat_form.php?doc_type=' . $invoiceDoctypeId . '&client_id=' . $values['client_id'] . '&sotr_id=' . $CurSotrID . '&zat_id=' . $zatIdForPlat . '&sum_in=' . urlencode(max(0, (float)$values['sum'] - (float)$values['sum_plat'])),
     'childFormName' => 'PlatForm',
+    'colWidths' => ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'out_flag' => '80px', 'note' => 'auto'],
+    'columnResizeUrl' => 'plat_column_width_save.php',
+    'columnResizeTbl' => 'plat',
     'pageSize' => 15,
     'hasExport' => true,
     'hasPrint' => true,
@@ -516,6 +523,7 @@ ob_start();
             ]) ?></td>
         <td>&nbsp;</td>
       </tr>
+<?php if ((int)($appSettings['nds_rate'] ?? 22) != 0): ?>
       <tr>
         <td class="form-label" colspan="3">Сумма НДС</td>
       </tr>
@@ -527,6 +535,7 @@ ob_start();
                 'style' => 'max-width:120px',
             ]) ?></td>
       </tr>
+<?php endif; ?>
       <tr>
         <td class="form-label">Сумма оплаты</td>
         <td class="form-label">Дата оплаты</td>
@@ -669,7 +678,11 @@ textarea.full { width: 100%; box-sizing: border-box; }
            render_btn_primary('img/save.png', 'Сохранить', ['type'=>'submit','formnovalidate'=>true]),
            render_btn_link_icon_text('img/cancel.png', 'Отменить', $formCancelUrl, ['class'=>'btn-secondary'])]
 ) ?>
+<?php if ($mode === 'new' && $id <= 0): ?>
+<input type="hidden" name="auto_save_ready" value="1" />
+<?php endif; ?>
 </form>
+<script>if(typeof FormModalCore!=='undefined'&&FormModalCore.initTabAutoSave)FormModalCore.initTabAutoSave([1,2]);</script>
 <?php
 $formHtml = ob_get_clean();
 

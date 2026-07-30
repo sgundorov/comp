@@ -22,8 +22,8 @@ function recalc_group_pos(mysqli $conn, int $groupId): void {
 }
 
 if ($field === '_list') {
-    $stmt = $conn->prepare("SELECT sgroup_id AS id, name, note FROM sgroup WHERE group_id = ? ORDER BY sgroup_id ASC");
-    $stmt->bind_param('i', $groupId);
+    $stmt = $conn->prepare("SELECT sgroup_id AS id, name, note FROM sgroup WHERE group_id = ? AND service_flag = (SELECT service_flag FROM `group` WHERE group_id = ?) ORDER BY sgroup_id ASC");
+    $stmt->bind_param('ii', $groupId, $groupId);
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -45,8 +45,18 @@ if ($field === '_delete') {
     $stmt->execute();
     $stmt->close();
     if ($delGroupId > 0) recalc_group_pos($conn, $delGroupId);
+    $freshList = [];
+    if ($delGroupId > 0) {
+        $lStmt = $conn->prepare("SELECT sgroup_id AS id, name, note FROM sgroup WHERE group_id = ? AND service_flag = (SELECT service_flag FROM `group` WHERE group_id = ?) ORDER BY sgroup_id ASC");
+        if ($lStmt) {
+            $lStmt->bind_param('ii', $delGroupId, $delGroupId);
+            $lStmt->execute();
+            $freshList = $lStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $lStmt->close();
+        }
+    }
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['ok' => true, '_deleted' => true, 'id' => $id, 'group_id' => $delGroupId]);
+    echo json_encode(['ok' => true, '_deleted' => true, 'id' => $id, 'group_id' => $delGroupId, 'sgroup_list' => $freshList]);
     exit;
 }
 
@@ -81,8 +91,13 @@ if ($id > 0) {
         if ($groupId > 0) recalc_group_pos($conn, $groupId);
     }
 } else {
-    $stmt = $conn->prepare("INSERT INTO sgroup (group_id, $field) VALUES (?, ?)");
-    $stmt->bind_param($ALLOWED[$field]['type'] === 'text' ? 'is' : 'id', $groupId, $val);
+    $parentSf = '0';
+    if ($groupId > 0) {
+        $sfR = $conn->query("SELECT service_flag FROM `group` WHERE group_id = $groupId");
+        if ($sfR && $sfRow = $sfR->fetch_assoc()) $parentSf = (string)$sfRow['service_flag'];
+    }
+    $stmt = $conn->prepare("INSERT INTO sgroup (group_id, service_flag, $field) VALUES (?, ?, ?)");
+    $stmt->bind_param($ALLOWED[$field]['type'] === 'text' ? 'iss' : 'isd', $groupId, $parentSf, $val);
     $stmt->execute();
     $newId = (int)$conn->insert_id;
     $stmt->close();

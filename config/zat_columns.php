@@ -6,7 +6,7 @@ if (!defined('ZAT_COLUMNS_LOADED')) {
         return [
             ['name' => 'id',      'label' => 'ID',          'sort_expr' => 'z.zat_id',    'search' => true,  'filter' => false, 'export' => true, 'param' => null, 'readonly' => true],
             ['name' => 'name',    'label' => 'Операция',    'sort_expr' => 'z.name',      'search' => true,  'filter' => false, 'export' => true, 'param' => null],
-            ['name' => 'out_flag', 'label' => 'Расход',      'sort_expr' => 'z.out_flag',   'search' => false, 'filter' => false, 'export' => true, 'param' => null],
+            ['name' => 'out_flag', 'label' => 'Тип',      'sort_expr' => 'z.out_flag',   'search' => false, 'filter' => false, 'export' => true, 'param' => null],
             ['name' => 'note',    'label' => 'Примечание',  'sort_expr' => 'z.note',      'search' => true,  'filter' => false, 'export' => true, 'param' => null],
         ];
     }

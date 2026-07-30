@@ -12,18 +12,22 @@ $id   = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
 $ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 $isReadonly = ($mode === 'delete');
 $errors = [];
+$serviceMode = (string)($_POST['type'] ?? $_GET['type'] ?? 'product');
+if (!in_array($serviceMode, ['product', 'service'], true)) $serviceMode = 'product';
+$isService = ($serviceMode === 'service');
+$serviceFlag = $isService ? '1' : '0';
 
 $categList = [];
 $stmt = @$conn->prepare("SELECT categ_id, categ AS name FROM categ ORDER BY categ");
 if ($stmt) { $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $categList[] = ['id' => (int)$r['categ_id'], 'name' => (string)$r['name']]; $stmt->close(); }
 
 $groupList = [];
-$stmt = @$conn->prepare("SELECT group_id, name FROM `group` ORDER BY name");
-if ($stmt) { $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $groupList[] = ['id' => (int)$r['group_id'], 'name' => (string)$r['name']]; $stmt->close(); }
+$stmt = @$conn->prepare("SELECT group_id, name FROM `group` WHERE service_flag = ? ORDER BY name");
+if ($stmt) { $stmt->bind_param('s', $serviceFlag); $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $groupList[] = ['id' => (int)$r['group_id'], 'name' => (string)$r['name']]; $stmt->close(); }
 
 $sgroupList = [];
-$stmt = @$conn->prepare("SELECT sgroup_id, name FROM sgroup ORDER BY name");
-if ($stmt) { $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $sgroupList[] = ['id' => (int)$r['sgroup_id'], 'name' => (string)$r['name']]; $stmt->close(); }
+$stmt = @$conn->prepare("SELECT sgroup_id, name, group_id FROM sgroup WHERE service_flag = ? ORDER BY name");
+if ($stmt) { $stmt->bind_param('s', $serviceFlag); $stmt->execute(); $res = $stmt->get_result(); if ($res) while ($r = $res->fetch_assoc()) $sgroupList[] = ['id' => (int)$r['sgroup_id'], 'name' => (string)$r['name'], 'group_id' => (int)$r['group_id']]; $stmt->close(); }
 
 $countryList = [];
 $stmt = @$conn->prepare("SELECT country_id, country AS name FROM country ORDER BY country");
@@ -65,6 +69,7 @@ function getUnitName($conn, $id) {
 $values = [
     'product_id'    => 0,
     'product_name'  => '',
+    'code'          => '',
     'article'       => '',
     'categ_id'      => 0,
     'group_id'      => 0,
@@ -78,6 +83,7 @@ $values = [
     'note'          => '',
     'noquant_flag'  => 0,
     'hide_flag'     => 0,
+    'service_flag'  => 0,
     'site'          => '',
     'description'   => '',
     'photo'         => '',
@@ -133,6 +139,7 @@ if ($values['product_id'] > 0) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['product_name'] = (string)($_POST['product_name'] ?? '');
+    $values['code']         = (string)($_POST['code'] ?? '');
     $values['article']      = (string)($_POST['article'] ?? '');
     $values['categ_id']     = (int)($_POST['categ_id'] ?? 0);
     $values['group_id']     = (int)($_POST['group_id'] ?? 0);
@@ -140,12 +147,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['country_id']   = (int)($_POST['country_id'] ?? 0);
     $values['izgot_id']     = (int)($_POST['izgot_id'] ?? 0);
     $values['unit_id']      = (int)($_POST['unit_id'] ?? 0);
-    $values['residue']      = str_replace(',', '.', (string)($_POST['residue'] ?? '0'));
-    $values['price_in']     = str_replace(',', '.', (string)($_POST['price_in'] ?? '0'));
-    $values['price_out']    = str_replace(',', '.', (string)($_POST['price_out'] ?? '0'));
+    $values['residue']      = (float)(str_replace(',', '.', (string)($_POST['residue'] ?? '0')));
+    $values['price_in']     = (float)(str_replace(',', '.', (string)($_POST['price_in'] ?? '0')));
+    $values['price_out']    = (float)(str_replace(',', '.', (string)($_POST['price_out'] ?? '0')));
     $values['note']         = (string)($_POST['note'] ?? '');
     $values['noquant_flag'] = (int)(!empty($_POST['noquant_flag']));
     $values['hide_flag']    = (int)(!empty($_POST['hide_flag']));
+    $values['service_flag'] = $isService ? 1 : 0;
     $values['site']         = (string)($_POST['site'] ?? '');
     $values['description']  = (string)($_POST['description'] ?? '');
 
@@ -200,57 +208,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $values['photo'] = $photo;
 
         if ($mode === 'delete') {
-        $stmt = @$conn->prepare("DELETE FROM product WHERE product_id = ?");
+        $stmt = $conn->prepare("DELETE FROM product WHERE product_id = ?");
         if ($stmt) {
             $stmt->bind_param('i', $id);
-            $stmt->execute();
+            $ok = $stmt->execute();
+            $stmtErr = $stmt->error;
             $stmt->close();
-            if ($ajax) {
-                ob_clean();
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'mode' => 'delete', 'id' => $id], JSON_UNESCAPED_UNICODE);
-                exit;
+            if ($ok) {
+                if ($ajax) {
+                    ob_clean();
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => true, 'mode' => 'delete', 'id' => $id], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            } else {
+                $errors[] = 'Ошибка БД: ' . ($stmtErr ?: mysqli_error($conn) ?: 'неизвестная ошибка');
             }
+        } else {
+            $errors[] = 'Ошибка подготовки запроса: ' . mysqli_error($conn);
         }
     } elseif ($mode === 'new' || $mode === 'copy') {
         $baseInsertName = trim($values['product_name']);
         $values['product_name'] = $baseInsertName;
+        if ($values['code'] === '') $values['code'] = '0';
         $insertCounter = 1;
-        $stmt = @$conn->prepare("INSERT INTO product (product_name, article, categ_id, group_id, sgroup_id, country_id, izgot_id, unit_id, residue, price_in, price_out, note, noquant_flag, hide_flag, site, description, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $conn->prepare("INSERT INTO product (product_name, code, article, categ_id, group_id, sgroup_id, country_id, izgot_id, unit_id, residue, price_in, price_out, note, noquant_flag, hide_flag, service_flag, site, description, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         if ($stmt) {
+            $saved = false;
             do {
-                bind_auto($stmt, [$values['product_name'], $values['article'],
+                bind_auto($stmt, [$values['product_name'], $values['code'], $values['article'],
                     $values['categ_id'], $values['group_id'], $values['sgroup_id'], $values['country_id'],
                     $values['izgot_id'], $values['unit_id'],
                     $values['residue'], $values['price_in'], $values['price_out'],
                     $values['note'],
                     $values['noquant_flag'], $values['hide_flag'],
+                    $values['service_flag'],
                     $values['site'], $values['description'], $values['photo']]);
-                $stmt->execute();
+                $ok = $stmt->execute();
                 $dup = (mysqli_errno($conn) === 1062);
                 if ($dup) {
                     $values['product_name'] = $baseInsertName . ' (' . $insertCounter . ')';
                     $insertCounter++;
+                } elseif ($ok) {
+                    $saved = true;
                 }
             } while ($dup && $insertCounter < 100);
+            $stmtErr = $stmt->error;
             $newId = $stmt->insert_id;
             $stmt->close();
-            if ($ajax) {
-                $pageOfNew = computePageOfNew($conn, 'product', 'id', 'id', 'asc', $newId, $newId, 'service_flag = 0');
-                ob_clean();
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'mode' => 'new', 'id' => $newId, 'page' => $pageOfNew, 'product_name' => $values['product_name']], JSON_UNESCAPED_UNICODE);
-                exit;
+            if ($saved) {
+                if ($values['code'] === '0') {
+                    $conn->query("UPDATE product SET code = $newId WHERE product_id = $newId");
+                    $values['code'] = (string)$newId;
+                }
+                if ($ajax) {
+                    $pageOfNew = computePageOfNew($conn, 'product', 'id', 'id', 'asc', $newId, $newId, 'service_flag = ' . ($isService ? '1' : '0'));
+                    ob_clean();
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => true, 'mode' => 'new', 'id' => $newId, 'page' => $pageOfNew, 'product_name' => $values['product_name']], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            } else {
+                $errors[] = 'Ошибка БД: ' . ($stmtErr ?: mysqli_error($conn) ?: 'неизвестная ошибка');
             }
+        } else {
+            $errors[] = 'Ошибка подготовки запроса: ' . mysqli_error($conn);
         }
     } elseif ($mode === 'edit') {
         $baseEditName = trim($values['product_name']);
         $values['product_name'] = $baseEditName;
+        if ($values['code'] === '') $values['code'] = (string)$id;
         $editCounter = 1;
-        $stmt = @$conn->prepare("UPDATE product SET product_name=?, article=?, categ_id=?, group_id=?, sgroup_id=?, country_id=?, izgot_id=?, unit_id=?, residue=?, price_in=?, price_out=?, note=?, noquant_flag=?, hide_flag=?, site=?, description=?, photo=? WHERE product_id=?");
+        $stmt = $conn->prepare("UPDATE product SET product_name=?, code=?, article=?, categ_id=?, group_id=?, sgroup_id=?, country_id=?, izgot_id=?, unit_id=?, residue=?, price_in=?, price_out=?, note=?, noquant_flag=?, hide_flag=?, site=?, description=?, photo=? WHERE product_id=?");
         if ($stmt) {
+            $saved = false;
             do {
-                bind_auto($stmt, [$values['product_name'], $values['article'],
+                bind_auto($stmt, [$values['product_name'], $values['code'], $values['article'],
                     $values['categ_id'], $values['group_id'], $values['sgroup_id'], $values['country_id'],
                     $values['izgot_id'], $values['unit_id'],
                     $values['residue'], $values['price_in'], $values['price_out'],
@@ -258,36 +291,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $values['noquant_flag'], $values['hide_flag'],
                     $values['site'], $values['description'], $values['photo'],
                     $id]);
-                $stmt->execute();
+                $ok = $stmt->execute();
                 $dup = (mysqli_errno($conn) === 1062);
                 if ($dup) {
                     $values['product_name'] = $baseEditName . ' (' . $editCounter . ')';
                     $editCounter++;
+                } elseif ($ok) {
+                    $saved = true;
                 }
             } while ($dup && $editCounter < 100);
+            $stmtErr = $stmt->error;
             $stmt->close();
-            if ($ajax) {
-                ob_clean();
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'mode' => 'edit', 'id' => $id, 'product_name' => $values['product_name']], JSON_UNESCAPED_UNICODE);
-                exit;
+            if ($saved) {
+                if ($ajax) {
+                    ob_clean();
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => true, 'mode' => 'edit', 'id' => $id, 'product_name' => $values['product_name']], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            } else {
+                $errors[] = 'Ошибка БД: ' . ($stmtErr ?: mysqli_error($conn) ?: 'неизвестная ошибка');
             }
+        } else {
+            $errors[] = 'Ошибка подготовки запроса: ' . mysqli_error($conn);
         }
     }
     if (!$ajax) {
-        header('Location: tmc.php');
+        header('Location: tmc.php' . ($isService ? '?type=service' : ''));
         exit;
     }
     }
 }
 
 $name = $values['product_name'] !== '' ? $values['product_name'] : '(без названия)';
+$formLabel = $isService ? 'Услуга' : 'Товар';
 $pageTitle = match ($mode) {
-    'new'    => 'Товар (новый)',
-    'edit'   => "Товар: $name",
-    'copy'   => "Товар: $name (копия)",
-    'delete' => "Товар: $name (удаление)",
-    default  => 'Товар',
+    'new'    => "$formLabel (новый)",
+    'edit'   => "$formLabel: $name",
+    'copy'   => "$formLabel: $name (копия)",
+    'delete' => "$formLabel: $name (удаление)",
+    default  => $formLabel,
 };
 
 $categName = $values['categ_id'] > 0 ? getCategName($conn, $values['categ_id']) : '';
@@ -322,9 +365,10 @@ if (!$ajax):
 </head>
 <body>
 <?php endif; ?>
-<h2 class="page-title<?= $mode === 'delete' ? ' page-title--delete' : '' ?>"><img src="img/tmc.png" alt="" /> <?= h($pageTitle) ?></h2>
+<h2 class="page-title<?= $mode === 'delete' ? ' page-title--delete' : '' ?>"><img src="img/<?= $isService ? 'uslug' : 'tmc' ?>.png" alt="" /> <?= h($pageTitle) ?></h2>
 <form class="form" method="post" action="tmc_form.php" enctype="multipart/form-data" data-form-modal style="max-width:790px !important">
 <input type="hidden" name="mode" value="<?= h($mode) ?>" />
+<input type="hidden" name="type" value="<?= h($serviceMode) ?>" />
 <?php if ($id > 0): ?><input type="hidden" name="id" value="<?= (int)$id ?>" /><?php endif; ?>
 
 <?php foreach ($errors as $e): ?>
@@ -335,14 +379,16 @@ if (!$ajax):
   <div class="tab-headers">
     <div class="tab-header active" data-tab-index="0">Параметры</div>
     <div class="tab-header" data-tab-index="1">Прочее</div>
+    <?php if (!$isService): ?>
     <div class="tab-header" data-tab-index="2">Остатки</div>
-    <div class="tab-header" data-tab-index="3">История</div>
+    <?php endif; ?>
+    <div class="tab-header" data-tab-index="<?= $isService ? '2' : '3' ?>">История</div>
   </div>
 
   <div class="tab-pane active" data-tab-index="0">
     <table class="form-table">
       <tr>
-        <td class="form-label" colspan="3">Наименование</td>
+        <td class="form-label" colspan="3">Наименование *</td>
       </tr>
       <tr>
         <td colspan="3"><?= render_input('text', 'product_name', $values['product_name'], ['class' => 'full', 'id' => 'tmc-name', 'required' => !$isReadonly]) ?></td>
@@ -358,17 +404,18 @@ if (!$ajax):
         <td><?= render_lookup('sgroup', 'sgroup_id', $values['sgroup_id'], $sgroupName, h(json_encode($sgroupList, JSON_UNESCAPED_UNICODE)), 'sgroup_form.php?mode=new', $isReadonly, ['id' => 'tmc-sgroup']) ?></td>
       </tr>
       <tr>
+        <td class="form-label">Штрихкод</td>
         <td class="form-label">Артикул</td>
-        <td class="form-label" colspan="2">&nbsp;</td>
+        <td class="form-label">&nbsp;</td>
       </tr>
-      <tr>
+      <tr class="col-3">
+        <td><?= render_input('text', 'code', $values['code'], ['id' => 'tmc-code']) ?></td>
         <td><?= render_input('text', 'article', $values['article'], ['id' => 'tmc-article']) ?></td>
-        <td colspan="2">
+        <td>
           <label><input type="checkbox" name="hide_flag" value="1"<?= $values['hide_flag'] ? ' checked' : '' ?><?= $isReadonly ? ' disabled' : '' ?> /> Не показывать</label>
-          &nbsp;
-          <label><input type="checkbox" name="noquant_flag" value="1"<?= $values['noquant_flag'] ? ' checked' : '' ?><?= $isReadonly ? ' disabled' : '' ?> /> Без количества</label>
         </td>
       </tr>
+      <?php if (!$isService): ?>
       <tr>
         <td class="form-label">Производитель</td>
         <td class="form-label">Страна</td>
@@ -379,26 +426,31 @@ if (!$ajax):
         <td><?= render_lookup('country', 'country_id', $values['country_id'], $countryName, h(json_encode($countryList, JSON_UNESCAPED_UNICODE)), 'country_form.php?mode=new', $isReadonly, ['id' => 'tmc-country']) ?></td>
         <td><?= render_input('text', 'site', $values['site'], ['id' => 'tmc-site']) ?></td>
       </tr>
+      <?php endif; ?>
       <tr>
         <td class="form-label">Закупочная цена</td>
         <td class="form-label">Розничная цена</td>
         <td>&nbsp;</td>
       </tr>
       <tr class="col-3">
-        <td><?= render_input('text', 'price_in', $values['price_in'], ['id' => 'tmc-price_in', 'class' => 'num']) ?></td>
-        <td><?= render_input('text', 'price_out', $values['price_out'], ['id' => 'tmc-price_out', 'class' => 'num']) ?></td>
+        <td><?= render_input('text', 'price_in', $values['price_in'] == 0 ? '' : $values['price_in'], ['id' => 'tmc-price_in', 'class' => 'num']) ?></td>
+        <td><?= render_input('text', 'price_out', $values['price_out'] == 0 ? '' : $values['price_out'], ['id' => 'tmc-price_out', 'class' => 'num']) ?></td>
         <td>&nbsp;</td>
       </tr>
+      <?php if (!$isService): ?>
       <tr>
         <td class="form-label">Количество</td>
         <td class="form-label">Единица измерения</td>
         <td>&nbsp;</td>
       </tr>
       <tr class="col-3">
-        <td><?= render_input('text', 'residue', $values['residue'], ['id' => 'tmc-residue', 'class' => 'num']) ?></td>
+        <td><?php $residueRaw = (float)($values['residue'] ?? 0); $residueDisp = $residueRaw == 0 ? '' : ($residueRaw == (int)$residueRaw ? (string)(int)$residueRaw : rtrim(rtrim(number_format($residueRaw, 3, '.', ''), '0'), '.')); ?><?= render_input('text', 'residue', $residueDisp, ['id' => 'tmc-residue', 'class' => 'num', 'readonly' => true]) ?></td>
         <td><?= render_lookup('unit', 'unit_id', $values['unit_id'], $unitName, h(json_encode($unitList, JSON_UNESCAPED_UNICODE)), 'unit_form.php?mode=new', $isReadonly, ['id' => 'tmc-unit']) ?></td>
-        <td>&nbsp;</td>
+        <td>
+          <label><input type="checkbox" name="noquant_flag" value="1"<?= $values['noquant_flag'] ? ' checked' : '' ?><?= $isReadonly ? ' disabled' : '' ?> /> Без количества</label>
+        </td>
       </tr>
+      <?php endif; ?>
       <tr>
         <td class="form-label" colspan="3">Примечание</td>
       </tr>
@@ -463,6 +515,7 @@ if (!$ajax):
     </table>
   </div>
 
+  <?php if (!$isService): ?>
   <div class="tab-pane" data-tab-index="2">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <button type="button" class="btn-secondary" id="recalc-residue-btn" title="Пересчитать"><img src="img/refresh.png" alt="" /> Пересчет</button>
@@ -493,18 +546,24 @@ if (!$ajax):
       </table>
     </div>
   </div>
+  <?php endif; ?>
 
-  <div class="tab-pane" data-tab-index="3">
+  <div class="tab-pane" data-tab-index="<?= $isService ? '2' : '3' ?>">
     <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <input type="text" id="history-search" placeholder="Поиск…" style="width:160px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;" />
       <label style="font-size:12px;color:var(--muted)">Период с</label>
-      <input type="date" id="history-date-from" style="padding:4px 6px;border:1px solid var(--line);border-radius:4px;" />
+      <input type="date" id="history-date-from" class="history-filter-input" />
       <label style="font-size:12px;color:var(--muted)">по</label>
-      <input type="date" id="history-date-to" style="padding:4px 6px;border:1px solid var(--line);border-radius:4px;" />
+      <input type="date" id="history-date-to" class="history-filter-input" />
       <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer">
         <input type="checkbox" id="history-approved" /> Утверждённые
       </label>
+      <input type="text" id="history-search" placeholder="Поиск…" class="history-filter-input" style="margin-left:auto;width:160px" />
     </div>
+    <style>
+      .history-filter-input { height:28px; padding:0 6px; border:1px solid var(--line); border-radius:4px; box-sizing:border-box; font-size:13px; font-family:inherit; color:var(--input-text); background:var(--input-bg); }
+      .history-filter-input:focus { border-color:var(--accent); outline:none; box-shadow:0 0 0 2px rgba(230,126,34,.2); }
+      .search-hl { background:#e67e22; color:#fff; border-radius:2px; padding:0 1px; }
+    </style>
     <div id="history-wrap" style="max-height:300px;border:1px solid var(--line);border-radius:4px;overflow-y:auto;">
       <table class="data-table" id="history-table" style="min-width:auto;">
         <colgroup>
@@ -517,7 +576,7 @@ if (!$ajax):
           <col style="width:80px" data-resizable />
           <col style="width:60px" data-resizable />
           <col style="width:80px" data-resizable />
-          <col style="width:auto" data-resizable />
+          <col style="min-width:300px" data-resizable />
         </colgroup>
         <thead style="position:sticky;top:0;z-index:1;background:#1f2c3a;color:#ffe9a8;">
           <tr>
@@ -563,11 +622,12 @@ if (!$ajax):
 </div>
 
 <?php
+$cancelUrl = 'tmc.php' . ($isService ? '?type=service' : '');
 $actions = $isReadonly
     ? [render_btn_danger('img/delete.png', 'Удалить', ['type'=>'submit','formnovalidate'=>true]),
-       render_btn_link_icon_text('img/cancel.png', 'Отменить', 'tmc.php', ['class'=>'btn-secondary'])]
+       render_btn_link_icon_text('img/cancel.png', 'Отменить', $cancelUrl, ['class'=>'btn-secondary'])]
     : [render_btn_primary('img/save.png', 'Сохранить', ['type'=>'submit','formnovalidate'=>true]),
-       render_btn_link_icon_text('img/cancel.png', 'Отменить', 'tmc.php', ['class'=>'btn-secondary'])];
+       render_btn_link_icon_text('img/cancel.png', 'Отменить', $cancelUrl, ['class'=>'btn-secondary'])];
 echo render_form_actions($actions);
 ?>
 </form>
@@ -644,7 +704,26 @@ echo render_form_actions($actions);
         if (dFrom && cellDate < dFrom) matchDate = false;
         if (dTo && cellDate > dTo) matchDate = false;
       }
-      tr.style.display = (matchSearch && matchApproved && matchDate) ? '' : 'none';
+      var visible = matchSearch && matchApproved && matchDate;
+      tr.style.display = visible ? '' : 'none';
+      if (visible && st) {
+        Array.from(tr.children).forEach(function (td, idx) {
+          if (idx === 0) return;
+          var orig = td.getAttribute('data-orig-html');
+          if (!orig) { td.setAttribute('data-orig-html', td.innerHTML); orig = td.innerHTML; }
+          td.innerHTML = orig;
+          var txt = td.textContent;
+          if (txt.toLowerCase().indexOf(st) >= 0) {
+            var re = new RegExp('(' + st.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+            td.innerHTML = td.innerHTML.replace(re, '<span class="search-hl">$1</span>');
+          }
+        });
+      } else if (!st) {
+        Array.from(tr.children).forEach(function (td) {
+          var orig = td.getAttribute('data-orig-html');
+          if (orig) td.innerHTML = orig;
+        });
+      }
     });
   }
 
@@ -727,7 +806,7 @@ echo render_form_actions($actions);
 <style>
 .form-modal { max-width: 790px !important; }
 .form { max-width: 790px; }
-.tab-container { margin-bottom: 16px; }
+.tab-container { margin-bottom: 4px; }
 .tab-headers { display: flex; border-bottom: 2px solid var(--accent); margin-bottom: 12px; }
 .tab-header {
   padding: 8px 20px; cursor: pointer; font-size: 14px; font-weight: bold;
@@ -746,6 +825,8 @@ echo render_form_actions($actions);
 input.num { width: 120px; text-align: right; }
 input.full { width: 100%; box-sizing: border-box; }
 textarea.full { width: 100%; box-sizing: border-box; }
+.form-note { margin: 2px 0 2px; }
+.form-actions--bottom { margin-top: 2px; }
 </style>
 <script>
 document.querySelectorAll('[data-lookup]:not([data-lookup-bound])').forEach(function(root){

@@ -860,7 +860,7 @@ if (!defined('TABLEPAGE_LOADED')) {
                         $ph = implode(',', array_fill(0, count($names), '?'));
                         $this->appendWhere("$colExpr IN ($ph)", $names, str_repeat('s', count($names)));
                     }
-                    $label = $cfg['label'] ?? $this->colMeta[$col]['label'] ?? $col;
+                    $label = $this->colMeta[$col]['label'] ?? $cfg['label'] ?? $col;
                     $this->filters[] = ['kind' => 'col_filter', 'text' => "$label = " . implode(', ', $names), 'clear' => $param];
                 } elseif (isset($cfg['table'])) {
                     $ids = array_values(array_filter(array_map('intval', explode(',', $raw)), fn($v) => $v > 0));
@@ -882,7 +882,7 @@ if (!defined('TABLEPAGE_LOADED')) {
                         if ($res) while ($r = $res->fetch_assoc()) $names[] = (string)$r['name'];
                         $stmt->close();
                     }
-                    $label = $cfg['label'] ?? $this->colMeta[$col]['label'] ?? $col;
+                    $label = $this->colMeta[$col]['label'] ?? $cfg['label'] ?? $col;
                     $this->filters[] = ['kind' => 'col_filter', 'text' => "$label = " . (count($names) > 0 ? implode(', ', $names) : implode(',', $ids)), 'clear' => $param];
                 }
             }
@@ -924,7 +924,7 @@ if (!defined('TABLEPAGE_LOADED')) {
 #login-overlay .login-box h2{margin:-32px -40px 20px;padding:10px 12px;background:#1f2c3a;color:#ffe9a8;font-size:22px;font-weight:700;line-height:1.1;border-bottom:2px solid #2a3a4b;border-radius:8px 8px 0 0;user-select:none}
 #login-overlay .login-box .field{margin-bottom:14px}
 #login-overlay .login-box .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
-#login-overlay .login-box .field input{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-size:14px;color:var(--input-text);background:var(--input-bg)}
+#login-overlay .login-box .field input{width:100%;box-sizing:border-box;height:24px;padding:0 6px;border:1px solid var(--border);border-radius:1px;font-size:14px;font-family:inherit;color:var(--input-text);background:var(--input-bg)}
 #login-overlay .login-box .field input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(230,126,34,.2)}
 #login-overlay .login-box .actions{display:flex;gap:18px;justify-content:center;margin-top:20px}
 #login-overlay .login-box .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;padding:8px 24px}
@@ -948,7 +948,7 @@ if (!defined('TABLEPAGE_LOADED')) {
   var loginInput = document.getElementById('login-login');
   var passInput = document.getElementById('login-password');
   var errEl = document.getElementById('login-error');
-  function showError(msg) { errEl.textContent = msg; errEl.style.display = ''; }
+  function showError(msg) { errEl.textContent = msg; errEl.style.display = 'block'; }
   function hideError() { errEl.style.display = 'none'; }
   function doLogin() {
     var l = loginInput.value.trim();
@@ -964,7 +964,7 @@ if (!defined('TABLEPAGE_LOADED')) {
       .catch(function(){ showError('Ошибка соединения'); });
   }
   document.getElementById('login-submit').addEventListener('click', doLogin);
-  loginInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') passInput.focus(); });
+  loginInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
   passInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
   loginInput.focus();
 })();
@@ -1038,6 +1038,7 @@ if (!defined('TABLEPAGE_LOADED')) {
         public function renderToolbar(array $options = []): void {
             $formPrefix = $options['formPrefix'] ?? $this->formPrefix;
             $extraLeftHtml = $options['extraLeftHtml'] ?? '';
+            $afterPrintHtml = $options['afterPrintHtml'] ?? '';
 
             $extraExportParams = $options['extraExportParams'] ?? [];
             if (!array_key_exists('extraExportParams', $options)) {
@@ -1078,6 +1079,7 @@ if (!defined('TABLEPAGE_LOADED')) {
         <button class="icon-btn" type="button" title="Печать"><img src="img/print.png" alt="" /></button>
         <div class="dropdown-menu"><?= $printDropdownHtml ?></div>
       </div>
+      <?= $afterPrintHtml ?>
       <div class="dropdown selected-actions<?= $marksCount > 0 ? ' visible' : '' ?>" id="selectedActions">
         <button class="menu-btn" type="button" title="Действия с выбранными">
           <span id="selectedCount">Выбрано <?= (int)$marksCount ?></span>
@@ -1152,7 +1154,8 @@ if (!defined('TABLEPAGE_LOADED')) {
     <?php foreach ($this->visibleColumns as $vc):
         $cn = $vc['name'];
         $savedW = $this->columnWidths[$cn] ?? null;
-        $w = $savedW !== null ? $savedW . 'px' : ($defaultWidths[$cn] ?? '150px');
+        $dflt = $defaultWidths[$cn] ?? '150px';
+        $w = $savedW !== null ? $savedW . 'px' : (is_numeric($dflt) ? $dflt . 'px' : $dflt);
     ?>
       <col class="col-<?= h($cn) ?>" style="width: <?= $w ?>;" />
     <?php endforeach; ?>
@@ -2431,7 +2434,9 @@ if (!empty($cfInit)): ?>
     <?php endif; ?>
     })();
 
+<?php if ($columnResizeUrl): ?>
     ColumnResize.init({ saveUrl: '<?= h($columnResizeUrl) ?>', tbl: '<?= h($tableKey) ?>', selector: 'table.data-table' });
+<?php endif; ?>
     </script>
 <?php
     if ($extraCode) {

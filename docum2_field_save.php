@@ -22,29 +22,35 @@ function _fmt_qty($v) { return fmt_num($v, 3); }
 function _fmt_d2($v, $dec) { return fmt_num($v, $dec); }
 
 function recalc_docum_totals(mysqli $conn, int $documId): array {
-    $stmt = $conn->prepare("SELECT COALESCE(SUM(sum),0), COALESCE(SUM(sum_discount),0), COUNT(*) FROM docum2 WHERE docum_id = ?");
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(sum),0), COALESCE(SUM(sum_discount),0), COALESCE(SUM(sum_nds),0), COUNT(*) FROM docum2 WHERE docum_id = ?");
     $stmt->bind_param('i', $documId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_row();
     $stmt->close();
     $sum  = (float)$row[0];
     $sd   = (float)$row[1];
-    $pos  = (int)$row[2];
-    $spStmt = $conn->prepare("SELECT COALESCE(d.sum_plat,0), d.typeop, COALESCE(tp.prihod_flag,0) AS prihod_flag FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = ?");
+    $snds = (float)$row[2];
+    $pos  = (int)$row[3];
+    $spStmt = $conn->prepare("SELECT d.typeop, COALESCE(tp.prihod_flag,0) AS prihod_flag FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = ?");
     $spStmt->bind_param('i', $documId);
     $spStmt->execute();
     $spRow = $spStmt->get_result()->fetch_assoc();
     $spStmt->close();
-    $sumPlat = (float)($spRow['sum_plat'] ?? 0);
+    $typeop = (int)($spRow['typeop'] ?? 120);
     $prihodFlag = (int)($spRow['prihod_flag'] ?? 0);
+    $ps = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
+    $ps->bind_param('ii', $documId, $typeop);
+    $ps->execute();
+    $sumPlat = (float)$ps->get_result()->fetch_row()[0];
+    $ps->close();
     $sumPlatRed = $prihodFlag ? ($sum > -$sumPlat) : ($sumPlat < $sum);
     $sumBalans = $sum - $sumPlat;
-    $upd = $conn->prepare("UPDATE docum SET sum = ?, sum_discount = ?, pos = ?, sum_balans = ? WHERE docum_id = ?");
-    bind_auto($upd, [$sum, $sd, $pos, $sumBalans, $documId]);
+    $upd = $conn->prepare("UPDATE docum SET sum = ?, sum_discount = ?, pos = ?, sum_balans = ?, sum_plat = ? WHERE docum_id = ?");
+    bind_auto($upd, [$sum, $sd, $pos, $sumBalans, $sumPlat, $documId]);
     $upd->execute();
     $upd->close();
     $sumPlatFmt = _fmt_d2($sumPlat, 2);
-    return ['total_sum' => _fmt_d2($sum, 2), 'total_sum_discount' => _fmt_d2($sd, 2), 'pos' => $pos, 'sum_plat' => $sumPlatFmt, 'sum_plat_red' => $sumPlatRed];
+    return ['total_sum' => _fmt_d2($sum, 2), 'total_sum_discount' => _fmt_d2($sd, 2), 'total_sum_nds' => _fmt_d2($snds, 2), 'pos' => $pos, 'sum_plat' => $sumPlatFmt, 'sum_plat_red' => $sumPlatRed];
 }
 
 $field = $field === '' ? $action : $field;
@@ -58,10 +64,16 @@ if ($field === '_apply_discount') {
         exit;
     }
     check_docum_accepted($conn, $docId);
-    $stmt = $conn->prepare("UPDATE docum2 SET discount = ?, sum = quant * price * (1 - ? / 100), sum_discount = quant * price * (? / 100) WHERE docum_id = ?");
-    bind_auto($stmt, [$discount, $discount, $discount, $docId]);
+    $ndsRate = (int)($appSettings['nds_rate'] ?? 22);
+    $noNds   = ($appSettings['no_nds'] ?? '0') === '1';
+    $stmt = $conn->prepare("UPDATE docum2 SET discount = ?, sum = quant * price * (1 - ? / 100), sum_discount = quant * price * (? / 100), sum_nds = (CASE WHEN ? = 1 THEN quant * price * (1 - ? / 100) * ? / (100 + ?) ELSE quant * price * (1 - ? / 100) * ? / 100 END) WHERE docum_id = ?");
+    bind_auto($stmt, [$discount, $discount, $discount, $noNds ? 1 : 0, $discount, $ndsRate, $ndsRate, $discount, $ndsRate, $docId]);
     $stmt->execute();
     $stmt->close();
+    $hStmt = $conn->prepare("UPDATE docum SET discount = ? WHERE docum_id = ?");
+    $hStmt->bind_param('di', $discount, $docId);
+    $hStmt->execute();
+    $hStmt->close();
     $totals = recalc_docum_totals($conn, $docId);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array_merge(['ok' => true], $totals));
@@ -116,12 +128,12 @@ if ($field === '_list') {
         echo json_encode([]);
         exit;
     }
-    $stmt = $conn->prepare("SELECT docum2_id, product_id, code, product_name, quant, price, discount, sum, sum_discount, note FROM docum2 WHERE docum_id = ? ORDER BY docum2_id ASC");
+    $stmt = $conn->prepare("SELECT docum2_id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note FROM docum2 WHERE docum_id = ? ORDER BY docum2_id ASC");
     $stmt->bind_param('i', $dId);
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
-    $zeroFields = ['quant', 'price', 'discount', 'sum', 'sum_discount'];
+    $zeroFields = ['quant', 'price', 'discount', 'sum', 'sum_discount', 'sum_nds'];
     $out = array_map(function($r) use ($zeroFields) {
         $item = [
             'id' => (int)$r['docum2_id'],
@@ -133,6 +145,7 @@ if ($field === '_list') {
             'discount' => _fmt_d2($r['discount'], 1),
             'sum' => _fmt_d2($r['sum'], 2),
             'sum_discount' => _fmt_d2($r['sum_discount'], 2),
+            'sum_nds' => _fmt_d2($r['sum_nds'], 2),
             'note' => (string)$r['note'],
         ];
         foreach ($zeroFields as $f) {
@@ -163,6 +176,8 @@ if ($field === '_import_marked') {
         exit;
     }
     check_docum_accepted($conn, $dId);
+    $ndsRate = (int)($appSettings['nds_rate'] ?? 22);
+    $noNds   = ($appSettings['no_nds'] ?? '0') === '1';
     $discount = 0;
     $parentStoreId = 0;
     $dStmt = $conn->prepare("SELECT discount, store_id, typeop FROM docum WHERE docum_id = ?");
@@ -186,7 +201,7 @@ if ($field === '_import_marked') {
     $inserted = 0;
     if (!empty($ids)) {
         $pStmt = $conn->prepare("SELECT product_id, product_name, article, $priceCol AS price FROM product WHERE product_id = ?");
-        $iStmt = $conn->prepare("INSERT INTO docum2 (docum_id, product_id, code, product_name, quant, price, discount, sum, sum_discount, note, typeop, store_id) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, '', $parentTypeop, ?)");
+        $iStmt = $conn->prepare("INSERT INTO docum2 (docum_id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note, typeop, store_id) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, '', $parentTypeop, ?)");
         if (!$iStmt) {
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['ok' => false, 'error' => 'prepare failed: ' . $conn->error]);
@@ -202,7 +217,8 @@ if ($field === '_import_marked') {
                 $pname = (string)$pRow['product_name'];
                 $sum = $price * (1 - $discount / 100);
                 $sumDisc = $price * ($discount / 100);
-                bind_auto($iStmt, [$dId, $pid, $code, $pname, $price, $discount, $sum, $sumDisc, $parentStoreId]);
+                $sumNds = $noNds ? ($sum * $ndsRate / (100 + $ndsRate)) : ($sum * $ndsRate / 100);
+                bind_auto($iStmt, [$dId, $pid, $code, $pname, $price, $discount, $sum, $sumDisc, $sumNds, $parentStoreId]);
                 if (!$iStmt->execute()) {
                     header('Content-Type: application/json; charset=utf-8');
                     echo json_encode(['ok' => false, 'error' => 'insert failed: ' . $iStmt->error, 'sql' => $conn->error]);
@@ -244,6 +260,7 @@ $ALLOWED = [
     'discount'     => ['type' => 'decimal', 'decimals' => 1],
     'sum'          => ['type' => 'decimal', 'decimals' => 2],
     'sum_discount' => ['type' => 'decimal', 'decimals' => 2],
+    'sum_nds'      => ['type' => 'decimal', 'decimals' => 2],
     'note'         => ['type' => 'text'],
 ];
 
@@ -281,6 +298,26 @@ if ($docum2Id > 0) {
         case 'decimal':
             $value = str_replace(',', '.', $value);
             $valFloat = (float)$value;
+            if ($field === 'quant' && !empty($appSettings['neg_ost_flag']) && $appSettings['neg_ost_flag'] === '1') {
+                $d2 = $conn->query("SELECT docum_id, product_id FROM docum2 WHERE docum2_id = $docum2Id")->fetch_assoc();
+                $dId = $d2 ? (int)$d2['docum_id'] : 0;
+                $pid = $d2 ? (int)$d2['product_id'] : 0;
+                if ($dId > 0 && $pid > 0) {
+                    $nq = $conn->query("SELECT noquant_flag FROM product WHERE product_id = $pid")->fetch_assoc();
+                    if (!$nq || !(int)$nq['noquant_flag']) {
+                        $pf = $conn->query("SELECT COALESCE(tp.prihod_flag,0) AS pf, d.store_id FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = $dId")->fetch_assoc();
+                        if ($pf && !(int)$pf['pf'] && (int)$pf['store_id'] > 0) {
+                            $rr = $conn->query("SELECT COALESCE(quant,0) AS q FROM residue WHERE wh_id = {$pf['store_id']} AND product_id = $pid")->fetch_assoc();
+                            $residueQ = $rr ? (float)$rr['q'] : 0;
+                            if ($valFloat > $residueQ) {
+                                header('Content-Type: application/json; charset=utf-8');
+                                echo json_encode(['ok' => false, 'error' => 'Недостаточно остатка товара на участке. Текущий остаток: ' . _fmt_qty($residueQ)]);
+                                exit;
+                            }
+                        }
+                    }
+                }
+            }
             $stmt = $conn->prepare("UPDATE docum2 SET $field = ? WHERE docum2_id = ?");
             bind_auto($stmt, [$valFloat, $docum2Id]);
             $stmt->execute();
@@ -324,12 +361,15 @@ if ($docum2Id > 0) {
         $discount = (float)$row['discount'];
         $sum = $quant * $price * (1 - $discount / 100);
         $sum_discount = $quant * $price * ($discount / 100);
-        $uStmt = $conn->prepare("UPDATE docum2 SET sum = ?, sum_discount = ? WHERE docum2_id = ?");
-        bind_auto($uStmt, [$sum, $sum_discount, $docum2Id]);
+        $ndsRate = (int)($appSettings['nds_rate'] ?? 22);
+        $noNds   = ($appSettings['no_nds'] ?? '0') === '1';
+        $sum_nds = $noNds ? ($sum * $ndsRate / (100 + $ndsRate)) : ($sum * $ndsRate / 100);
+        $uStmt = $conn->prepare("UPDATE docum2 SET sum = ?, sum_discount = ?, sum_nds = ? WHERE docum2_id = ?");
+        bind_auto($uStmt, [$sum, $sum_discount, $sum_nds, $docum2Id]);
         $uStmt->execute();
         $uStmt->close();
     }
-    $q2 = $conn->query("SELECT docum2_id AS id, product_id, code, product_name, quant, price, discount, sum, sum_discount, note FROM docum2 WHERE docum2_id = $docum2Id");
+    $q2 = $conn->query("SELECT docum2_id AS id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note FROM docum2 WHERE docum2_id = $docum2Id");
     $itemData = $q2 ? $q2->fetch_assoc() : null;
 } else {
     if ($documId > 0) check_docum_accepted($conn, $documId);
@@ -340,6 +380,15 @@ if ($docum2Id > 0) {
     $stmt->execute();
     $newId = $conn->insert_id;
     $stmt->close();
+    if ($documId > 0 && $newId > 0) {
+        $pq = $conn->query("SELECT store_id, typeop FROM docum WHERE docum_id = $documId")->fetch_assoc();
+        if ($pq) {
+            $upd = $conn->prepare("UPDATE docum2 SET typeop = ?, store_id = ? WHERE docum2_id = ?");
+            $upd->bind_param('iii', (int)$pq['typeop'], (int)$pq['store_id'], $newId);
+            $upd->execute();
+            $upd->close();
+        }
+    }
 }
 
 $totals = $actualDocumId > 0 ? recalc_docum_totals($conn, $actualDocumId) : [];

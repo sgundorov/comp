@@ -35,7 +35,7 @@ function render_head_end(): void {
 #login-overlay .login-box h2{margin:-32px -40px 20px;padding:10px 12px;background:#1f2c3a;color:#ffe9a8;font-size:22px;font-weight:700;line-height:1.1;border-bottom:2px solid #2a3a4b;border-radius:8px 8px 0 0;user-select:none}
 #login-overlay .login-box .field{margin-bottom:14px}
 #login-overlay .login-box .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
-#login-overlay .login-box .field input{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-size:14px;color:var(--input-text);background:var(--input-bg)}
+#login-overlay .login-box .field input{width:100%;box-sizing:border-box;height:24px;padding:0 6px;border:1px solid var(--border);border-radius:1px;font-size:14px;font-family:inherit;color:var(--input-text);background:var(--input-bg)}
 #login-overlay .login-box .field input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(230,126,34,.2)}
 #login-overlay .login-box .actions{display:flex;gap:18px;justify-content:center;margin-top:20px}
 #login-overlay .login-box .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;padding:8px 24px}
@@ -59,7 +59,7 @@ function render_head_end(): void {
   var loginInput = document.getElementById('login-login');
   var passInput = document.getElementById('login-password');
   var errEl = document.getElementById('login-error');
-  function showError(msg) { errEl.textContent = msg; errEl.style.display = ''; }
+  function showError(msg) { errEl.textContent = msg; errEl.style.display = 'block'; }
   function hideError() { errEl.style.display = 'none'; }
   function doLogin() {
     var l = loginInput.value.trim();
@@ -75,7 +75,7 @@ function render_head_end(): void {
       .catch(function(){ showError('Ошибка соединения'); });
   }
   document.getElementById('login-submit').addEventListener('click', doLogin);
-  loginInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') passInput.focus(); });
+  loginInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
   passInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
   loginInput.focus();
 })();
@@ -223,7 +223,13 @@ function render_table_colgroup(array $visibleColumns, array $columnWidths, array
     <?php foreach ($visibleColumns as $vc):
         $cn = $vc['name'];
         $savedW = $columnWidths[$cn] ?? null;
-        $w = $savedW !== null ? $savedW . 'px' : (!empty($defaultWidths[$cn]) ? $defaultWidths[$cn] : '150px');
+        if ($savedW !== null) {
+            $w = $savedW . 'px';
+        } elseif (!empty($defaultWidths[$cn])) {
+            $w = is_numeric($defaultWidths[$cn]) ? $defaultWidths[$cn] . 'px' : $defaultWidths[$cn];
+        } else {
+            $w = '150px';
+        }
     ?>
       <col class="col-<?= h($cn) ?>" style="width: <?= $w ?>;" />
     <?php endforeach; ?>

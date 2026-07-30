@@ -19,7 +19,6 @@ $colValues = [
     'id'    => fn($r) => (int)$r['number'],
     'name'  => fn($r) => (string)($r['name'] ?? ''),
     'fname' => fn($r) => (string)($r['fname'] ?? ''),
-    'quant' => fn($r) => (int)($r['quant'] ?? 0),
     'note'  => fn($r) => (string)($r['note'] ?? ''),
 ];
 $filterLabels = $tp->getFilterDescription();

@@ -84,7 +84,7 @@ render_form_modal(); ?>
 
     <?php $activeMenu = 'role.php'; include 'menu.php'; ?>
 
-    <h1 class="page-title"><img src="img/role.png" alt="" /> Роль сотрудника</h1>
+    <h1 class="page-title"><img src="img/role.png" alt="" /> Роли сотрудников</h1>
 
     <?php
       $baseQs = function($p) use ($search, $searchActive, $searchCols, $searchCond, $sortQs) {
@@ -153,6 +153,8 @@ render_form_modal(); ?>
             }
             return ['', ''];
         }, [
+            'searchActive' => $searchActive,
+            'searchCols' => $searchCols,
             'tdExtraAttrs' => function($cn, $vc, $r, $i) {
                 return ' data-col-idx="' . (int)$i . '"';
             },

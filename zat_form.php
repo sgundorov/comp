@@ -98,10 +98,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $titles = [
-    'new'    => 'Операция (новая)',
-    'edit'   => 'Операция: ' . $origName,
-    'copy'   => 'Операция: ' . $origName . ' (копия)',
-    'delete' => 'Операция: ' . $origName . ' (удаление)',
+    'new'    => 'Вид операций с деньгами (новый)',
+    'edit'   => 'Вид операций с деньгами: ' . $origName,
+    'copy'   => 'Вид операций с деньгами: ' . $origName . ' (копия)',
+    'delete' => 'Вид операций с деньгами: ' . $origName . ' (удаление)',
 ];
 $pageTitle = $titles[$mode] ?? 'Экспорт в Excel';
 
@@ -127,7 +127,7 @@ ob_start();
 ) ?>
 <?php endif; ?>
 
-<?= render_field('Наименование', render_input('text', 'name', $values['name'], [
+<?= render_field('Вид операции', render_input('text', 'name', $values['name'], [
         'id' => 'zat-name',
         'required' => !$isReadonly,
         'readonly' => $isReadonly,

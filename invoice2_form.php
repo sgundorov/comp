@@ -9,6 +9,9 @@ $isAjax     = (string)($_GET['ajax'] ?? $_POST['ajax'] ?? '') === '1' || (strtol
 $isOffer    = ((string)($_GET['kind'] ?? '') === 'offer');
 $errors     = [];
 
+$ndsRate = (int)($appSettings['nds_rate'] ?? 22);
+$noNds   = ($appSettings['no_nds'] ?? '0') === '1';
+
 $values = [
     'product_id'    => 0,
     'product_name'  => '',
@@ -35,6 +38,7 @@ if ($invoice2Id > 0) {
         $values['discount']     = (string)$r['discount'];
         $values['sum']          = (string)$r['sum'];
         $values['sum_discount'] = (string)$r['sum_discount'];
+        $values['sum_nds']      = (string)$r['sum_nds'];
         $values['note']         = (string)$r['note'];
         $invoiceId = (int)$r['invoice_id'];
     }
@@ -56,7 +60,8 @@ if ($mode === 'copy') {
 }
 
 $productList = [];
-$q = $conn->query("SELECT product_id, product_name, code, price_out FROM product ORDER BY product_name");
+$hideSql = (empty($appSettings['show_hidden']) || $appSettings['show_hidden'] !== '1') ? ' WHERE hide_flag = 0' : '';
+$q = $conn->query("SELECT product_id, product_name, code, price_out FROM product" . $hideSql . " ORDER BY product_name");
 while ($r = $q->fetch_assoc()) {
     $productList[] = [
         'id'        => (int)$r['product_id'],
@@ -126,10 +131,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $quant    = max(0, (float)$values['quant']);
     $price    = max(0, (float)$values['price']);
     $discount = max(0, (float)$values['discount']);
-    $sum          = $quant * $price * (1 - $discount / 100);
+        $sum          = $quant * $price * (1 - $discount / 100);
     $sum_discount = $quant * $price * ($discount / 100);
     $values['sum']          = number_format($sum, 2, '.', '');
     $values['sum_discount'] = number_format($sum_discount, 2, '.', '');
+    $sum_nds = $noNds ? ($sum * $ndsRate / (100 + $ndsRate)) : ($sum * $ndsRate / 100);
+    $values['sum_nds'] = number_format($sum_nds, 2, '.', '');
 
     if ($values['product_id'] <= 0) {
         $errors[] = 'Выберите товар';
@@ -144,8 +151,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($p['id'] === $values['product_id']) { $productName = $p['name']; break; }
         }
         if ($invoice2Id > 0) {
-            $stmt = $conn->prepare("UPDATE invoice2 SET product_id = ?, product_name = ?, quant = ?, price = ?, discount = ?, sum = ?, sum_discount = ?, sum_nds = 0, note = ? WHERE invoice2_id = ?");
-            bind_auto($stmt, [$values['product_id'], $productName, $quant, $price, $discount, $sum, $sum_discount, $values['note'], $invoice2Id]);
+            $stmt = $conn->prepare("UPDATE invoice2 SET product_id = ?, product_name = ?, quant = ?, price = ?, discount = ?, sum = ?, sum_discount = ?, sum_nds = ?, note = ? WHERE invoice2_id = ?");
+            bind_auto($stmt, [$values['product_id'], $productName, $quant, $price, $discount, $sum, $sum_discount, $sum_nds, $values['note'], $invoice2Id]);
             $stmt->execute();
             $stmt->close();
             if ($invoiceId <= 0) {
@@ -153,8 +160,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $invoiceId = $q2 && ($r2 = $q2->fetch_assoc()) ? (int)$r2['invoice_id'] : 0;
             }
         } else {
-            $stmt = $conn->prepare("INSERT INTO invoice2 (invoice_id, product_id, product_name, quant, price, discount, sum, sum_discount, sum_nds, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)");
-            bind_auto($stmt, [$invoiceId, $values['product_id'], $productName, $quant, $price, $discount, $sum, $sum_discount, $values['note']]);
+            $stmt = $conn->prepare("INSERT INTO invoice2 (invoice_id, product_id, product_name, quant, price, discount, sum, sum_discount, sum_nds, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            bind_auto($stmt, [$invoiceId, $values['product_id'], $productName, $quant, $price, $discount, $sum, $sum_discount, $sum_nds, $values['note']]);
             $stmt->execute();
             $invoice2Id = $conn->insert_id;
             $stmt->close();
@@ -172,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'discount' => number_format($discount, 1, '.', ''),
             'sum' => number_format($sum, 2, '.', ''),
             'sum_discount' => number_format($sum_discount, 2, '.', ''),
-            'sum_nds' => number_format(0, 2, '.', ''),
+            'sum_nds' => $values['sum_nds'],
             'note' => $values['note'],
             'total_sum' => $totals['sum'],
             'total_sum_discount' => $totals['sum_discount'],
@@ -189,6 +196,7 @@ $sumDiscountDisplay  = fmt_num($values['sum_discount'], 2);
 $priceDisplay        = fmt_num($values['price'], 2);
 $quantDisplay        = fmt_num($values['quant'], 3);
 $discountDisplay     = fmt_num($values['discount'], 2);
+$sumNdsDisplay       = fmt_num($values['sum_nds'], 2);
 
 ob_start();
 ?>
@@ -203,7 +211,7 @@ $isReadonly = $mode === 'delete';
 $actionUrl = 'invoice2_form.php?mode=' . $mode . ($invoice2Id > 0 ? '&id=' . $invoice2Id : '') . '&invoice_id=' . $invoiceId;
 ?>
 <h2 class="page-title<?= $mode === 'delete' ? ' page-title--delete' : '' ?>"><?= h($pageTitle) ?></h2>
-<form class="form" method="post" action="<?= $actionUrl ?>" autocomplete="off" data-form-modal>
+<form class="form" method="post" action="<?= $actionUrl ?>" autocomplete="off" data-form-modal data-nds-rate="<?= $ndsRate ?>" data-no-nds="<?= $noNds ? '1' : '0' ?>">
 <?= render_input('hidden', 'invoice2_id', $invoice2Id) ?>
 <?= render_input('hidden', 'invoice_id', $invoiceId) ?>
 
@@ -250,6 +258,18 @@ $actionUrl = 'invoice2_form.php?mode=' . $mode . ($invoice2Id > 0 ? '&id=' . $in
     <td><?= render_input('text', 'sum_discount', $sumDiscountDisplay, ['id' => 'inv2-sum-discount', 'readonly' => true, 'tabindex' => '-1', 'style' => 'max-width:140px']) ?></td>
     <td>&nbsp;</td>
   </tr>
+<?php if ($ndsRate != 0): ?>
+  <tr>
+    <td class="form-label">Сумма НДС</td>
+    <td class="form-label">&nbsp;</td>
+    <td class="form-label">&nbsp;</td>
+  </tr>
+  <tr>
+    <td><?= render_input('text', 'sum_nds', $sumNdsDisplay, ['id' => 'inv2-snds', 'readonly' => true, 'tabindex' => '-1', 'style' => 'max-width:140px']) ?></td>
+    <td>&nbsp;</td>
+    <td>&nbsp;</td>
+  </tr>
+<?php endif; ?>
   <tr>
     <td class="form-label" colspan="3">Примечание</td>
   </tr>
@@ -345,6 +365,10 @@ if ($isAjax) {
     var discountInput = wrap.querySelector('#inv2-discount');
     var sumInput = wrap.querySelector('#inv2-sum');
     var sumDiscInput = wrap.querySelector('#inv2-sum-discount');
+    var sndsInput = wrap.querySelector('#inv2-snds');
+    var formEl = wrap.querySelector('form[data-form-modal]');
+    var ndsRate = parseInt(formEl ? formEl.getAttribute('data-nds-rate') : '22', 10) || 0;
+    var noNds = (formEl ? formEl.getAttribute('data-no-nds') : '0') === '1';
 
     function doRecalc() {
       var q = parseFloat((quantInput ? quantInput.value : '1').replace(',', '.')) || 0;
@@ -352,8 +376,10 @@ if ($isAjax) {
       var d = parseFloat((discountInput ? discountInput.value : '0').replace(',', '.')) || 0;
       var sum = q * p * (1 - d / 100);
       var sumD = q * p * (d / 100);
+      var snds = noNds ? (sum * ndsRate / (100 + ndsRate)) : (sum * ndsRate / 100);
       if (sumInput) { var sf = sum.toFixed(2); sumInput.value = sf === '0.00' ? '' : sf.replace('.', ','); }
       if (sumDiscInput) { var sdf = sumD.toFixed(2); sumDiscInput.value = sdf === '0.00' ? '' : sdf.replace('.', ','); }
+      if (sndsInput) { var ndsf = snds.toFixed(2); sndsInput.value = ndsf === '0.00' ? '' : ndsf.replace('.', ','); }
     }
 
     function onProductSelect(id, name) {

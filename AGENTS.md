@@ -47,6 +47,29 @@ Fix form modal not closing after submit in city.php/client.php (stayed open with
 ### Current state
 - All pages pass `php -l` syntax check
 - client.php renders without JS errors (tested via built-in server)
-- Pending: browser verification, integration tests
+
+---
+
+## Session Summary (2026-07-24)
+
+### Objective
+- Форма оплаты счёта: авто-заполнение `sum_in` остатком (`invoice.sum - invoice.sum_plat`)
+- Таблица счетов: красный текст `sum_plat` при неполной оплате
+- Серверная + клиентская блокировка запретов для роли admin на критических объектах
+- Исправление `_apply_discount` для invoice2 и docum2 (учёт количества, сохранение discount в заголовок)
+- Меню "Администрирование" с группировкой ролей/объектов/прав
+
+### Changes made
+1. **`invoice_form.php:398`** — `childFormUrl` для `$platTable`: добавлены `client_id`, `sotr_id`, `zat_id`, `sum_in` (остаток = `sum - sum_plat`)
+2. **`invoice.php:327-338`** — `render_table_tbody`: добавлен `tdExtraAttrs` с красным цветом/жирностью для `sum_plat` при `sum_plat < sum`
+3. **`sotr_form.php`** — проверка на удаление последнего администратора (роль из БД)
+4. **`sotr_field_save.php`** — проверка при inline-смене роли: нельзя снять последнего админа
+5. **`dostup_save.php`** — серверная блокировка запретов для админа на `Sotr`, `Role`, `Object`, `Setup` (кроме `print_flag`)
+6. **`dostup.php`** — клиентская блокировка: класс `admin-locked` + JS-проверка
+7. **`menu.php`** — "Файлы" → "Администрирование", в него вложены Роли/Объекты/Права
+8. **`app.css`** — `.submenu` border unified с `.dropdown-menu`
+9. **`invoice2_field_save.php`** — `_apply_discount` исправлен: `quant * price` + `UPDATE invoice SET discount = ?`
+10. **`docum2_field_save.php`** — `_apply_discount` + `UPDATE docum SET discount = ?`
+11. **`invoice.php`** — хендлер apply-discount: `setData` → `refresh()` (исправление обновления таблицы в модалке)
 
 См. также [USER.md](./USER.md) — профиль пользователя и правила взаимодействия.

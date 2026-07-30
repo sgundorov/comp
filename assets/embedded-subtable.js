@@ -593,7 +593,20 @@
               var tbl = window['__' + self.prefix + 'Table'] || self;
               if (self.totalsCallback && typeof global[self.totalsCallback] === 'function') global[self.totalsCallback](data);
               if (tbl) {
-                if (data._deleted) {
+                if (data.sgroup_list) {
+                  tbl.data = data.sgroup_list;
+                  if (data._deleted) {
+                    if (tbl.data.length > 0) {
+                      var idx = Math.min(tbl.data.length - 1, 0);
+                      tbl.selectedId = Number(tbl.data[idx].id);
+                    } else {
+                      tbl.selectedId = 0;
+                    }
+                  } else if (data.id) {
+                    tbl.selectedId = Number(data.id);
+                  }
+                  tbl.render();
+                } else if (data._deleted) {
                   var ddata = tbl.data || self.data;
                   var idx = -1;
                   for (var i = 0; i < ddata.length; i++) { if (ddata[i].id == data.id) { idx = i; break; } }

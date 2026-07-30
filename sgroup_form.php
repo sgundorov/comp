@@ -21,10 +21,24 @@ function recalc_group_pos(mysqli $conn, int $groupId): void {
     $upd->close();
 }
 
+function fetch_sgroup_list_for_group(mysqli $conn, int $groupId, string $serviceFlag): array {
+    if ($groupId <= 0) return [];
+    $stmt = $conn->prepare("SELECT sgroup_id AS id, name, note FROM sgroup WHERE group_id = ? AND service_flag = ? ORDER BY sgroup_id ASC");
+    $stmt->bind_param('is', $groupId, $serviceFlag);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $rows;
+}
+
 $mode    = (string)($_GET['mode'] ?? $_POST['mode'] ?? 'edit');
 $id      = (int)($_GET['id']   ?? $_POST['id']   ?? 0);
 $groupId = (int)($_GET['group_id'] ?? $_POST['group_id'] ?? 0);
 if (!in_array($mode, ['new', 'edit', 'copy', 'delete'], true)) $mode = 'edit';
+
+$serviceFlag = (string)($_GET['service_flag'] ?? $_POST['service_flag'] ?? '0');
+$serviceFlag = $serviceFlag === '1' ? '1' : '0';
+$isService = ($serviceFlag === '1');
 
 $errors = [];
 $focusField = '';
@@ -33,12 +47,17 @@ $origName = '';
 $groupName = '';
 
 if ($groupId > 0) {
-    $gStmt = $conn->prepare("SELECT name FROM `group` WHERE group_id = ?");
+    $gStmt = $conn->prepare("SELECT name, service_flag FROM `group` WHERE group_id = ?");
     $gStmt->bind_param('i', $groupId);
     $gStmt->execute();
     $gRow = $gStmt->get_result()->fetch_assoc();
     $gStmt->close();
-    if ($gRow) $groupName = (string)$gRow['name'];
+    if ($gRow) {
+        $groupName = (string)$gRow['name'];
+        $serviceFlag = (string)$gRow['service_flag'];
+        $serviceFlag = $serviceFlag === '1' ? '1' : '0';
+        $isService = ($serviceFlag === '1');
+    }
 }
 
 if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
@@ -76,15 +95,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newPos = 0;
                 if ($groupId > 0) { $q = $conn->query("SELECT pos FROM `group` WHERE group_id = $groupId"); $r = $q ? $q->fetch_assoc() : null; $newPos = $r ? (int)$r['pos'] : 0; }
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $id, '_deleted' => true, 'pos' => $newPos]);
+                echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $id, '_deleted' => true, 'pos' => $newPos, 'sgroup_list' => fetch_sgroup_list_for_group($conn, $groupId, $serviceFlag)]);
                 exit;
             }
-            header('Location: group.php');
+            header('Location: sgroup.php' . ($isService ? '?kind=service' : ''));
             exit;
         }
         if ($mode === 'new' || $mode === 'copy') {
-            $stmt = $conn->prepare("INSERT INTO sgroup (group_id, name, note) VALUES (?, ?, ?)");
-            bind_auto($stmt, [$groupId, $values['name'], $values['note']]);
+            $stmt = $conn->prepare("INSERT INTO sgroup (group_id, name, note, service_flag) VALUES (?, ?, ?, ?)");
+            bind_auto($stmt, [$groupId, $values['name'], $values['note'], $serviceFlag]);
             $stmt->execute();
             $newId = (int)$conn->insert_id;
             $stmt->close();
@@ -93,10 +112,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newPos = 0;
                 if ($groupId > 0) { $q = $conn->query("SELECT pos FROM `group` WHERE group_id = $groupId"); $r = $q ? $q->fetch_assoc() : null; $newPos = $r ? (int)$r['pos'] : 0; }
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $newId, 'name' => $values['name'], 'note' => $values['note'], 'pos' => $newPos]);
+                echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $newId, 'name' => $values['name'], 'note' => $values['note'], 'pos' => $newPos, 'sgroup_list' => fetch_sgroup_list_for_group($conn, $groupId, $serviceFlag)]);
                 exit;
             }
-            header('Location: group.php');
+            header('Location: sgroup.php' . ($isService ? '?kind=service' : ''));
             exit;
         }
         if ($mode === 'edit') {
@@ -106,22 +125,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $id, 'name' => $values['name'], 'note' => $values['note']]);
+                echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $id, 'name' => $values['name'], 'note' => $values['note'], 'sgroup_list' => fetch_sgroup_list_for_group($conn, $groupId, $serviceFlag)]);
                 exit;
             }
-            header('Location: group.php');
+            header('Location: sgroup.php' . ($isService ? '?kind=service' : ''));
             exit;
         }
     }
 }
 
+$pageTitleLabel = $isService ? 'Подгруппа услуг' : 'Подгруппа товаров';
 $titles = [
-    'new'    => 'Подгруппа (новая)',
-    'edit'   => 'Подгруппа: ' . $origName,
-    'copy'   => 'Подгруппа: ' . $origName . ' (копия)',
-    'delete' => 'Подгруппа: ' . $origName . ' (удаление)',
+    'new'    => $pageTitleLabel . ' (новая)',
+    'edit'   => $pageTitleLabel . ': ' . $origName,
+    'copy'   => $pageTitleLabel . ': ' . $origName . ' (копия)',
+    'delete' => $pageTitleLabel . ': ' . $origName . ' (удаление)',
 ];
-$pageTitle = $titles[$mode] ?? 'Экспорт в Excel';
+$pageTitle = $titles[$mode] ?? $pageTitleLabel;
 $isReadonly = ($mode === 'delete');
 
 ob_start();
@@ -131,6 +151,7 @@ ob_start();
 <?= render_input('hidden', 'mode', $mode) ?>
 <?= render_input('hidden', 'id', $id) ?>
 <?= render_input('hidden', 'group_id', $groupId) ?>
+<?= render_input('hidden', 'service_flag', $serviceFlag) ?>
 
 <?php foreach ($errors as $e): ?>
   <div class="flash flash--error"><?= h($e) ?></div>
@@ -200,10 +221,11 @@ if ($isAjax) {
   </div>
   <script>
     (function () {
+      var isService = <?= json_encode($isService) ?>;
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
           e.preventDefault();
-          window.location.href = 'group.php';
+          window.location.href = 'sgroup.php' + (isService ? '?kind=service' : '');
         }
       });
     })();

@@ -8,6 +8,9 @@ $documId   = (int)($_GET['docum_id'] ?? 0);
 $isAjax    = (string)($_GET['ajax'] ?? $_POST['ajax'] ?? '') === '1' || (strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest');
 $errors    = [];
 
+$ndsRate = (int)($appSettings['nds_rate'] ?? 22);
+$noNds   = ($appSettings['no_nds'] ?? '0') === '1';
+
 $values = [
     'product_id'    => 0,
     'product_name'  => '',
@@ -16,6 +19,7 @@ $values = [
     'discount'      => '0',
     'sum'           => '0.00',
     'sum_discount'  => '0.00',
+    'sum_nds'       => '0.00',
     'note'          => '',
 ];
 
@@ -33,6 +37,7 @@ if ($docum2Id > 0) {
         $values['discount']      = (string)$r['discount'];
         $values['sum']           = (string)$r['sum'];
         $values['sum_discount']  = (string)$r['sum_discount'];
+        $values['sum_nds']       = (string)$r['sum_nds'];
         $values['note']          = (string)$r['note'];
         $documId = (int)$r['docum_id'];
     }
@@ -61,7 +66,8 @@ if ($mode === 'copy') {
 
 $productList = [];
 $priceColD2 = in_array($parentTypeop, [20, 110], true) ? 'price_in' : 'price_out';
-$q = $conn->query("SELECT product_id, product_name, article AS code, $priceColD2 AS price FROM product WHERE hide_flag = 0 ORDER BY product_name");
+$hideFilter = (empty($appSettings['show_hidden']) || $appSettings['show_hidden'] !== '1') ? 'hide_flag = 0' : '1';
+$q = $conn->query("SELECT product_id, product_name, article AS code, $priceColD2 AS price FROM product WHERE " . $hideFilter . " ORDER BY product_name");
 while ($r = $q->fetch_assoc()) {
     $productList[] = [
         'id'    => (int)$r['product_id'],
@@ -96,29 +102,35 @@ if ($values['product_id'] > 0) {
 }
 
 function recalc_docum_totals(mysqli $conn, int $documId): array {
-    $stmt = $conn->prepare("SELECT COALESCE(SUM(sum),0), COALESCE(SUM(sum_discount),0), COUNT(*) FROM docum2 WHERE docum_id = ?");
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(sum),0), COALESCE(SUM(sum_discount),0), COALESCE(SUM(sum_nds),0), COUNT(*) FROM docum2 WHERE docum_id = ?");
     $stmt->bind_param('i', $documId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_row();
     $stmt->close();
     $sum  = (float)$row[0];
     $sd   = (float)$row[1];
-    $pos  = (int)$row[2];
-    $spStmt = $conn->prepare("SELECT COALESCE(d.sum_plat,0), d.typeop, COALESCE(tp.prihod_flag,0) AS prihod_flag FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = ?");
+    $snds = (float)$row[2];
+    $pos  = (int)$row[3];
+    $spStmt = $conn->prepare("SELECT d.typeop, COALESCE(tp.prihod_flag,0) AS prihod_flag FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = ?");
     $spStmt->bind_param('i', $documId);
     $spStmt->execute();
     $spRow = $spStmt->get_result()->fetch_assoc();
     $spStmt->close();
-    $sumPlat = (float)($spRow['sum_plat'] ?? 0);
+    $typeop = (int)($spRow['typeop'] ?? 120);
     $prihodFlag = (int)($spRow['prihod_flag'] ?? 0);
+    $ps = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
+    $ps->bind_param('ii', $documId, $typeop);
+    $ps->execute();
+    $sumPlat = (float)$ps->get_result()->fetch_row()[0];
+    $ps->close();
     $sumPlatRed = $prihodFlag ? ($sum > -$sumPlat) : ($sumPlat < $sum);
     $sumBalans = $sum - $sumPlat;
-    $upd = $conn->prepare("UPDATE docum SET sum = ?, sum_discount = ?, pos = ?, sum_balans = ? WHERE docum_id = ?");
-    bind_auto($upd, [$sum, $sd, $pos, $sumBalans, $documId]);
+    $upd = $conn->prepare("UPDATE docum SET sum = ?, sum_discount = ?, pos = ?, sum_balans = ?, sum_plat = ? WHERE docum_id = ?");
+    bind_auto($upd, [$sum, $sd, $pos, $sumBalans, $sumPlat, $documId]);
     $upd->execute();
     $upd->close();
     $sumPlatFmt = _fmt_d2($sumPlat, 2);
-    return ['total_sum' => _fmt_d2($sum, 2), 'total_sum_discount' => _fmt_d2($sd, 2), 'pos' => $pos, 'sum_plat' => $sumPlatFmt, 'sum_plat_red' => $sumPlatRed];
+    return ['total_sum' => _fmt_d2($sum, 2), 'total_sum_discount' => _fmt_d2($sd, 2), 'total_sum_nds' => _fmt_d2($snds, 2), 'pos' => $pos, 'sum_plat' => $sumPlatFmt, 'sum_plat_red' => $sumPlatRed];
 }
 
 function _fmt_qty($v) { return fmt_num($v, 3); }
@@ -139,17 +151,34 @@ if ($isAjax && isset($_POST['action'])) {
         $note = trim((string)($_POST['note'] ?? ''));
         if ($productId <= 0 && $productName === '') $errors[] = 'Укажите товар';
         if ($quant <= 0) $errors[] = 'Количество должно быть больше нуля';
+        if (empty($errors) && !empty($appSettings['neg_ost_flag']) && $appSettings['neg_ost_flag'] === '1' && $documId > 0) {
+            $pf = $conn->query("SELECT COALESCE(tp.prihod_flag,0) AS pf FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = $documId")->fetch_assoc();
+            if ($pf && !(int)$pf['pf']) {
+                $storeId = 0;
+                $ds = $conn->query("SELECT store_id FROM docum WHERE docum_id = $documId")->fetch_assoc();
+                if ($ds) $storeId = (int)$ds['store_id'];
+                if ($storeId > 0) {
+                    $nq = $conn->query("SELECT noquant_flag FROM product WHERE product_id = $productId")->fetch_assoc();
+                    if (!$nq || !(int)$nq['noquant_flag']) {
+                        $rr = $conn->query("SELECT COALESCE(quant,0) AS q FROM residue WHERE wh_id = $storeId AND product_id = $productId")->fetch_assoc();
+                        $residueQ = $rr ? (float)$rr['q'] : 0;
+                        if ($quant > $residueQ) $errors[] = 'Недостаточно остатка товара на участке. Текущий остаток: ' . _fmt_qty($residueQ);
+                    }
+                }
+            }
+        }
         if (empty($errors)) {
             $sum = $quant * $price * (1 - $discount / 100);
             $sum_discount = $quant * $price * ($discount / 100);
+            $sum_nds = $noNds ? ($sum * $ndsRate / (100 + $ndsRate)) : ($sum * $ndsRate / 100);
             if ($docum2Id > 0) {
-                $stmt = $conn->prepare("UPDATE docum2 SET product_id = ?, product_name = ?, quant = ?, price = ?, discount = ?, sum = ?, sum_discount = ?, note = ? WHERE docum2_id = ?");
-                bind_auto($stmt, [$productId, $productName, $quant, $price, $discount, $sum, $sum_discount, $note, $docum2Id]);
+                $stmt = $conn->prepare("UPDATE docum2 SET product_id = ?, product_name = ?, quant = ?, price = ?, discount = ?, sum = ?, sum_discount = ?, sum_nds = ?, note = ? WHERE docum2_id = ?");
+                bind_auto($stmt, [$productId, $productName, $quant, $price, $discount, $sum, $sum_discount, $sum_nds, $note, $docum2Id]);
                 $stmt->execute();
                 $stmt->close();
             } else {
-                $stmt = $conn->prepare("INSERT INTO docum2 (docum_id, product_id, product_name, quant, price, discount, sum, sum_discount, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                bind_auto($stmt, [$documId, $productId, $productName, $quant, $price, $discount, $sum, $sum_discount, $note]);
+                $stmt = $conn->prepare("INSERT INTO docum2 (docum_id, product_id, product_name, quant, price, discount, sum, sum_discount, sum_nds, note, typeop, store_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                bind_auto($stmt, [$documId, $productId, $productName, $quant, $price, $discount, $sum, $sum_discount, $sum_nds, $note, $parentTypeop, $parentStoreId]);
                 $stmt->execute();
                 $docum2Id = $conn->insert_id;
                 $stmt->close();
@@ -167,9 +196,11 @@ if ($isAjax && isset($_POST['action'])) {
                 'discount' => _fmt_d2($discount, 1),
                 'sum' => _fmt_d2($sum, 2),
                 'sum_discount' => _fmt_d2($sum_discount, 2),
+                'sum_nds' => _fmt_d2($sum_nds, 2),
                 'note' => $note,
                 'total_sum' => $totals['total_sum'],
                 'total_sum_discount' => $totals['total_sum_discount'],
+                'total_sum_nds' => $totals['total_sum_nds'],
                 'pos' => $totals['pos'],
                 'sum_plat' => $totals['sum_plat'],
                 'sum_plat_red' => $totals['sum_plat_red'],
@@ -192,6 +223,7 @@ if ($isAjax && isset($_POST['action'])) {
             'docum_id' => $documId,
             'total_sum' => $totals['total_sum'],
             'total_sum_discount' => $totals['total_sum_discount'],
+            'total_sum_nds' => $totals['total_sum_nds'],
             'pos' => $totals['pos'],
             'sum_plat' => $totals['sum_plat'],
             'sum_plat_red' => $totals['sum_plat_red'],
@@ -202,6 +234,7 @@ if ($isAjax && isset($_POST['action'])) {
 
 $sumDisplay          = _fmt_d2($values['sum'], 2);
 $sumDiscountDisplay  = _fmt_d2($values['sum_discount'], 2);
+$sumNdsDisplay       = _fmt_d2($values['sum_nds'], 2);
 $quantDisplay        = _fmt_qty($values['quant']);
 $discountDisplay     = _fmt_d2($values['discount'], 1);
 
@@ -216,7 +249,7 @@ $pageTitle = $mode === 'copy'   ? "Товар документа: $productNameFo
 ?>
 <style>.form-modal .lookup-wrap{max-width:100%;flex:1}.form-table{width:100%}</style>
 <h2 class="page-title<?= $mode === 'delete' ? ' page-title--delete' : '' ?>"><?= h($pageTitle) ?></h2>
-<form class="form" method="post" action="<?= h('docum2_form.php?mode=' . $mode . ($docum2Id > 0 ? '&id=' . $docum2Id : '') . '&docum_id=' . $documId) ?>" autocomplete="off" data-form-modal>
+<form class="form" method="post" action="<?= h('docum2_form.php?mode=' . $mode . ($docum2Id > 0 ? '&id=' . $docum2Id : '') . '&docum_id=' . $documId) ?>" autocomplete="off" data-form-modal data-nds-rate="<?= $ndsRate ?>" data-no-nds="<?= $noNds ? '1' : '0' ?>">
 <?= render_input('hidden', 'docum2_id', $docum2Id) ?>
 <?= render_input('hidden', 'docum_id', $documId) ?>
 
@@ -231,7 +264,7 @@ $pageTitle = $mode === 'copy'   ? "Товар документа: $productNameFo
   <tr>
     <td colspan="3"><div style="display:flex;align-items:stretch;gap:0;width:100%"><?= render_lookup('product', 'product_id', $values['product_id'], $currentProductName,
         h(json_encode($productList, JSON_UNESCAPED_UNICODE)),
-        'tmc_form.php?mode=new', $isReadonly, ['id' => 'd2-product-id']) ?><?php if (!$isReadonly && $values['product_id'] > 0): ?><button type="button" class="lookup-tool" title="Товар" id="d2-product-edit-btn" style="background:var(--tool);color:#fff;width:24px;height:24px;border-radius:0 1px 1px 0"><svg viewBox="0 0 24 24" style="width:14px;height:14px" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button><?php endif; ?></div></td>
+        'tmc_form.php?mode=new', $isReadonly, ['id' => 'd2-product-id']) ?><?php if ($values['product_id'] > 0): ?><button type="button" class="lookup-tool" title="Товар" id="d2-product-edit-btn" style="background:var(--tool);color:#fff;width:24px;height:24px;border-radius:0 1px 1px 0"><svg viewBox="0 0 24 24" style="width:14px;height:14px" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button><?php endif; ?></div></td>
   </tr>
   <tr>
     <td class="form-label">Кол-во</td>
@@ -263,6 +296,18 @@ $pageTitle = $mode === 'copy'   ? "Товар документа: $productNameFo
     <?php if (!in_array($parentTypeop, [127, 100], true)): ?><td><?= render_input('text', 'sum_discount', $sumDiscountDisplay, ['id' => 'd2-sum-discount', 'readonly' => true, 'tabindex' => '-1', 'style' => 'max-width:140px']) ?></td><?php endif; ?>
     <td>&nbsp;</td>
   </tr>
+  <?php if ($ndsRate > 0): ?>
+  <tr>
+    <td class="form-label">Сумма НДС</td>
+    <?php if (!in_array($parentTypeop, [127, 100], true)): ?><td class="form-label">&nbsp;</td><?php endif; ?>
+    <td class="form-label">&nbsp;</td>
+  </tr>
+  <tr class="col-3">
+    <td><?= render_input('text', 'sum_nds', $sumNdsDisplay, ['id' => 'd2-snds', 'readonly' => true, 'tabindex' => '-1', 'style' => 'max-width:140px']) ?></td>
+    <?php if (!in_array($parentTypeop, [127, 100], true)): ?><td>&nbsp;</td><?php endif; ?>
+    <td>&nbsp;</td>
+  </tr>
+  <?php endif; ?>
   <tr>
     <td class="form-label" colspan="3">Примечание</td>
   </tr>
@@ -296,6 +341,10 @@ $pageTitle = $mode === 'copy'   ? "Товар документа: $productNameFo
   var discountInput = wrap.querySelector('#d2-discount');
   var sumInput = wrap.querySelector('#d2-sum');
   var sumDiscInput = wrap.querySelector('#d2-sum-discount');
+  var sndsInput = wrap.querySelector('#d2-snds');
+  var formEl = wrap.querySelector('form[data-form-modal]');
+  var ndsRate = parseInt(formEl ? formEl.getAttribute('data-nds-rate') : '22', 10) || 0;
+  var noNds = (formEl ? formEl.getAttribute('data-no-nds') : '0') === '1';
   function _rf(v) {
     if (v === 0) return '';
     return v.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
@@ -304,8 +353,12 @@ $pageTitle = $mode === 'copy'   ? "Товар документа: $productNameFo
     var q = parseFloat((quantInput ? quantInput.value : '1').replace(',', '.')) || 0;
     var p = parseFloat((priceInput ? priceInput.value : '0').replace(',', '.')) || 0;
     var d = parseFloat((discountInput ? discountInput.value : '0').replace(',', '.')) || 0;
-    if (sumInput) sumInput.value = _rf(q * p * (1 - d / 100));
-    if (sumDiscInput) sumDiscInput.value = _rf(q * p * (d / 100));
+    var sum = q * p * (1 - d / 100);
+    var sumD = q * p * (d / 100);
+    var snds = noNds ? (sum * ndsRate / (100 + ndsRate)) : (sum * ndsRate / 100);
+    if (sumInput) sumInput.value = _rf(sum);
+    if (sumDiscInput) sumDiscInput.value = _rf(sumD);
+    if (sndsInput) { var ndsf = snds.toFixed(2); sndsInput.value = ndsf === '0.00' ? '' : ndsf.replace('.', ','); }
   }
   if (quantInput) quantInput.addEventListener('input', recalc);
   if (priceInput) priceInput.addEventListener('input', recalc);
@@ -369,6 +422,10 @@ if ($isAjax) {
     var discountInput = document.querySelector('#d2-discount');
     var sumInput = document.querySelector('#d2-sum');
     var sumDiscInput = document.querySelector('#d2-sum-discount');
+    var sndsInput = document.querySelector('#d2-snds');
+    var formEl = document.querySelector('form[data-form-modal]');
+    var ndsRate = parseInt(formEl ? formEl.getAttribute('data-nds-rate') : '22', 10) || 0;
+    var noNds = (formEl ? formEl.getAttribute('data-no-nds') : '0') === '1';
     function _rf(v) {
       if (v === 0) return '';
       return v.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
@@ -377,8 +434,12 @@ if ($isAjax) {
       var q = parseFloat((quantInput ? quantInput.value : '1').replace(',', '.')) || 0;
       var p = parseFloat((priceInput ? priceInput.value : '0').replace(',', '.')) || 0;
       var d = parseFloat((discountInput ? discountInput.value : '0').replace(',', '.')) || 0;
-      if (sumInput) sumInput.value = _rf(q * p * (1 - d / 100));
-      if (sumDiscInput) sumDiscInput.value = _rf(q * p * (d / 100));
+      var sum = q * p * (1 - d / 100);
+      var sumD = q * p * (d / 100);
+      var snds = noNds ? (sum * ndsRate / (100 + ndsRate)) : (sum * ndsRate / 100);
+      if (sumInput) sumInput.value = _rf(sum);
+      if (sumDiscInput) sumDiscInput.value = _rf(sumD);
+      if (sndsInput) { var ndsf = snds.toFixed(2); sndsInput.value = ndsf === '0.00' ? '' : ndsf.replace('.', ','); }
     }
     if (quantInput) quantInput.addEventListener('input', recalc);
     if (priceInput) priceInput.addEventListener('input', recalc);

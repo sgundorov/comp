@@ -149,7 +149,7 @@ ob_start();
 ) ?>
 <?php endif; ?>
 
-<?= render_field('Объект доступа', render_input('text', 'object', $values['object'], [
+<?= render_field('Обозначение', render_input('text', 'object', $values['object'], [
         'id' => 'object-name',
         'required' => !$isReadonly,
         'readonly' => $isReadonly,
@@ -159,7 +159,7 @@ ob_start();
     ['readonly' => $isReadonly]
 ) ?>
 
-<?= render_field('Наименование', render_input('text', 'name', $values['name'], [
+<?= render_field('Объект доступа', render_input('text', 'name', $values['name'], [
         'id' => 'object-name-full',
         'readonly' => $isReadonly,
         'tabindex' => $isReadonly ? '-1' : null,

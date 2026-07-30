@@ -190,7 +190,7 @@ switch ($ALLOWED[$field]['type']) {
 
 $sumPlat = 0;
 $docQ = $conn->query("SELECT doc_id, doc_type FROM plat WHERE plat_id = $id");
-if ($docQ && ($docR = $docQ->fetch_assoc()) && in_array((int)$docR['doc_type'], [5, 10, 20, 110, 120, 127], true) && (int)$docR['doc_id'] > 0) {
+if ($docQ && ($docR = $docQ->fetch_assoc()) && in_array((int)$docR['doc_type'], [5, 10, 20, 40, 110, 120, 127], true) && (int)$docR['doc_id'] > 0) {
     $docType = (int)$docR['doc_type'];
     $parentTable = in_array($docType, [5, 10], true) ? 'invoice' : 'docum';
     $parentKey = in_array($docType, [5, 10], true) ? 'invoice_id' : 'docum_id';

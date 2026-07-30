@@ -5,6 +5,8 @@ require_once __DIR__ . '/config/sgroup_page.php';
 
 $tp = new TablePage($conn, $sgroupPageConfig);
 
+$tp->appendWhere("sg.service_flag = ?", [$sgroupServiceFlag], 's');
+
 $groupId = (int)($_GET['group_id'] ?? 0);
 if ($groupId > 0) {
     $tp->appendWhere('sg.group_id = ?', [$groupId], 'i');
