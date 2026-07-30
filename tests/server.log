@@ -1,0 +1,73 @@
+[Sun Jul 12 18:02:24 2026] PHP 8.2.12 Development Server (http://localhost:8899) started
+[Sun Jul 12 18:02:25 2026] [::1]:50975 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50975 Closed without sending a request; it was probably just an unused speculative preconnection
+[Sun Jul 12 18:02:25 2026] [::1]:50975 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50977 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50977 [404]: GET /comp/city.php - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50977 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50978 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50978 Invalid request (Malformed HTTP request)
+[Sun Jul 12 18:02:25 2026] [::1]:50978 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50979 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50979 [404]: GET /comp/city.php?q=NonExistent&cols=city&cond=contains&sf=1 - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50979 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50980 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50980 [404]: GET /comp/city_form.php?mode=new&ajax=1 - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50980 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50981 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50981 [404]: POST /comp/city_form.php?mode=new&ajax=1 - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50981 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50982 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50982 [404]: GET /comp/city_form.php?mode=edit&id=1&ajax=1 - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50982 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50983 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50983 [404]: POST /comp/city_form.php?mode=edit&id=1&ajax=1 - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50983 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50984 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50984 [404]: POST /comp/city_field_save.php - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50984 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50985 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50985 [404]: GET /comp/invoice.php - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50985 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50986 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50986 [404]: GET /comp/invoice_form.php?mode=new&ajax=1 - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50986 Closing
+[Sun Jul 12 18:02:25 2026] [::1]:50987 Accepted
+[Sun Jul 12 18:02:25 2026] [::1]:50987 [404]: GET /comp/invoice_form.php?mode=edit&id=1&ajax=1 - No such file or directory
+[Sun Jul 12 18:02:25 2026] [::1]:50987 Closing
+[Sun Jul 12 18:03:33 2026] PHP 8.2.12 Development Server (http://localhost:8899) started
+osed without sending a request; it was probably just an unused speculative preconnection
+[Sun Jul 12 18:03:33 2026] [::1]:54222 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54223 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54223 Invalid request (Malformed HTTP request)
+[Sun Jul 12 18:03:33 2026] [::1]:54223 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54224 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54224 [404]: GET /comp/city.php?q=NonExistent&cols=city&cond=contains&sf=1 - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54224 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54225 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54225 [404]: GET /comp/city_form.php?mode=new&ajax=1 - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54225 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54226 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54226 [404]: GET /comp/city_form.php?mode=edit&id=1&ajax=1 - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54226 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54227 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54227 [404]: GET /comp/invoice.php - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54227 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54228 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54228 [404]: GET /comp/invoice_form.php?mode=new&ajax=1 - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54228 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54229 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54229 [404]: GET /comp/invoice_form.php?mode=edit&id=1&ajax=1 - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54229 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54230 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54230 [404]: GET /comp/city.php - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54230 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54231 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54231 [404]: POST /comp/city_form.php?mode=edit&id=1&ajax=1 - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54231 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54232 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54232 [404]: POST /comp/city_form.php?mode=new&ajax=1 - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54232 Closing
+[Sun Jul 12 18:03:33 2026] [::1]:54233 Accepted
+[Sun Jul 12 18:03:33 2026] [::1]:54233 [404]: POST /comp/city_field_save.php - No such file or directory
+[Sun Jul 12 18:03:33 2026] [::1]:54233 Closing

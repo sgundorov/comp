@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Продажа товаров — Компаньон</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #333; }
+body { background: #f5f6f8; }
+.page { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+.layout { display: flex; gap: 30px; margin-top: 0; align-items: flex-start; }
+
+.sidebar { width: 240px; flex-shrink: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+.sidebar-title { background: #1a2530; color: #f0c040; font-size: 14px; font-weight: 700; padding: 10px 14px; }
+.sidebar ul { list-style: none; }
+.sidebar li { border-top: 1px solid #eee; }
+.sidebar a { display: block; padding: 9px 14px; font-size: 13px; color: #2a6b9a; text-decoration: none; }
+.sidebar a:hover { background: #edf4fb; }
+.sidebar a.active { background: #e8f0f8; font-weight: 700; color: #1a2530; }
+
+.content { flex: 1; min-width: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 28px 32px; }
+.content h1 { font-size: 24px; margin-bottom: 16px; color: #1a2530; }
+.content h2 { font-size: 18px; margin: 28px 0 10px; color: #2a3a4b; }
+.content h3 { font-size: 15px; margin: 20px 0 8px; color: #3a4a5b; }
+.content p { margin: 10px 0; }
+.content ul, .content ol { margin: 8px 0 8px 24px; }
+.content li { margin: 4px 0; }
+.content a { color: #2a6b9a; }
+.content hr { border: none; border-top: 2px solid #eee; margin: 28px 0; }
+.content img.zoom { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; margin: 8px 0; }
+.content em { color: #666; }
+.content strong { color: #1a2530; }
+
+table.fields { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+table.fields th, table.fields td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; vertical-align: top; }
+table.fields th { background: #f4f6f9; font-weight: 600; color: #1a2530; white-space: nowrap; }
+table.fields td:first-child { font-weight: 600; white-space: nowrap; color: #2a3a4b; }
+table.fields td:last-child { color: #555; }
+
+@media (max-width: 800px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; }
+  table.fields th, table.fields td { white-space: normal; }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-title">КОМПАНЬОН</div>
+      <ul>
+        <li><a href="index.html">О приложении</a></li>
+        <li><a href="interface.html">Интерфейс и основные способы работы</a></li>
+        <li><a href="sklad.html">Склад</a></li>
+        <li><a href="nomenclature.html">Номенклатура</a></li>
+        <li><a href="contractors.html">Контрагенты</a></li>
+        <li><a href="docfinance.html">Документы и финансы</a></li>
+        <li><a href="handbook.html">Справочники</a></li>
+        <li><a href="admin.html">Администрирование</a></li>
+      </ul>
+    </aside>
+    <main class="content">
+      <p><a href="sklad.html">&larr; Склад</a></p>
+
+      <h1>Продажа товаров</h1>
+
+      <p><strong>Продажа</strong> &mdash; отгрузка товаров покупателю. Товар списывается со склада. Документ фиксирует реализацию товаров и служит основанием для формирования счёта покупателю.</p>
+
+      <h2>Таблица документов продажи</h2>
+
+      <p>На этой странице находится таблица со списком всех документов продажи.</p>
+
+      <p><img class="zoom" src="img/prod.png" alt="Таблица документов продажи приложения Компаньон" style="max-width:74	0px" /></p>
+      <p><em>Таблица документов продажи.</em></p>
+
+      <h3><strong>Колонки таблицы "Продажа":</strong></h3>
+      <ul>
+        <li><strong>Утв.</strong> &mdash; признак (значок) "Утверждено".</li>
+        <li><strong>Док. №</strong> &mdash; номер документа.</li>
+        <li><strong>Дата</strong> &mdash; дата оформления продажи.</li>
+        <li><strong>Контрагент</strong> &mdash; покупатель.</li>
+        <li><strong>Участок</strong> &mdash; склад, с которого отгружается товар.</li>
+        <li><strong>Скидка %</strong> &mdash; процент скидки на.</li>
+        <li><strong>Сумма</strong> &mdash; общая сумма документа.</li>
+        <li><strong>Оплачено</strong> &mdash; сумма, оплаченная покупателем.</li>
+        <li><strong>Позиций</strong> &mdash; количество товарных позиций.</li>
+        <li><strong>Примечание</strong> &mdash; комментарий к документу.</li>
+      </ul>
+
+<p>Документы можно сортировать и искать по любой колонке. Имеется "колоночный фильтр" по контрагенту и участку.</p>
+
+<p><img src="img\bt_utw.png" style="max-width:32px" /> <strong>Кнопка "Утвердить"</strong>. Включение признака "Утверждено" изменяет остатки товаров документа на участке (складе). При этом в документе запрещаются любые изменения кроме поля "Примечание" документа.</p>
+
+      <hr />
+
+      <h2>Форма документа "Продажа"</h2>
+
+      <p>Форма "Продажа" состоит из трех вкладок. Поля ввода расположены на вкладке &laquo;Параметры&raquo;:</p>
+
+
+      <p><img class="zoom" src="img/prod_up.png" alt="Форма документа продажи приложения Компаньон" style="max-width:600px" /></p>
+      <p><em>Форма редактирования документа продажи. </em></p>
+
+      <table class="fields">
+        <tr><th>Поле</th><th>Описание поля</th></tr>
+        <tr><td>Документ №</td><td>номер документа. Заполняется автоматически, но может быть изменён вручную.</td></tr>
+        <tr><td>Дата</td><td>дата создания документа.</td></tr>
+        <tr><td>Время</td><td>время создания документа.</td></tr>
+        <tr><td>Контрагент*</td><td>покупатель. Выбирается из справочника контрагентов. Поле обязательное.</td></tr>
+        <tr><td>Участок*</td><td>склад, с которого отгружается товар.</td></tr>
+        <tr><td>Скидка</td><td>процент скидки на документ в целом. Кнопка "Установить скидку" устанавливает скидку у всех товаров этого документа. При этом пересчитывается сумма скидки.</td></tr>
+        <tr><td>Сумма скидки</td><td>Сумма скидки документа. Рассчитывается автоматически на основе товарных позиций.</td>
+        <tr><td>Итоговая сумма</td><td>общая сумма документа, рассчитывается автоматически.</td></tr>
+        <tr><td>Позиций</td><td>количество товарных позиций, заполняется автоматически.</td></tr>
+        <tr><td>Оплачено</td><td>сумма, оплаченная покупателем. Рассчитывается на основе запией о платежах по данному документу.</td></tr>
+        <tr><td>Дата оплаты</td><td>дата оплаты.</td></tr>
+        <tr><td>Сотрудник</td><td>кто создал документ. Выбор из справочника.</td></tr>
+        <tr><td>Принял</td><td>кто отгрузил товар. Выбор из справочника.</td></tr>
+        <tr><td>Примечание</td><td>произвольный комментарий к документу.</td></tr>
+      </table>
+
+      <hr />
+
+      <h2>Вкладка "Товары"</h2>
+
+      <p>На этой вкладке находится таблица со списком товаров документа.</p>
+      <p><img class="zoom" src="img/prod2_up.png" alt="Табличная часть товаров" style="max-width:740px" /></p>
+      <p><em>Вкладка "Товары" с перечнем отгружаемых позиций.</em></p>
+
+      <p><strong>Форма записи о товаре документа содержит:</strong></p>
+
+      <ul>
+        <li><strong>Товар</strong> &mdash; поле выбора номенклатуры с поиском (фильтром) по наименованию.</li>
+        <li><strong>Количество</strong> &mdash; количество единиц товара.</li>
+        <li><strong>Цена</strong> &mdash; цена за единицу.</li>
+        <li><strong>Скидка</strong> &mdash; процент скидки на данный товар.</li>
+        <li><strong>Сумма</strong> &mdash; итоговая сумма по товару, рассчитывается автоматически.</li>
+        <li><strong>Примечание</strong> &mdash; комментарий к товарной позиции.</li>
+      </ul>
+
+
+      <h3>Проверка остатков</h3>
+      <p>При выборе товара и вводе количества система автоматически проверяет остаток на выбранном складе. Если остаток недостаточен, программа выдаёт предупреждение. Нельзя продать товара больше, чем есть в наличии.</p>
+
+      <hr />
+
+      <h2>Вкладка "Оплата" документа</h2>
+
+     <p>На этой вкладке находится таблица со списком платежей по этому документу. Форма записи об оплате описана в разделе "Кассовая книга".</p>
+
+      <hr />
+
+      <h2>Печатные формы</h2>
+
+      <p>Для документа "Продажа" доступны следующие печатные формы:</p>
+
+      <ul>
+        <li><strong>Расходная накладная</strong> &mdash; основной сопроводительный документ.</li>
+        <li><strong>Товарный чек</strong> &mdash; для розничных продаж.</li>
+        <li><strong>Счёт-фактура</strong> &mdash; для налогового учёта.</li>
+        <li><strong>Акт выполненных работ</strong> &mdash; для услуг.</li>
+        <li><strong>УПД</strong> &mdash; универсальный передаточный документ.</li>
+      </ul>
+
+      <p>Выбор шаблона печати осуществляется через меню <strong>Печать</strong> в панели инструментов таблицы. Шаблоны настраиваются в разделе <strong>Администрирование &rarr; Настройка документов</strong>.</p>
+
+      <hr />
+
+      <p><a href="sklad.html">&larr; Вернуться к списку документов склада</a></p>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Справочники — Компаньон</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #333; }
+body { background: #f5f6f8; }
+.page { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+.layout { display: flex; gap: 30px; margin-top: 0; align-items: flex-start; }
+
+.sidebar { width: 240px; flex-shrink: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+.sidebar-title { background: #1a2530; color: #f0c040; font-size: 14px; font-weight: 700; padding: 10px 14px; }
+.sidebar ul { list-style: none; }
+.sidebar li { border-top: 1px solid #eee; }
+.sidebar a { display: block; padding: 9px 14px; font-size: 13px; color: #2a6b9a; text-decoration: none; }
+.sidebar a:hover { background: #edf4fb; }
+.sidebar a.active { background: #e8f0f8; font-weight: 700; color: #1a2530; }
+
+.content { flex: 1; min-width: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 28px 32px; }
+.content h1 { font-size: 24px; margin-bottom: 16px; color: #1a2530; }
+.content h2 { font-size: 18px; margin: 28px 0 10px; color: #2a3a4b; }
+.content h3 { font-size: 15px; margin: 20px 0 8px; color: #3a4a5b; }
+.content p { margin: 10px 0; }
+.content ul, .content ol { margin: 8px 0 8px 24px; }
+.content li { margin: 4px 0; }
+.content a { color: #2a6b9a; }
+.content hr { border: none; border-top: 2px solid #eee; margin: 28px 0; }
+.content img.zoom { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; margin: 8px 0; }
+.content img.inline-icon { vertical-align: middle; margin-right: 4px; }
+.content em { color: #666; }
+.content strong { color: #1a2530; }
+
+
+@media (max-width: 800px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-title">КОМПАНЬОН</div>
+      <ul>
+        <li><a href="index.html">О приложении</a></li>
+        <li><a href="interface.html">Интерфейс и основные способы работы</a></li>
+        <li><a href="sklad.html">Склад</a></li>
+        <li><a href="nomenclature.html">Номенклатура</a></li>
+        <li><a href="contractors.html">Контрагенты</a></li>
+        <li><a href="docfinance.html">Документы и финансы</a></li>
+        <li><a href="handbook.html" class="active">Справочники</a></li>
+        <li><a href="admin.html">Администрирование</a></li>
+      </ul>
+    </aside>
+    <main class="content">
+      <h1>Справочники</h1>
+
+      <p>Справочники &mdash; это простые таблицы, содержащие базовую информацию, которая используется в других разделах приложения. Доступ к ним осуществляется через <strong>Главное меню &rarr; Справочники</strong>. Все справочники имеют стандартную таблицу с панелью инструментов и форму редактирования в модальном окне.</p>
+
+      <p><img class="zoom" src="img/handbook-menu.png" alt="Меню справочников" style="max-width:400px" /></p>
+      <p><em>Подменю раздела Справочники.</em></p>
+
+      <hr />
+
+      <h2>Фирмы</h2>
+
+      <p>Страница содержит перечень юридических лиц (компаний-организаций), от имени которых ведётся деятельность. Каждая фирма хранит полные регистрационные реквизиты, используемые в печатных формах документов (счета, накладные, акты).</p>
+
+      <p><img class="zoom" src="img/firm-table.png" alt="Таблица фирм" style="max-width:800px" /></p>
+      <p><em>Таблица справочника «Фирмы».</em></p>
+
+      <h3>Колонки таблицы</h3>
+      <ul>
+        <li><strong>Наименование</strong> &mdash; краткое название организации.</li>
+        <li><strong>Полное наименование</strong> &mdash; полное официальное название.</li>
+        <li><strong>ИНН</strong> &mdash; идентификационный номер налогоплательщика.</li>
+        <li><strong>Адрес</strong> &mdash; юридический адрес организации.</li>
+        <li><strong>Телефон</strong> &mdash; контактный телефон.</li>
+        <li><strong>Банковские реквизиты</strong> &mdash; расчётный счёт, БИК, корреспондентский счёт, наименование банка.</li>
+      </ul>
+
+      <h3>Поля формы</h3>
+      <p>Форма редактирования содержит все реквизиты юридического лица: наименование (краткое и полное), ИНН, КПП, ОГРН, юридический адрес, фактический адрес, телефон, факс, e-mail, банковские реквизиты (расчётный счёт, БИК, корр. счёт, банк), а также отметку об активности организации.</p>
+
+      <p>Реквизиты фирмы автоматически подставляются в печатные формы документов. Если в системе зарегистрировано несколько фирм, перед печатью можно выбрать, от имени какой организации формировать документ.</p>
+
+      <hr />
+
+      <h2>Города</h2>
+
+      <p>Страница содержит перечень городов и населённых пунктов. Используется в адресах контрагентов и других справочниках.</p>
+
+      <p><img class="zoom" src="img/city-table.png" alt="Таблица городов" style="max-width:600px" /></p>
+      <p><em>Таблица справочника «Города».</em></p>
+
+      <h3>Колонки таблицы</h3>
+      <ul>
+        <li><strong>Наименование</strong> &mdash; название города или населённого пункта.</li>
+        <li><strong>Область / Регион</strong> &mdash; регион, к которому относится город.</li>
+        <li><strong>Страна</strong> &mdash; страна (выбор из справочника стран).</li>
+      </ul>
+
+      <h3>Поля формы</h3>
+      <p>Форма содержит поле наименования города, поле выбора региона и поле выбора страны. Страна выбирается из справочника «Страны».</p>
+
+      <hr />
+
+      <h2>Страны</h2>
+
+      <p>Страница содержит перечень стран. Используется в справочнике городов и в адресах контрагентов.</p>
+
+      <p><img class="zoom" src="img/country-table.png" alt="Таблица стран" style="max-width:600px" /></p>
+      <p><em>Таблица справочника «Страны».</em></p>
+
+      <h3>Колонки таблицы</h3>
+      <ul>
+        <li><strong>Наименование (рус.)</strong> &mdash; название страны на русском языке.</li>
+        <li><strong>Наименование (англ.)</strong> &mdash; название страны на английском языке (необязательное поле).</li>
+        <li><strong>Код</strong> &mdash; двухбуквенный или трёхбуквенный код страны (например, RU, US, DE).</li>
+      </ul>
+
+      <h3>Поля формы</h3>
+      <p>Форма содержит три поля: название на русском, название на английском и код страны.</p>
+
+      <hr />
+
+      <h2>Участки</h2>
+
+      <p>Страница содержит перечень складов и мест хранения товаров. Используется во всех складских документах для указания места хранения.</p>
+
+      <p><img class="zoom" src="img/store-table.png" alt="Таблица участков" style="max-width:600px" /></p>
+      <p><em>Таблица справочника «Участки» (места хранения).</em></p>
+
+      <h3>Колонки таблицы</h3>
+      <ul>
+        <li><strong>Наименование</strong> &mdash; название склада или участка.</li>
+        <li><strong>Адрес</strong> &mdash; фактический адрес расположения склада.</li>
+        <li><strong>Ответственный</strong> &mdash; сотрудник, ответственный за данный участок (выбор из справочника сотрудников).</li>
+      </ul>
+
+      <h3>Поля формы</h3>
+      <p>Форма содержит поле наименования, поле адреса и поле выбора ответственного сотрудника. Участки используются в шапке и табличной части складских документов при выборе склада отправителя и получателя.</p>
+
+      <hr />
+
+      <h2>Состояния заявок</h2>
+
+      <p>Страница содержит перечень статусов (состояний) документов. Например: «Черновик», «Проведён», «Отменён».</p>
+
+      <p><img class="zoom" src="img/status-table.png" alt="Таблица состояний заявок" style="max-width:500px" /></p>
+      <p><em>Таблица справочника «Состояния заявок».</em></p>
+
+      <h3>Колонки таблицы</h3>
+      <ul>
+        <li><strong>Наименование</strong> &mdash; название статуса.</li>
+        <li><strong>Цвет</strong> &mdash; цветовая индикация статуса (например, зелёный для проведённых документов, красный для отменённых). Цвет отображается в таблицах документов в виде цветной метки.</li>
+      </ul>
+
+      <h3>Поля формы</h3>
+      <p>Форма содержит наименование статуса и выбор цвета из палитры. Цвет используется для визуального выделения строк в таблицах документов.</p>
+
+      <hr />
+
+      <h2>Типы контактов</h2>
+
+      <p>Страница содержит перечень типов контактов, используемых в карточке контрагента. Например: «Должность», «Телефон», «Email», «Сайт», «Факс», «Мессенджер».</p>
+
+      <p><img class="zoom" src="img/contype-table.png" alt="Таблица типов контактов" style="max-width:500px" /></p>
+      <p><em>Таблица справочника «Типы контактов».</em></p>
+
+      <h3>Колонки таблицы</h3>
+      <ul>
+        <li><strong>Наименование</strong> &mdash; название типа контакта.</li>
+      </ul>
+
+      <h3>Поля формы</h3>
+      <p>Форма содержит только наименование типа. Справочник используется в блоке контактов на странице редактирования контрагента.</p>
+
+      <hr />
+
+      <h2>Виды рекламы</h2>
+
+      <p>Страница содержит перечень рекламных каналов, по которым пришёл контрагент. Например: «Из поисковика», «По рекомендации», «Социальные сети», «Баннер».</p>
+
+      <p><img class="zoom" src="img/promo-table.png" alt="Таблица видов рекламы" style="max-width:500px" /></p>
+      <p><em>Таблица справочника «Виды рекламы».</em></p>
+
+      <h3>Колонки таблицы</h3>
+      <ul>
+        <li><strong>Наименование</strong> &mdash; название рекламного канала.</li>
+      </ul>
+
+      <h3>Поля формы</h3>
+      <p>Форма содержит только наименование. Значение выбирается в карточке контрагента для указания источника, откуда клиент узнал о компании. Позволяет оценивать эффективность рекламных каналов.</p>
+
+      <hr />
+
+      <p><a href="docfinance.html">&larr; Документы и финансы</a> &nbsp;|&nbsp; <a href="admin.html">Администрирование &rarr;</a></p>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>

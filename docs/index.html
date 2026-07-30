@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Веб-приложение Компаньон</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #333; }
+body { background: #f5f6f8; }
+.page { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+.layout { display: flex; gap: 30px; margin-top: 0; align-items: flex-start; }
+
+/* sidebar */
+.sidebar { width: 240px; flex-shrink: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+.sidebar-title { background: #1a2530; color: #f0c040; font-size: 14px; font-weight: 700; padding: 10px 14px; }
+.sidebar ul { list-style: none; }
+.sidebar li { border-top: 1px solid #eee; }
+.sidebar a { display: block; padding: 9px 14px; font-size: 13px; color: #2a6b9a; text-decoration: none; }
+.sidebar a:hover { background: #edf4fb; }
+.sidebar a.active { background: #e8f0f8; font-weight: 700; color: #1a2530; }
+
+/* content */
+.content { flex: 1; min-width: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 28px 32px; }
+.content h1 { font-size: 24px; margin-bottom: 16px; color: #1a2530; }
+.content h2 { font-size: 18px; margin: 24px 0 10px; color: #2a3a4b; }
+.content h3 { font-size: 15px; margin: 20px 0 8px; color: #3a4a5b; }
+.content p { margin: 10px 0; }
+.content ul, .content ol { margin: 8px 0 8px 24px; }
+.content li { margin: 4px 0; }
+.content a { color: #2a6b9a; }
+.content hr { border: none; border-top: 2px solid #eee; margin: 28px 0; }
+.content img.zoom { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; margin: 8px 0; }
+.content em { color: #666; }
+.content strong { color: #1a2530; }
+
+
+@media (max-width: 800px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-title">КОМПАНЬОН</div>
+      <ul>
+        <li><a href="index.html" class="active">О приложении</a></li>
+        <li><a href="interface.html">Интерфейс и основные способы работы</a></li>
+        <li><a href="sklad.html">Склад</a></li>
+        <li><a href="nomenclature.html">Номенклатура</a></li>
+        <li><a href="contractors.html">Контрагенты</a></li>
+        <li><a href="docfinance.html">Документы и финансы</a></li>
+        <li><a href="handbook.html">Справочники</a></li>
+        <li><a href="admin.html">Администрирование</a></li>
+      </ul>
+    </aside>
+    <main class="content">
+      <h1>Веб-приложение «Компаньон»</h1>
+
+      <p>Приложение <strong>Компаньон</strong> предназначено для автоматизации складского учёта, документооборота и управления взаимоотношениями с контрагентами. Это веб-сервис, который работает в любом современном браузере, в том числе на мобильных устройствах.</p>
+
+      <p>Приложение обеспечивает полный цикл учёта товаров и услуг: поступление, перемещение, продажа, контроль остатков, а также ведение контрагентов, счетов, операций с деньгами и печать всех необходимых документов.</p>
+
+      <p><img class="zoom" src="img/main.png" alt="Главная страница приложения Компаньон" style="max-width:740px" /></p>
+      <p><em>Основное окно приложения с главным меню и таблицей документов. Щёлкните чтобы увеличить.</em></p>
+
+      <p>Демо-версию приложения можно посмотреть по адресу <a href="/comp">ваш-сервер/comp</a>. При входе необходимо зарегистрироваться, указав логин и пароль, выданные администратором.</p>
+
+      <p><img class="zoom" src="img/login.png" alt="Окно регистрации" style="max-width:400px" /></p>
+      <p><em>Окно регистрации при входе в приложение.</em></p>
+
+      <h2>Основные возможности</h2>
+      <ul>
+        <li><strong>Складской учёт</strong> — поступление, продажа, возврат, перемещение, списание товаров, контроль остатков на складах.</li>
+        <li><strong>Документооборот</strong> — счета, накладные, приходные/расходные ордера, коммерческие предложения, прайс листы.</li>
+        <li><strong>Контрагенты</strong> — ведение базы клиентов и поставщиков, учет всех контактов, история взаимоотношений.</li>
+        <li><strong>Финансы</strong> — кассовая книга, все операции с деньгаами, контроль взаиморасчётов.</li>
+        <li><strong>Товары и услуги</strong> — номенклатура, категории, группы, подгруппы, производители, единицы измерения.</li>
+        <li><strong>Справочники</strong> — города, страны, типы контактов, статусы — всё, что нужно для ведения учёта.</li>
+        <li><strong>Печать документов</strong> — формирование печатных форм счетов, накладных, актов и других документов на базе настраиваемых шаблонов. Возможность добавления новых видов печатных документов.</li>
+        <li><strong>Экспорт данных</strong> — выгрузка таблиц в CSV, Excel и HTML для дальнейшего анализа.</li>
+        <li><strong>Разграничение прав доступа</strong> — гибкая настройка прав сотрудников на просмотр, добавление, изменение и удаление записей.</li>
+      </ul>
+
+      <h2>Содержание документации</h2>
+      <ol>
+        <li><a href="interface.html">Интерфейс и основные способы работы с приложением</a> — главное меню, работа с таблицами и формами, клавиатурные сокращения, права доступа.</li>
+        <li><a href="sklad.html">Склад</a> — приход, продажа, возвраты, внутреннее перемещение, списание товаров.</li>
+        <li><a href="nomenclature.html">Номенклатура</a> — товары, услуги, категории, группы, производители, единицы измерения.</li>
+        <li><a href="contractors.html">Контрагенты</a> — клиенты и поставщики, контакты, категории, виды деятельности.</li>
+        <li><a href="docfinance.html">Документы и финансы</a> — счета, коммерческие предложения, кассовая книга, виды операций с деньгами.</li>
+        <li><a href="handbook.html">Справочники</a> — города, страны, участки, фирмы, состояния заявок, виды рекламы.</li>
+        <li><a href="admin.html">Администрирование</a> — сотрудники, роли, права доступа, настройка документов.</li>
+      </ol>
+
+      <h2>Для кого предназначено</h2>
+      <p>Приложение подойдёт небольшим и средним компаниям, ведущим складской учёт и документооборот: оптовым и розничным торговцам, сервисным организациям, производственным предприятиям. <strong>Компаньон</strong> помогает систематизировать учёт, снизить количество ошибок и ускорить работу сотрудников.</p>
+
+      <hr />
+
+      <p><a href="interface.html">Далее: Интерфейс и основные способы работы &rarr;</a></p>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>

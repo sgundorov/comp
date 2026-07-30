@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Возврат от покупателя — Компаньон</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #333; }
+body { background: #f5f6f8; }
+.page { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+.layout { display: flex; gap: 30px; margin-top: 0; align-items: flex-start; }
+.sidebar { width: 240px; flex-shrink: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+.sidebar-title { background: #1a2530; color: #f0c040; font-size: 14px; font-weight: 700; padding: 10px 14px; }
+.sidebar ul { list-style: none; }
+.sidebar li { border-top: 1px solid #eee; }
+.sidebar a { display: block; padding: 9px 14px; font-size: 13px; color: #2a6b9a; text-decoration: none; }
+.sidebar a:hover { background: #edf4fb; }
+.sidebar a.active { background: #e8f0f8; font-weight: 700; color: #1a2530; }
+.content { flex: 1; min-width: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 28px 32px; }
+.content h1 { font-size: 24px; margin-bottom: 16px; color: #1a2530; }
+.content h2 { font-size: 18px; margin: 28px 0 10px; color: #2a3a4b; }
+.content h3 { font-size: 15px; margin: 20px 0 8px; color: #3a4a5b; }
+.content p { margin: 10px 0; }
+.content ul, .content ol { margin: 8px 0 8px 24px; }
+.content li { margin: 4px 0; }
+.content a { color: #2a6b9a; }
+.content hr { border: none; border-top: 2px solid #eee; margin: 28px 0; }
+.content img.zoom { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; margin: 8px 0; }
+.content em { color: #666; }
+.content strong { color: #1a2530; }
+.content table.fields { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+.content table.fields th { background: #1a2530; color: #f0c040; padding: 8px 10px; text-align: left; font-weight: 600; }
+.content table.fields td { padding: 7px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+.content table.fields tr:nth-child(even) td { background: #fafafa; }
+.content table.fields td:first-child { font-weight: 600; white-space: nowrap; color: #1a2530; }
+@media (max-width: 800px) { .layout { flex-direction: column; } .sidebar { width: 100%; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="layout">
+    <aside class="sidebar">
+  <div class="sidebar-title">КОМПАНЬОН</div>
+  <ul>
+    <li><a href="index.html">О приложении</a></li>
+    <li><a href="interface.html">Интерфейс и основные способы работы</a></li>
+    <li><a href="sklad.html">Склад</a></li>
+    <li><a href="nomenclature.html">Номенклатура</a></li>
+    <li><a href="contractors.html">Контрагенты</a></li>
+    <li><a href="docfinance.html">Документы и финансы</a></li>
+    <li><a href="handbook.html">Справочники</a></li>
+    <li><a href="admin.html">Администрирование</a></li>
+  </ul>
+</aside>
+    <main class="content">
+      <p><a href="sklad.html">&larr; Склад</a></p>
+      <h1>Возврат от покупателя</h1>
+      <p>Документ «Возврат от покупателя» оформляет приём товаров, возвращённых покупателем. Товары возвращаются на склад и снова поступают в учёт.</p>
+      <p><img class="zoom" src="img/vozvrat.png" alt="Список возвратов от покупателя приложения Компаньон"></p>
+      <h2>Список документов возврата</h2>
+      <p>Эта страница показывает все документы возврата от покупателя. В таблице отображаются колонки:</p>
+      <ul>
+        <li><strong>Док. №</strong> — номер документа</li>
+        <li><strong>Дата</strong> — дата создания</li>
+        <li><strong>Контрагент</strong> — покупатель, вернувший товар</li>
+        <li><strong>Участок</strong> — склад, на который принимается товар</li>
+        <li><strong>Скидка</strong> — Процент скидки на документ в целом. Кнопка "Установить скидку" устанавливает скидку у всех товаров этого документа. При этом пересчитывается сумма скидки.</li>
+        <li><strong>Сумма</strong> — итоговая сумма документа</li>
+        <li><strong>Оплачено</strong> — сумма оплаты</li>
+        <li><strong>Позиций</strong> — количество товарных позиций</li>
+        <li><strong>Примечание</strong> — текстовое примечание к документу</li>
+      </ul>
+
+<p>Документы можно сортировать и искать по любой колонке. Имеется "колоночный фильтр" по контрагенту и участку.</p>
+<p><img src="img\bt_utw.png" style="max-width:32px"/> <strong>Кнопка "Утвердить"</strong>. Включение признака "Утверждено" увеличивает остатки товаров на участке (складе). При этом в документе запрещаются любые изменения кроме поля "Примечание".</p>
+
+      <h2>Форма документа «Возврат от покупателя»</h2>
+      <p><img class="zoom" src="img/vozvrat_up.png" alt="Форма возврата от покупателя"></p>
+
+      <h3>Поля заголовка</h3>
+      <table class="fields">
+        <thead>
+          <tr><th>Поле</th><th>Описание</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Док. №</td><td>Автоматически формируется системой. Можно изменить вручную.</td></tr>
+          <tr><td>Дата</td><td>Дата и время создания документа.</td></tr>
+          <tr><td>Контрагент*</td><td>Покупатель, вернувший товар. Выбирается из справочника контрагентов.</td></tr>
+          <tr><td>Участок*</td><td>Склад, на который оприходуется возвращаемый товар.</td></tr>
+          <tr><td>Скидка</td><td>Скидка на документ в процентах или сумме.</td></tr>
+          <tr><td>Итоговая сумма</td><td>Рассчитывается автоматически как сумма позиций за вычетом скидки.</td></tr>
+          <tr><td>Позиций</td><td>Количество товарных строк в документе.</td></tr>
+          <tr><td>По документу №</td><td>Ссылка на первичный документ (обычно накладная на продажу).</td></tr>
+          <tr><td>Оплачено</td><td>Факт оплаты: сумма, дата.</td></tr>
+          <tr><td>Дата оплаты</td><td>Дата фактической оплаты.</td></tr>
+          <tr><td>Сотрудник</td><td>Ответственный сотрудник, создавший документ.</td></tr>
+          <tr><td>Принял</td><td>Сотрудник, принявший товар на склад.</td></tr>
+          <tr><td>Примечание</td><td>Произвольный текст, примечание к документу.</td></tr>
+        </tbody>
+      </table>
+
+<h3>Вкладка «Товары» документа</h3>
+
+<p><img class="zoom" src="img/vozvrat2_up.png" alt="Таблица товаров возврата от покупателя" style="max-width:740px" /></p>
+<p><em>Таблица товарных позиций документа &laquo;Возврат от покупателя&raquo;.</em></p>
+
+<p>На этой вкладке находится таблица списка товарных позиции документа. Для добавления записи о товаре нажмите кнопку &laquo;Добавить&raquo;. В форме "Товар документа" указываются:</p>
+
+<table class="fields">
+<tr><td>Товар</td><td>Выбор товара/услуги из справочника номенклатуры. При поиске товара используется фильтр по наименованию.</td></tr>
+<tr><td>Кол-во</td><td>Количество товара.</td></tr>
+<tr><td>Цена</td><td>Цена за единицу товара.</td></tr>
+<tr><td>Скидка</td><td>Скидка на данную товарную позицию в процентах.</td></tr>
+<tr><td>Сумма</td><td>Стоимость позиции (количество x цена - скидка). Рассчитывается автоматически.</td></tr>
+<tr><td>Сумма скидки</td><td>Сумма скидки. Рассчитывается автоматически.</td></tr>
+<tr><td>Примечание</td><td>Комментарий к товарной позиции.</td></tr>
+</table>
+
+
+<p><img src="img/bt_import.png" style="max-width:32px" /> При помощи кнопки "Импорт" в документ можно вставить список товаров, предварительно отмеченных на странице "Товары".</p>
+
+<p>После добавления всех позиций сохраните документ нажатием кнопки &laquo;Применить&raquo; или &laquo;Сохранить&raquo;. Они отличаются только тем что кнопка "Применить" не закрывает форму.</p>
+
+<h3>Вкладка «Оплата» документа</h3>
+<p>На этой вкладке находится таблица со списком платежей по этому документу. Запись об оплате имеет Вид операции расходного типа, поэтому сумма операции получается отрицательная.</p>
+
+
+      <h3>Особенности</h3>
+      <p>При сохранении документа количество товара на складе <strong>увеличивается</strong> — товар возвращается в оборот. Документ обычно создаётся на основании исходного документа продажи, что позволяет автоматически подставить товарные позиции, цены и контрагента.</p>
+
+      </hr>
+      <p><a href="sklad.html">&larr; Вернуться к видам документов</a></p>
+    </main>
+  </div>
+</div>
+</body>
+</html>

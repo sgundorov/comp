@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Контрагенты — Компаньон</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #333; }
+body { background: #f5f6f8; }
+.page { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+.layout { display: flex; gap: 30px; margin-top: 0; align-items: flex-start; }
+
+.sidebar { width: 240px; flex-shrink: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+.sidebar-title { background: #1a2530; color: #f0c040; font-size: 14px; font-weight: 700; padding: 10px 14px; }
+.sidebar ul { list-style: none; }
+.sidebar li { border-top: 1px solid #eee; }
+.sidebar a { display: block; padding: 9px 14px; font-size: 13px; color: #2a6b9a; text-decoration: none; }
+.sidebar a:hover { background: #edf4fb; }
+.sidebar a.active { background: #e8f0f8; font-weight: 700; color: #1a2530; }
+
+.content { flex: 1; min-width: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 28px 32px; }
+.content h1 { font-size: 24px; margin-bottom: 16px; color: #1a2530; }
+.content h2 { font-size: 18px; margin: 28px 0 10px; color: #2a3a4b; }
+.content h3 { font-size: 15px; margin: 20px 0 8px; color: #3a4a5b; }
+.content p { margin: 10px 0; }
+.content ul, .content ol { margin: 8px 0 8px 24px; }
+.content li { margin: 4px 0; }
+.content a { color: #2a6b9a; }
+.content hr { border: none; border-top: 2px solid #eee; margin: 28px 0; }
+.content img.zoom { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; margin: 8px 0; }
+.content img.inline-icon { vertical-align: middle; margin-right: 4px; }
+.content em { color: #666; }
+.content strong { color: #1a2530; }
+.content .note { background: #fff9e6; border-left: 4px solid #f0c040; padding: 10px 14px; margin: 14px 0; border-radius: 0 4px 4px 0; font-size: 14px; }
+
+
+@media (max-width: 800px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-title">КОМПАНЬОН</div>
+      <ul>
+        <li><a href="index.html">О приложении</a></li>
+        <li><a href="interface.html">Интерфейс и основные способы работы</a></li>
+        <li><a href="sklad.html">Склад</a></li>
+        <li><a href="nomenclature.html">Номенклатура</a></li>
+        <li><a href="contractors.html" class="active">Контрагенты</a></li>
+        <li><a href="docfinance.html">Документы и финансы</a></li>
+        <li><a href="handbook.html">Справочники</a></li>
+        <li><a href="admin.html">Администрирование</a></li>
+      </ul>
+    </aside>
+    <main class="content">
+      <h1>Контрагенты</h1>
+
+      <p>Раздел <strong>Контрагенты</strong> предназначен для ведения базы клиентов и поставщиков, а также вспомогательных справочников: категорий контрагентов, видов деятельности, типов контактов и источников рекламы.</p>
+
+      <h2>1. Контрагенты</h2>
+      <p>Основная страница учёта клиентов и поставщиков. Содержит полную информацию о каждом контрагенте.</p>
+
+      <p><img class="zoom" src="img/main.png" alt="Таблица контрагентов приложения Компаньон" style="max-width:740px" /></p>
+      <p><em>Таблица контрагентов с включенными фильтрами по Категории и Городу.</em></p>
+
+      <h3>Поиск</h3>
+      <p>В этой таблице доступен быстрый поиск по любому полю записи о контрагенте. Можно также использовать "колоночные фильтры" по "Категории", "Городу" и "Стране". Результат их работы показан на скриншоте выше.</p>
+
+      <h3>Печать</h3>
+      <p>Можно напечатать (или экспортировать) список всех контрагентов, только отмеченных или отдельной страницы.  Список выводится с учётом всех включенных фильтров. Через <a href="admin.html">систему разделения доступа</a> можно запретить печать и экспорт списка контрагентов для некоторых категорий сотрудников.</p>
+
+      <p>В панели инструментов этой таблицы есть дополнительные (не стандартные) кнопки:</p>
+      <ul>
+        <li><strong>Контакты</strong> &mdash; открывает страницу "Контакты" с записями о контактах выбранного контрагента.</li>
+        <li><strong>Контакты</strong> &mdash; открывает страницу "Контакты" с записями о контактах выбранного контрагента.</li>
+        <li><strong>Оплата</strong> &mdash; открывает страницу "Кассовая книга" с записями об операциях с деньгами  выбранного контрагента.</li>
+      </ul>
+
+      <h3>Колонки таблицы</h3>
+      <ul>
+        <li><strong>Контрагент</strong> &mdash; наименование контрагента - организации или физического лица.</li>
+        <li><strong>Фамлия, Имя и Отчество</strong> &mdash; ФИО контрагента.</li>
+        <li><strong>Категория</strong> &mdash; категория контрагента (опт, розница, VIP и т.д.).</li>
+        <li><strong>Виды деятельности</strong> &mdash; виды деятельности контрагента.</li>
+        <li><strong>Телефон</strong> &mdash; контактный телефон.</li>
+        <li><strong>Email</strong> &mdash; адрес электронной почты.</li>
+        <li><strong>Город</strong> &mdash; населённый пункт.</li>
+        <li><strong>Страна</strong> &mdash; страна контрагента.</li>
+        <li><strong>Адрес</strong> &mdash; фактический адрес.</li>
+        <li><strong>Примечание</strong> &mdash; произволные примечания о контрагенте.</li>
+      </ul>
+
+      <p>При помощи панели "Настройка столбцов таблицы" можно включить (или выключить) видимость и доугих полей записи о контрагенте а также изменить порядок вывода колонок в таблице. Прокручивать колонки по горизонтали можно клавишами Left и Right.</p>
+
+      <h3>Форма редактирования контрагента</h3>
+      <p><img class="zoom" src="img/client_up.png" alt="Форма редактирования контрагента" style="max-width:650px" /></p>
+      <p><em>Форма редактирования контрагента.</em></p>
+
+      <h3><strong>Поля формы Контрагент</strong></h3>
+      <p><strong>Вкладка "Общие":</strong>
+      <ul>
+        <li><strong>Организация</strong> &mdash; название организации (если есть).</li>
+        <li><strong>Фамилия, Имя и Отчество</strong> &mdash; поля для ФИО физического лица.</li>
+        <li><strong>Категория</strong> &mdash; выбор из справочника категорий контрагентов.</li>
+        <li><strong>Телефон</strong> &mdash; номер телефона.</li>
+        <li><strong>Сотовый телефон</strong> &mdash; номер сотового телефона.</li>
+        <li><strong>Email</strong> &mdash; адрес электронной почты.</li>
+        <li><strong>Сайт</strong> &mdash; адрес сайта контрагента.</li>
+        <li><strong>Поставщик</strong> &mdash; признак "Поставщик".</li>
+        <li><strong>Проблемный</strong> &mdash; признак "Проблемный".</li>
+        <li><strong>Скрыт</strong> &mdash; признак "Скрыт". Скрытые записи показываются в таблице только если в параметрах настройки приложения включен флаг "Показывать все записи".</li>
+        <li><strong>Примечание</strong> &mdash; большое поле для произвольныж заметок о контрагенте.</li>
+      </ul>
+      <p><strong>Вкладка "Адрес":</strong>
+      <ul>
+        <li><strong>Город</strong> &mdash; выбор из справочника городов.</li>
+        <li><strong>Страна</strong> &mdash; выбор из справочника стран.</li>
+        <li><strong>Индекс</strong> &mdash; почтовый индекс.</li>
+        <li><strong>Юридический адрес</strong> &mdash; юридический адрес (для организации).</li>
+        <li><strong>Фактический адрес</strong> &mdash; аактический адрес.</li>
+      </ul>
+      <p><strong>Вкладка "Реквизиты":</strong>
+      <ul>
+        <li><strong>ИНН</strong> &mdash; ИНН налогоплательщика.</li>
+        <li><strong>КПП</strong> &mdash; КПП организации.</li>
+        <li><strong>ОГРН</strong> &mdash; код ОГРН.</li>
+        <li><strong>Банк</strong> &mdash; название банка.</li>
+        <li><strong>БИК</strong> &mdash; код БИК.</li>
+        <li><strong>Счет</strong> &mdash; расчетный счет.</li>
+        <li><strong>Корсчет</strong> &mdash; корреспондетский счет.</li>
+        <li><strong>Директор</strong> &mdash; ФИО директора.</li>
+        <li><strong>Главбух</strong> &mdash; ФИО главного бухгалтера.</li>
+        <li><strong>Реклама</strong> &mdash; выбор источника рекламы из справочника.</li>
+        <li><strong>Виды деятельности</strong> &mdash; выбор выбор одного или нескольких видов деятельности из справочника.</li>
+      </ul>
+      <p><strong>Вкладка "Документы".</strong></p>
+      <p>На этой вкладке находится таблица со списком документов (файлов), связанных с данным контрагентом. Это могут быть фотографии докуметов клиента (паспорт и пр.), файлы различных документов и т.п. Здесь же выводится само изображение (для файлов изображений). Клик по этому изображению или имени файла в таблице открывает изображение в большом масштабе в отдельной вкладке браузера.</p>
+
+      <p><img class="zoom" src="img/clidoc.png" alt="Вкладка Документы формы контрагента" style="max-width:650px" /></p>
+      <p><em>Вкладка "Документы" формы контрагента.</em></p>
+
+      <h3>Особенности</h3>
+      <ul>
+        <li>С контрагентом может быть связано несколько <strong>контактов</strong> (см. раздел 2).</li>
+        <li>Контрагент фигурирует в <strong>документах</strong> (счета, накладные, заказы).</li>
+        <li>При выборе контрагента в документах его данные (наименование, адрес, телефонб реквизиты) подставляются автоматически.</li>
+      </ul>
+
+      <hr>
+
+      <h2>2. Контакты</h2>
+      <p>Таблица записей о контактах с контрагентами. Позволяет хранить сколько угодно записей о контактах для каждого из контрагентов. Эту таблицу можно открыть из главного меню приложения или при помощи кнопки "Контакты" на странице "Контрагенты" - чтобы посмотреть записи о контактах выбранного контрагента.</p>
+
+      <p><img class="zoom" src="img/contact.png" alt="Таблица контактов приложения Компаньон" style="max-width:740px" /></p>
+      <p><em>Таблица контакнтов с включенным фильтром по Контрагенту.</em></p>
+
+      <p>В этой таблице доступен быстрый поиск по любому полю записи о контакте. Можно также использовать "колоночные фильтры" по "Контрагенту", "Виду контакта" и по "Сотруднику".</p>
+
+      <h3>Колонки таблицы:</h3>
+      <ul>
+        <li><strong>ID</strong> &mdash; уникальный код записи о контакте.</li>
+        <li><strong>Контрагент</strong> &mdash; название контрагента.</li>
+        <li><strong>Дата/время</strong> &mdash; Дата и время контакта.</li>
+        <li><strong>Важный</strong> &mdash; признак важного контакта.</li>
+        <li><strong>Вид контакта</strong> &mdash; выбор из стравочника видов контакта.</li>
+        <li><strong>Сотрудник</strong> &mdash; сотрудник, создавший запись о контакте.</li>
+        <li><strong>Содержание контакта</strong> &mdash; большое поле с описанием контакта.</li>
+      </ul>
+
+      <hr>
+
+      <h2>3. Категории контрагентов</h2>
+      <p>Справочник категорий для группировки контрагентов: оптовые, розничные, VIP, дилеры и т.д.</p>
+
+      <h3>Колонки таблицы</h3>
+      <ul>
+        <li><strong>Категория</strong> &mdash; название категории.</li>
+        <li><strong>Поставщик</strong> &mdash; признак поставщика.</li>
+        <li><strong>Проблемный</strong> &mdash; признак проблемного контрагента.</li>
+        <li><strong>Цвет</strong> &mdash; выбор цвета выделения для этой категории контрагентов.</li>
+        <li><strong>Примечаие</strong> &mdash; примечание о категории.</li>
+      </ul>
+      <p>Категория используется как поле-справочник в форме контрагента. Цвет выделения используется в таблице "Контрагенты".</p>
+
+      <hr>
+
+      <h2>4. Виды деятельности</h2>
+      <p>Справочник видов деятельности контрагентов (торговля, производство, услуги и т.д.). Содержит два поля:  <strong>Вид деятельности</strong> и <strong>Примечание</strong>.</p>
+
+      <hr>
+
+      <h2>5. Виды контактов</h2>
+      <p>Справочник видов контактов: телефон, электронная почта, встреча, WhatsApp, Telegram и т.д. Содержит поля <strong>Видконтакта</strong>, признак <strong>Важный</strong> и <strong>Примечание</strong>.</p>
+      <p>Используется в записи о контакте (раздел 2).</p>
+
+      <hr>
+      <h2>6. Виды рекламы</h2>
+      <p>Справочник источников рекламы: звонок, сайт, рекомендация, контекстная реклама, соцсети и т.д. Позволяет отслеживать, откуда пришёл клиент. Содержит следующие поля:</p>
+      <ul>
+        <li><strong>Вид рекламы</strong> &mdash; название вида рекламы.</li>
+        <li><strong>Дата начала</strong> &mdash; дата окончания рекламной компании.</li>
+        <li><strong>Дата окончания</strong> &mdash; дата начала рекламной компании.</li>
+        <li><strong>Количество клиентов</strong> &mdash; количество клиентов с этим видом рекламы.</li>
+        <li><strong>Процент</strong> &mdash; процент клиентов с этим видом рекламы от общего их числа.</li>
+        <li><strong>Примечаие</strong> &mdash; примечание о виде рекламы.</li>
+      </ul>
+      <p>В рерхней части страницы "Виды рекламы" имеется кнопка "Пересчет", при помощи которой можно пересчитать текущие данные о количестве клиентов и проценте для всех видов рекламы.</p>
+
+      <hr />
+
+      <p><a href="interface.html">&larr; Назад к интерфейсу</a></p>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>

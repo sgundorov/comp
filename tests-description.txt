@@ -1,0 +1,158 @@
+Тесты проекта comp
+====================
+
+Запуск
+------
+Все тесты (unit + integration):
+  .\run_integration_tests.ps1   (PHPUnit + запуск PHP built-in сервера)
+
+Только unit (без сервера):
+  C:\xampp\php\php.exe .\phpunit.phar --testsuite=unit
+
+Только integration (нужен сервер на порту 8899):
+  C:\xampp\php\php.exe .\phpunit.phar --testsuite=integration
+
+Фильтр по классу:
+  C:\xampp\php\php.exe .\phpunit.phar --testsuite=integration --filter=TmcFullTest
+  C:\xampp\php\php.exe .\phpunit.phar --testsuite=unit --filter=ControlsTest
+
+Testdox (читаемый вывод без деталей):
+  C:\xampp\php\php.exe .\phpunit.phar --testsuite=integration --filter=TmcFullTest --testdox
+
+Всего: 107 тестов, 245 assertions (31 unit / 76 integration)
+
+
+Unit-тесты (31 тестов, 65 assertions)
+-------------------------------------
+Запускаются без сервера, проверяют чистые функции/утилиты.
+
+  FmtNumTest (7)
+    - testZeroReturnsEmpty         - число 0 → пустая строка
+    - testIntegerReturnsWithoutDecimals
+    - testTrimsTrailingZeros
+    - testCommaInput
+    - testThreeDecimals
+    - testOneDecimal
+    - testNegativeValues
+
+  HtmlEncodeTest (3)
+    - testPlainText
+    - testSpecialChars             - экранирование HTML
+    - testMixed
+    - testNullCoercion
+
+  HelpersTest (5)
+    - testHilightContains          - подсветка совпадений
+    - testHilightNoMatch
+    - testHilightEmptySearch
+    - testHilightStartsWith
+    - testHilightEndsWith
+
+  ControlsTest (8)
+    - testRenderInputText
+    - testRenderInputHidden
+    - testRenderInputEmptyValueNoValueAttr
+    - testRenderInputWithAttrs
+    - testRenderTextarea
+    - testRenderBtnText
+    - testRenderBtnPrimary
+    - testRenderBtnDanger
+
+  TemplateEngineTest (7)
+    - testReplaceVars              - подстановка {var}
+    - testReplaceMultipleVars
+    - testReplaceVarNotFound
+    - testProcessDetailBlocks
+    - testProcessDetailBlocksEmpty
+    - testRenderTemplate           - рендер .html файла
+    - testRenderTemplateFileNotFound
+
+
+Integration-тесты (76 тестов, 180 assertions)
+---------------------------------------------
+Требуют PHP built-in сервер на http://127.0.0.1:8899.
+Создают БД comp_test, копируют схему из comp, заполняют сидами.
+Каждый тест сбрасывает marks-состояние сессии.
+
+  TablePageTest
+    - testLogin
+    - testPageTitle
+    - testLoginAdmin                - ответ /login_handler.php
+    - testUserNotFound
+
+  CityFullTest (шаблон интеграционного теста)
+    - testLogin, testPageRender, testToggleSelectOn/Off
+    - testClearSelection, testInvertSelection, testToggleShowOnly
+    - testSearchByName/NotFound/Cleared
+    - testSortByNameAsc/Desc, testSortMulti
+    - testExportCsv/Xls/WithSearch/WithMarks
+    - testColumnWidthSave/ResetSingle/ResetAll
+    - testColumnsSave/HidesColumn
+    - testColumnFilterOptions
+    - testInlineEditText
+    - testFormReturnFocusAfterCreate/Edit
+
+  InvoiceTotalsTest
+    - тесты сумм в invoice (документ с НДС, скидками, начислениями)
+
+  ClientFullTest (30)
+    - testLogin                     - авторизация admin/admin
+    - testPageRender                - рендер страницы (7 колонок, данные)
+    - testToggleSelectOn/Off        - отметка строки
+    - testClearSelection            - снятие всех отметок
+    - testInvertSelection           - инверсия отметок
+    - testToggleShowOnly            - режим показа отмеченных
+    - testSearchByPhone/Email       - поиск по телефону, email
+    - testSearchNotFound            - поиск без результатов
+    - testSearchCleared             - сброс поиска
+    - testSortByNameAsc/Desc        - сортировка по имени
+    - testSortMulti                 - сортировка по двум полям
+    - testExportCsv/Xls             - экспорт в CSV/XLS
+    - testExportCsvWithSearch       - экспорт с фильтром поиска
+    - testExportWithMarks           - экспорт только отмеченных
+    - testColumnWidthSave/ResetSingle/ResetAll
+    - testColumnsSave/HidesColumn   - управление видимостью колонок
+    - testColumnFilterOptions       - получение опций фильтра
+    - testColumnFilterApply         - применение фильтра по категории
+    - testInlineEditCheckbox        - inline edit checkbox (supplier_flag)
+    - testInlineEditLookup          - inline edit lookup (cli_categ_id)
+    - testInlineEditText            - inline edit text (phone)
+    - testFormReturnFocusAfterCreate  - создание + data-focus
+    - testFormReturnFocusAfterEdit    - редактирование + data-focus
+
+  TmcFullTest (30) — товары
+    - testLogin
+    - testPageRender                - рендер (11 колонок, 4 товара)
+    - testToggleSelectOn/Off
+    - testClearSelection
+    - testInvertSelection
+    - testToggleShowOnly
+    - testSearchByName/Article      - поиск по названию, артикулу
+    - testSearchNotFound
+    - testSearchCleared
+    - testSortByNameAsc/Desc
+    - testSortMulti                 - quant:asc, name:desc
+    - testExportCsv/Xls
+    - testExportCsvWithSearch       - фильтр по артикулу
+    - testExportWithMarks
+    - testColumnWidthSave/ResetSingle/ResetAll
+    - testColumnsSave/HidesColumn   - скрытие колонки article
+    - testColumnFilterOptions       - опции для categ
+    - testColumnFilterApply         - фильтр по group_id
+    - testInlineEditText            - редактирование названия
+    - testInlineEditLookup          - смена категории
+    - testInlineEditDecimal         - смена цены
+    - testFormReturnFocusAfterCreate  - создание товара + data-focus
+    - testFormReturnFocusAfterEdit    - редактирование + data-focus
+
+
+Зависимости
+-----------
+- PHP 8.2 (C:\xampp\php\php.exe)
+- PHPUnit 11.5.56 (phpunit.phar в корне проекта)
+- MySQL root/1439@localhost:3306
+- БД comp (оригинал) — схема копируется в comp_test
+- PHP built-in сервер на 127.0.0.1:8899
+- Библиотека curl для HTTP-запросов из PHPUnit
+
+ВАЖНО: тесты изменяют config.local.php и создают/удаляют БД comp_test.

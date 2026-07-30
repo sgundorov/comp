@@ -1,0 +1,1140 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>╨У╨╛╤А╨╛╨┤╨░</title>
+  <link rel="stylesheet" href="app.css" />
+  <style>
+    .data-table tbody td.col-note { white-space: normal; word-break: break-word; }
+    .cell-edit-panel .cell-edit-actions { position: relative; z-index: 2; }
+    .data-table tbody tr:hover td.col-city { background: #2c3a4d; }
+    .data-table tbody tr.selected td.col-city { background: #3a5a8a; }
+    .data-table tbody tr.selected:hover td.col-city { background: #3a5a8a; }
+    .data-table thead th[data-sort-col]:hover { background: #3d5468; }
+    .col-filter-panel {
+      display: none; position: fixed; z-index: 1000; min-width: 240px; max-width: 320px;
+      padding: 8px; background: #2f3e4e; border: 2px solid #6b7785;
+      border-radius: 2px; box-shadow: 0 8px 18px rgba(0,0,0,.35); text-align: left;
+    }
+    .col-filter-panel.open { display: block; }
+    .col-filter-search { width: 100%; height: 28px; padding: 0 8px; margin: 0 0 6px; box-sizing: border-box; border: 1px solid var(--line); background: #fff; color: #2b2b2b; border-radius: 2px; font-size: 13px; outline: none; }
+    .col-filter-list { margin-bottom: 8px; }
+    .col-filter-row { display: flex; align-items: center; gap: 6px; padding: 4px; cursor: pointer; color: #fff; font-size: 13px; user-select: none; }
+    .col-filter-row:hover { background: var(--btn-hover); }
+    .col-filter-row input[type="checkbox"] { width: 14px; height: 14px; flex: 0 0 auto; }
+    .col-filter-row .col-filter-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .col-filter-empty { padding: 6px 4px; color: var(--muted); font-size: 12px; font-style: italic; }
+    .col-filter-more { padding: 4px; color: var(--muted); font-size: 12px; font-style: italic; border-top: 1px solid var(--line); }
+    .col-filter-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 10px 8px; border-top: 1px solid var(--line); }
+    .col-filter-actions button { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; background: var(--btn); color: #fff; border: 1px solid var(--line); border-radius: 2px; cursor: pointer; font-size: 14px; }
+    .col-filter-actions button img { width: 28px; height: 28px; flex: 0 0 auto; display: block; }
+    .col-filter-actions button:hover { background: var(--btn-hover); }
+    .col-filter-actions .col-filter-apply { background: var(--accent); border-color: var(--accent); }
+    .col-filter-actions .col-filter-apply:hover { background: #cf6d1a; border-color: #cf6d1a; }
+  </style>
+<link rel="stylesheet" href="/comp/assets/table.css" />
+    </head>
+<body>
+<style>
+#login-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;flex-direction:column}
+#login-overlay .login-box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:32px 40px;box-shadow:0 8px 32px rgba(0,0,0,.4);min-width:320px}
+#login-overlay .login-box h2{margin:-32px -40px 20px;padding:10px 12px;background:#1f2c3a;color:#ffe9a8;font-size:22px;font-weight:700;line-height:1.1;border-bottom:2px solid #2a3a4b;border-radius:8px 8px 0 0;user-select:none}
+#login-overlay .login-box .field{margin-bottom:14px}
+#login-overlay .login-box .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+#login-overlay .login-box .field input{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-size:14px;color:var(--input-text);background:var(--input-bg)}
+#login-overlay .login-box .field input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(230,126,34,.2)}
+#login-overlay .login-box .actions{display:flex;gap:18px;justify-content:center;margin-top:20px}
+#login-overlay .login-box .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;padding:8px 24px}
+#login-overlay .login-box .btn-primary:hover{background:var(--accent-hover)}
+#login-overlay .login-error{color:var(--danger);font-size:13px;text-align:center;margin-top:10px;display:none}
+</style>
+<div id="login-overlay">
+  <div class="login-box">
+    <h2>╨а╨╡╨│╨╕╤Б╤В╤А╨░╤Ж╨╕╤П ╤Б╨╛╤В╤А╤Г╨┤╨╜╨╕╨║╨░</h2>
+    <div class="field"><label>╨Ы╨╛╨│╨╕╨╜</label><input type="text" id="login-login" value="" autocomplete="username" /></div>
+    <div class="field"><label>╨Я╨░╤А╨╛╨╗╤М</label><input type="password" id="login-password" autocomplete="current-password" /></div>
+    <div class="login-error" id="login-error"></div>
+    <div class="actions">
+      <button class="btn btn-primary" id="login-submit"><img src="img/accept.png" alt="" /> ╨Т╤Е╨╛╨┤</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var overlay = document.getElementById('login-overlay');
+  var loginInput = document.getElementById('login-login');
+  var passInput = document.getElementById('login-password');
+  var errEl = document.getElementById('login-error');
+  function showError(msg) { errEl.textContent = msg; errEl.style.display = ''; }
+  function hideError() { errEl.style.display = 'none'; }
+  function doLogin() {
+    var l = loginInput.value.trim();
+    var p = passInput.value;
+    if (!l || !p) { showError('╨Т╨▓╨╡╨┤╨╕╤В╨╡ ╨╗╨╛╨│╨╕╨╜ ╨╕ ╨┐╨░╤А╨╛╨╗╤М'); return; }
+    hideError();
+    fetch('login_handler.php', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest'}, credentials:'same-origin', body:'login='+encodeURIComponent(l)+'&password='+encodeURIComponent(p) })
+      .then(function(r){return r.json()})
+      .then(function(d){
+        if (d && d.ok) { location.reload(); }
+        else { showError(d && d.error ? d.error : '╨Ю╤И╨╕╨▒╨║╨░ ╨▓╤Е╨╛╨┤╨░'); }
+      })
+      .catch(function(){ showError('╨Ю╤И╨╕╨▒╨║╨░ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╤П'); });
+  }
+  document.getElementById('login-submit').addEventListener('click', doLogin);
+  loginInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') passInput.focus(); });
+  passInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
+  loginInput.focus();
+})();
+</script>
+<div class="export-modal-backdrop" id="exportModal" role="dialog" aria-labelledby="exportModalTitle" aria-modal="true">
+    <div class="export-modal">
+      <div class="export-modal-title" id="exportModalTitle">╨б╨╛╤Е╤А╨░╨╜╨╡╨╜╨╕╨╡ ╤Д╨░╨╣╨╗╨░</div>
+      <div class="export-modal-row export-modal-row-input">
+        <label class="export-modal-label" for="exportModalFilename">╨Ш╨╝╤П ╤Д╨░╨╣╨╗╨░:</label>
+        <input class="export-modal-input" type="text" id="exportModalFilename" />
+        <span class="export-modal-ext" id="exportModalExt"></span>
+      </div>
+      <div class="export-modal-row">
+        <div class="export-modal-label">╨д╨╛╤А╨╝╨░╤В:</div>
+        <div class="export-modal-value" id="exportModalFormat"></div>
+      </div>
+      <div class="export-modal-row">
+        <div class="export-modal-label">╨Ч╨░╨┐╨╕╤Б╨╡╨╣:</div>
+        <div class="export-modal-value" id="exportModalCount"></div>
+      </div>
+      <div class="export-modal-actions">
+        <button type="button" class="export-cancel">╨Ю╤В╨╝╨╡╨╜╨░</button>
+        <button type="button" class="export-apply">╨б╨║╨░╤З╨░╤В╤М</button>
+      </div>
+    </div>
+  </div><div class="form-modal-backdrop" id="formModal" role="dialog" aria-labelledby="formModalTitle" aria-modal="true">
+    <div class="form-modal">
+      <button type="button" class="form-modal-close" data-form-close title="╨Ч╨░╨║╤А╤Л╤В╤М" aria-label="╨Ч╨░╨║╤А╤Л╤В╤М">&times;</button>
+      <div class="form-modal-body" id="formModalBody"></div>
+    </div>
+  </div><div class="page"><nav class="top-menu">
+  <img src="img/app.png" alt="" width="32" height="32" style="margin-right:8px;" />
+  <div class="menu-item">
+    <span class="menu-link">╨д╨░╨╣╨╗╤Л</span>
+    <div class="submenu">
+      <a href="#" onclick="__openFormModal('setup_form.php?mode=edit');return false;">╨Я╨░╤А╨░╨╝╨╡╤В╤А╤Л ╨╜╨░╤Б╤В╤А╨╛╨╣╨║╨╕</a>
+      <a href="repmenu.php">╨Э╨░╤Б╤В╤А╨╛╨╣╨║╨░ ╨┤╨╛╨║╤Г╨╝╨╡╨╜╤В╨╛╨▓</a>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-link">╨Ф╨╛╨║╤Г╨╝╨╡╨╜╤В╤Л</span>
+    <div class="submenu">
+      <a href="invoice.php">╨б╤З╨╡╤В╨░</a>
+      <a href="invoice.php?kind=offer">╨Ъ╨╛╨╝╨╝╨╡╤А╤З╨╡╤Б╨║╨╕╨╡ ╨┐╤А╨╡╨┤╨╗╨╛╨╢╨╡╨╜╨╕╤П</a>
+      <a href="plat.php">╨Ъ╨░╤Б╤Б╨╛╨▓╨░╤П ╨║╨╜╨╕╨│╨░</a>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-link">╨б╨║╨╗╨░╨┤</span>
+    <div class="submenu">
+      <a href="sale.php?typeop=20">╨Я╤А╨╕╤Е╨╛╨┤</a>
+      <a href="sale.php?typeop=110">╨Т╨╛╨╖╨▓╤А╨░╤В ╨┐╨╛╤Б╤В╨░╨▓╤Й╨╕╨║╤Г</a>
+      <a href="sale.php">╨Я╤А╨╛╨┤╨░╨╢╨░</a>
+      <a href="sale.php?typeop=10">╨Т╨╛╨╖╨▓╤А╨░╤В ╨╛╤В ╨┐╨╛╨║╤Г╨┐╨░╤В╨╡╨╗╤П</a>
+      <a href="sale.php?typeop=100">╨Т╨╜╤Г╤В╤А╨╡╨╜╨╜╨╡╨╡ ╨┐╨╡╤А╨╡╨╝╨╡╤Й╨╡╨╜╨╕╨╡</a>
+      <a href="sale.php?typeop=127">╨б╨┐╨╕╤Б╨░╨╜╨╕╨╡</a>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-link">╨б╨┐╤А╨░╨▓╨╛╤З╨╜╨╕╨║╨╕</span>
+    <div class="submenu">
+      <a href="firm.php">╨д╨╕╤А╨╝╤Л</a>
+      <a href="city.php" class="active">╨У╨╛╤А╨╛╨┤╨░</a>
+      <a href="country.php">╨б╤В╤А╨░╨╜╤Л</a>
+      <a href="store.php">╨г╤З╨░╤Б╤В╨║╨╕</a>
+      <a href="zat.php">╨Т╨╕╨┤╤Л ╨╛╨┐╨╡╤А╨░╤Ж╨╕╨╣ ╤Б ╨┤╨╡╨╜╤М╨│╨░╨╝╨╕</a>
+      <a href="status.php">╨б╨╛╤Б╤В╨╛╤П╨╜╨╕╤П ╨╖╨░╤П╨▓╨╛╨║</a>
+      <a href="sotr.php">╨б╨╛╤В╤А╤Г╨┤╨╜╨╕╨║╨╕</a>
+      <a href="role.php">╨а╨╛╨╗╨╕ ╤Б╨╛╤В╤А╤Г╨┤╨╜╨╕╨║╨╛╨▓</a>
+      <a href="object.php">╨Ю╨▒╤К╨╡╨║╤В╤Л ╨┤╨╛╤Б╤В╤Г╨┐╨░</a>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-link">╨Ъ╨╛╨╜╤В╤А╨░╨│╨╡╨╜╤В╤Л</span>
+    <div class="submenu">
+      <a href="client.php">╨Ъ╨╛╨╜╤В╤А╨░╨│╨╡╨╜╤В╤Л</a>
+      <a href="contact.php">╨Ъ╨╛╨╜╤В╨░╨║╤В╤Л</a>
+      <a href="cli_categ.php">╨Ъ╨░╤В╨╡╨│╨╛╤А╨╕╨╕ ╨║╨╛╨╜╤В╤А╨░╨│╨╡╨╜╤В╨╛╨▓</a>
+      <a href="cli_tag.php">╨Т╨╕╨┤╤Л ╨┤╨╡╤П╤В╨╡╨╗╤М╨╜╨╛╤Б╤В╨╕</a>
+      <a href="contype.php">╨Т╨╕╨┤╤Л ╨║╨╛╨╜╤В╨░╨║╤В╨╛╨▓</a>
+      <a href="promo.php">╨Т╨╕╨┤╤Л ╤А╨╡╨║╨╗╨░╨╝╤Л</a>
+          </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-link">╨в╨╛╨▓╨░╤А╤Л</span>
+    <div class="submenu">
+      <a href="tmc.php">╨в╨╛╨▓╨░╤А╤Л</a>
+      <a href="categ.php">╨Ъ╨░╤В╨╡╨│╨╛╤А╨╕╨╕ ╤В╨╛╨▓╨░╤А╨╛╨▓</a>
+      <a href="group.php">╨У╤А╤Г╨┐╨┐╤Л, ╨┐╨╛╨┤╨│╤А╤Г╨┐╨┐╤Л</a>
+      <a href="izgot.php">╨Я╤А╨╛╨╕╨╖╨▓╨╛╨┤╨╕╤В╨╡╨╗╨╕</a>
+      <a href="unit.php">╨Х╨┤╨╕╨╜╨╕╤Ж╤Л ╨╕╨╖╨╝╨╡╤А╨╡╨╜╨╕╤П</a>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-link">╨г╤Б╨╗╤Г╨│╨╕</span>
+    <div class="submenu">
+      <a href="service.php">╨г╤Б╨╗╤Г╨│╨╕</a>
+      <a href="groupserv.php">╨У╤А╤Г╨┐╨┐╤Л ╤Г╤Б╨╗╤Г╨│</a>
+      <a href="sgroup.php?kind=service">╨Я╨╛╨┤╨│╤А╤Г╨┐╨┐╤Л ╤Г╤Б╨╗╤Г╨│</a>
+    </div>
+  </div>
+  <div class="menu-spacer"></div>
+</nav>
+<h1 class="page-title"><img src="img/city.png" alt="" /> ╨У╨╛╤А╨╛╨┤</h1><div class="toolbar" data-total="860" data-show-only="0" data-marks-count="2" data-search="" data-page="1" data-pages="43" data-focus="0">
+    <div class="toolbar-left">
+      <button class="icon-btn" title="╨Ф╨╛╨▒╨░╨▓╨╕╤В╤М" data-form-open="city_form.php?mode=new"><img src="img/add.png" alt="" /></button>
+      <button class="icon-btn" id="rowOpenBtn" title="╨Ш╨╖╨╝╨╡╨╜╨╕╤В╤М" type="button" disabled><img src="img/edit.png" alt="" /></button>
+      <button class="icon-btn" id="rowDeleteBtn" title="╨г╨┤╨░╨╗╨╕╤В╤М" type="button" disabled><img src="img/delete.png" alt="" /></button>
+      <button class="icon-btn" id="rowCopyBtn" title="╨Ъ╨╛╨┐╨╕╤А╨╛╨▓╨░╤В╤М" type="button" disabled><img src="img/copy.png" alt="" /></button>
+      <button class="icon-btn" title="╨Ю╨▒╨╜╨╛╨▓╨╕╤В╤М" onclick="location.reload()"><img src="img/refresh.png" alt="" /></button>
+            <div class="dropdown">
+        <button class="icon-btn" type="button" title="╨н╨║╤Б╨┐╨╛╤А╤В"><img src="img/export.png" alt="" /></button>
+        <div class="dropdown-menu"><a class="dropdown-item" href="#" data-export-url="city_export.php?format=csv" data-export-filename="city.csv" data-export-format="CSV">╨н╨║╤Б╨┐╨╛╤А╤В ╨▓ CSV</a><a class="dropdown-item" href="#" data-export-url="city_export.php?format=xls" data-export-filename="city.xls" data-export-format="XLS (Excel)">╨н╨║╤Б╨┐╨╛╤А╤В ╨▓ Excel</a></div>
+      </div>
+      <div class="dropdown">
+        <button class="icon-btn" type="button" title="╨Я╨╡╤З╨░╤В╤М"><img src="img/print.png" alt="" /></button>
+        <div class="dropdown-menu"><a class="dropdown-item" href="city_print.php" target="_blank">╨Т╤Б╨╡ ╨╖╨░╨┐╨╕╤Б╨╕</a><a class="dropdown-item" href="city_print.php?all=1" target="_blank">╨Т╤Л╨▒╤А╨░╨╜╨╜╤Л╨╡</a><a class="dropdown-item" href="city_print.php?page=1" target="_blank">╨в╨╡╨║╤Г╤Й╨░╤П ╤Б╤В╤А╨░╨╜╨╕╤Ж╨░</a></div>
+      </div>
+      <div class="dropdown selected-actions visible" id="selectedActions">
+        <button class="menu-btn" type="button" title="╨Ф╨╡╨╣╤Б╤В╨▓╨╕╤П ╤Б ╨▓╤Л╨▒╤А╨░╨╜╨╜╤Л╨╝╨╕">
+          <span id="selectedCount">╨Т╤Л╨▒╤А╨░╨╜╨╛ 2</span>
+          <img src="img/look.png" alt="" />
+        </button>
+        <div class="dropdown-menu">
+          <a class="dropdown-item" href="#" onclick="clearSelection();return false;">╨Ю╤З╨╕╤Б╤В╨╕╤В╤М ╨▓╤Л╨▒╨╛╤А</a>
+          <a class="dropdown-item" href="#" onclick="invertSelection();return false;">╨Ш╨╜╨▓╨╡╤А╤В╨╕╤А╨╛╨▓╨░╤В╤М ╨▓╤Л╨▒╨╛╤А</a>
+          <a class="dropdown-item" href="#" onclick="toggleShowOnly();return false;">╨Я╨╛╨║╨░╨╖╨░╤В╤М ╨▓╤Л╨▒╤А╨░╨╜╨╜╤Л╨╡</a>
+          <a class="dropdown-item" href="#" onclick="exportSelected();return false;">╨н╨║╤Б╨┐╨╛╤А╤В</a>
+          <a class="dropdown-item" href="#" onclick="printSelected();return false;">╨Я╨╡╤З╨░╤В╤М</a>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <form id="searchForm" method="get" action="city.php" style="display:flex;gap:4px;align-items:center;">
+        <input class="quick-search" type="text" name="q" placeholder="╨С╤Л╤Б╤В╤А╤Л╨╣ ╨┐╨╛╨╕╤Б╨║" value="" />
+        <input type="hidden" name="cols" value="" />
+        <input type="hidden" name="cond" value="contains" />
+        <input type="hidden" name="sf" value="0" />
+                <button class="icon-btn search-toggle-btn" type="button" id="searchToggleBtn" title="╨Ш╤Б╨║╨░╤В╤М" aria-pressed="false">
+          <img src="img/find.png" alt="" />
+        </button>
+        <button class="icon-btn search-mini-btn" type="button" id="searchCondBtn" title="╨г╤Б╨╗╨╛╨▓╨╕╤П ╨┐╨╛╨╕╤Б╨║╨░" aria-haspopup="true" aria-expanded="false">
+          <img src="img/look.png" alt="" />
+        </button>
+      </form>
+      <button class="icon-btn" id="sortBtn" title="╨б╨╛╤А╤В╨╕╤А╨╛╨▓╨║╨░" type="button"><img src="img/sort.png" alt="" /></button>
+      <button class="icon-btn" id="columnsBtn" title="╨Э╨░╤Б╤В╤А╨╛╨╣╨║╨░ ╤Б╤В╨╛╨╗╨▒╤Ж╨╛╨▓ ╤В╨░╨▒╨╗╨╕╤Ж╤Л" type="button"><img src="img/setup.png" alt="" /></button>
+    </div>
+  </div>  <div class="table-wrap">
+    <table class="data-table">
+<colgroup>
+    <col class="col-check" style="width: 32px;" />
+          <col class="col-id" style="width: 46;" />
+          <col class="col-city" style="width: 144px;" />
+          <col class="col-country" style="width: 140px;" />
+          <col class="col-note" style="width: 500;" />
+      </colgroup><thead><tr>
+          <th class="col-check"><input type="checkbox" id="checkAll" /></th>
+              <th class="col-id" data-col="id" data-sort-col="id" data-col-idx="0" data-sort-dir="asc">
+        <span class="col-filter-label">ID</span>
+                          <span class="sort-indicator">1 тЦ▓</span>
+              </th>
+          <th class="col-city" data-col="city" data-sort-col="city" data-col-idx="1" data-sort-dir="">
+        <span class="col-filter-label">╨У╨╛╤А╨╛╨┤</span>
+                      </th>
+          <th class="col-country" data-col="country" data-sort-col="country" data-col-idx="2" data-sort-dir="" data-param="country_id" data-col="country" data-param="country_id" data-values="">
+        <span class="col-filter-label">╨б╤В╤А╨░╨╜╨░</span>
+        <button type="button" class="col-filter-btn" title="╨д╨╕╨╗╤М╤В╤А ╨┐╨╛ ╨║╨╛╨╗╨╛╨╜╨║╨╡"><img src="img/look.png" alt="" /></button>              </th>
+          <th class="col-note" data-col="note" data-sort-col="note" data-col-idx="3" data-sort-dir="">
+        <span class="col-filter-label">╨Я╤А╨╕╨╝╨╡╤З╨░╨╜╨╕╨╡</span>
+                      </th>
+      </tr></thead><tbody>
+                <tr data-row-id="2">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="2" data-id="2" /></td>
+                          <td class="col-id" data-value="2" data-col-idx="0">
+            <span class="cell-value">2</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Alwin" data-col-idx="1">
+            <span class="cell-value">Alwin</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="29" data-col-idx="2">
+            <span class="cell-value">╨Р╤А╨╝╨╡╨╜╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="999" data-col-idx="3">
+            <span class="cell-value">999</span>
+          </td>
+              </tr>
+            <tr data-row-id="3">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="3" data-id="3" checked /></td>
+                          <td class="col-id" data-value="3" data-col-idx="0">
+            <span class="cell-value">3</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Buckinghamshire" data-col-idx="1">
+            <span class="cell-value">Buckinghamshire</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="3" data-col-idx="2">
+            <span class="cell-value">╨Р╨╜╨│╨╗╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="4444" data-col-idx="3">
+            <span class="cell-value">4444</span>
+          </td>
+              </tr>
+            <tr data-row-id="4">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="4" data-id="4" checked /></td>
+                          <td class="col-id" data-value="4" data-col-idx="0">
+            <span class="cell-value">4</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Calarasi" data-col-idx="1">
+            <span class="cell-value">Calarasi</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="12" data-col-idx="2">
+            <span class="cell-value">╨Ь╨╛╨╗╨┤╨╛╨▓╨░</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="55" data-col-idx="3">
+            <span class="cell-value">55</span>
+          </td>
+              </tr>
+            <tr data-row-id="5">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="5" data-id="5" /></td>
+                          <td class="col-id" data-value="5" data-col-idx="0">
+            <span class="cell-value">5</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Dusseldorf" data-col-idx="1">
+            <span class="cell-value">Dusseldorf</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="13" data-col-idx="2">
+            <span class="cell-value">╨У╨╡╤А╨╝╨░╨╜╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="211" data-col-idx="3">
+            <span class="cell-value">211</span>
+          </td>
+              </tr>
+            <tr data-row-id="6">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="6" data-id="6" /></td>
+                          <td class="col-id" data-value="6" data-col-idx="0">
+            <span class="cell-value">6</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Erfurt" data-col-idx="1">
+            <span class="cell-value">Erfurt</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="13" data-col-idx="2">
+            <span class="cell-value">╨У╨╡╤А╨╝╨░╨╜╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="88" data-col-idx="3">
+            <span class="cell-value">88</span>
+          </td>
+              </tr>
+            <tr data-row-id="7">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="7" data-id="7" /></td>
+                          <td class="col-id" data-value="7" data-col-idx="0">
+            <span class="cell-value">7</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Gori" data-col-idx="1">
+            <span class="cell-value">Gori</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="14" data-col-idx="2">
+            <span class="cell-value">╨У╤А╤Г╨╖╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="8">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="8" data-id="8" /></td>
+                          <td class="col-id" data-value="8" data-col-idx="0">
+            <span class="cell-value">8</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Hilden" data-col-idx="1">
+            <span class="cell-value">Hilden</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="13" data-col-idx="2">
+            <span class="cell-value">╨У╨╡╤А╨╝╨░╨╜╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="--" data-col-idx="3">
+            <span class="cell-value">--</span>
+          </td>
+              </tr>
+            <tr data-row-id="9">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="9" data-id="9" /></td>
+                          <td class="col-id" data-value="9" data-col-idx="0">
+            <span class="cell-value">9</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Jelgava" data-col-idx="1">
+            <span class="cell-value">Jelgava</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="6" data-col-idx="2">
+            <span class="cell-value">╨Ы╨░╤В╨▓╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="11" data-col-idx="3">
+            <span class="cell-value">11</span>
+          </td>
+              </tr>
+            <tr data-row-id="10">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="10" data-id="10" /></td>
+                          <td class="col-id" data-value="10" data-col-idx="0">
+            <span class="cell-value">10</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Jurmala" data-col-idx="1">
+            <span class="cell-value">Jurmala</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="6" data-col-idx="2">
+            <span class="cell-value">╨Ы╨░╤В╨▓╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="11">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="11" data-id="11" /></td>
+                          <td class="col-id" data-value="11" data-col-idx="0">
+            <span class="cell-value">11</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Kalarash" data-col-idx="1">
+            <span class="cell-value">Kalarash</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="12" data-col-idx="2">
+            <span class="cell-value">╨Ь╨╛╨╗╨┤╨╛╨▓╨░</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="12">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="12" data-id="12" /></td>
+                          <td class="col-id" data-value="12" data-col-idx="0">
+            <span class="cell-value">12</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Karlovy Vary" data-col-idx="1">
+            <span class="cell-value">Karlovy Vary</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="15" data-col-idx="2">
+            <span class="cell-value">╨з╨╡╤Е╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="13">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="13" data-id="13" /></td>
+                          <td class="col-id" data-value="13" data-col-idx="0">
+            <span class="cell-value">13</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Kishinev" data-col-idx="1">
+            <span class="cell-value">Kishinev</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="12" data-col-idx="2">
+            <span class="cell-value">╨Ь╨╛╨╗╨┤╨╛╨▓╨░</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="╨б╤В╨╛╨╗╨╕╤Ж╨░" data-col-idx="3">
+            <span class="cell-value">╨б╤В╨╛╨╗╨╕╤Ж╨░</span>
+          </td>
+              </tr>
+            <tr data-row-id="14">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="14" data-id="14" /></td>
+                          <td class="col-id" data-value="14" data-col-idx="0">
+            <span class="cell-value">14</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Kohtla-Jarve" data-col-idx="1">
+            <span class="cell-value">Kohtla-Jarve</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="4" data-col-idx="2">
+            <span class="cell-value">╨н╤Б╤В╨╛╨╜╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="15">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="15" data-id="15" /></td>
+                          <td class="col-id" data-value="15" data-col-idx="0">
+            <span class="cell-value">15</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Larnaca" data-col-idx="1">
+            <span class="cell-value">Larnaca</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="16" data-col-idx="2">
+            <span class="cell-value">╨Ъ╨╕╨┐╤А</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="16">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="16" data-id="16" /></td>
+                          <td class="col-id" data-value="16" data-col-idx="0">
+            <span class="cell-value">16</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="London" data-col-idx="1">
+            <span class="cell-value">London</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="3" data-col-idx="2">
+            <span class="cell-value">╨Р╨╜╨│╨╗╨╕╤П</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="17">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="17" data-id="17" /></td>
+                          <td class="col-id" data-value="17" data-col-idx="0">
+            <span class="cell-value">17</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Medford" data-col-idx="1">
+            <span class="cell-value">Medford</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="17" data-col-idx="2">
+            <span class="cell-value">╨б╨и╨Р</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="19">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="19" data-id="19" /></td>
+                          <td class="col-id" data-value="19" data-col-idx="0">
+            <span class="cell-value">19</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Mongolia" data-col-idx="1">
+            <span class="cell-value">Mongolia</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="0" data-col-idx="2">
+            <span class="cell-value">0</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="20">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="20" data-id="20" /></td>
+                          <td class="col-id" data-value="20" data-col-idx="0">
+            <span class="cell-value">20</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Montreal" data-col-idx="1">
+            <span class="cell-value">Montreal</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="18" data-col-idx="2">
+            <span class="cell-value">╨Ъ╨░╨╜╨░╨┤╨░</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            <tr data-row-id="21">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="21" data-id="21" /></td>
+                          <td class="col-id" data-value="21" data-col-idx="0">
+            <span class="cell-value">21</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="New York" data-col-idx="1">
+            <span class="cell-value">New York</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="17" data-col-idx="2">
+            <span class="cell-value">╨б╨и╨Р</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="1-501" data-col-idx="3">
+            <span class="cell-value">1-501</span>
+          </td>
+              </tr>
+            <tr data-row-id="23">
+                  <td class="col-check"><input type="checkbox" class="row-check" value="23" data-id="23" /></td>
+                          <td class="col-id" data-value="23" data-col-idx="0">
+            <span class="cell-value">23</span>
+          </td>
+                  <td class="col-city cell-editable" data-field="city" data-value="Parsonsburg" data-col-idx="1">
+            <span class="cell-value">Parsonsburg</span>
+          </td>
+                  <td class="col-country cell-editable" data-field="country" data-value="17" data-col-idx="2">
+            <span class="cell-value">╨б╨и╨Р</span>
+          </td>
+                  <td class="col-note cell-editable" data-field="note" data-value="" data-col-idx="3">
+            <span class="cell-value"></span>
+          </td>
+              </tr>
+            </tbody>    </table>
+  </div>
+<div class="pagination">
+      <a class="page-btn" href="city.php?page=1" aria-disabled="true" style="pointer-events:none;opacity:.5;">┬л</a>
+            <a class="page-btn active" href="city.php?page=1">1</a>
+            <a class="page-btn" href="city.php?page=2">2</a>
+            <a class="page-btn" href="city.php?page=43">┬╗</a>
+      <span class="page-info">1 ╨╕╨╖ 43</span>
+    </div></div><script src="assets/lookup.js?v=1783007759"></script>
+<script src="assets/inline-edit.js?v=1782822634"></script>
+<script src="assets/row-select.js?v=1781187600"></script>
+<script src="assets/keyboard.js?v=1783183445"></script>
+<script src="assets/table-keyboard.js?v=1783183454"></script>
+<script src="assets/selection-toolbar.js?v=1783544089"></script>
+<script src="assets/search-panel.js?v=1783545080"></script>
+<script src="assets/sort-panel.js?v=1783544993"></script>
+<script src="assets/column-resize.js?v=1783860389"></script>
+<script src="assets/form-modal-core.js?v=1782070487"></script>
+<script src="assets/columns-panel.js?v=1781792284"></script>
+<script src="assets/export-modal.js?v=1780926191"></script>
+<script src="assets/column-filter.js?v=1783544388"></script>
+<script>
+    function closeAllPanels() {
+      document.querySelectorAll('.search-cond-panel.open, .search-cond-pop.open, .columns-panel.open, .col-filter-panel.open').forEach(function (p) { p.classList.remove('open'); if (p.style) p.style.display = ''; });
+    }
+    window.__focusAfterSave = function (params, form, data) {
+      var mode = (form.querySelector('input[name="mode"]') || {}).value || '';
+      if (mode === 'new' || mode === 'copy') {
+        if (data.id) { params.set('focus', String(data.id)); if (data.page) params.set('page', String(data.page)); else params.delete('page'); }
+        else { params.delete('focus'); }
+      } else if (mode === 'edit') {
+        var eid = parseInt((form.querySelector('input[name="id"]') || {}).value || '0', 10) || 0;
+        if (eid > 0) params.set('focus', String(eid)); else params.delete('focus');
+      } else if (mode === 'delete') {
+        var did = parseInt((form.querySelector('input[name="id"]') || {}).value || '0', 10) || 0;
+        var rows = Array.from(document.querySelectorAll('tr[data-row-id]'));
+        var idx = rows.findIndex(function (tr) { return parseInt(tr.dataset.rowId, 10) === did; });
+        var tb = (document.querySelector('.toolbar') || {}).dataset || {};
+        var cp = parseInt(tb.page || '1', 10), tp = parseInt(tb.pages || '1', 10);
+        if (idx >= 0) {
+          if (idx + 1 < rows.length) { params.set('focus', String(parseInt(rows[idx + 1].dataset.rowId, 10))); }
+          else if (cp < tp) { params.set('page', String(cp + 1)); params.set('focus', 'first'); }
+          else if (idx - 1 >= 0) { params.set('focus', String(parseInt(rows[idx - 1].dataset.rowId, 10))); }
+          else if (cp > 1) { params.set('page', String(cp - 1)); params.delete('focus'); }
+          else { params.delete('focus'); }
+        } else { params.delete('focus'); }
+      } else { params.delete('focus'); }
+    };
+    document.querySelectorAll('.submenu a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        var item = a.closest('.menu-item');
+        if (item) item.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+      });
+    });
+
+    var _tb = document.querySelector('.toolbar');
+    SelectionToolbar.initTableSelection('city.php', _tb ? _tb.getAttribute('data-search') || '' : '');
+
+      SelectionToolbar.init({
+        pageUrl: 'city.php',
+        search: _tb ? _tb.getAttribute('data-search') || '' : '',
+        getExportUrl: function () {
+          if (document.querySelectorAll('.row-check:checked').length === 0) return null;
+          return 'city_export.php?format=csv&all=1';
+        },
+        getPrintUrl: function () {
+          if (document.querySelectorAll('.row-check:checked').length === 0) return null;
+          return 'city_print.php?all=1';
+        },
+        getInvertUrl: function () {
+          var p = new URLSearchParams(location.search);
+          p.delete('ids');
+          return 'city.php?action=invertSelection&' + p.toString();
+        }
+      });
+      SearchPanel.init({
+        form: document.getElementById('searchForm'),
+        condBtn: document.getElementById('searchCondBtn'),
+        toggleBtn: document.getElementById('searchToggleBtn'),
+        columns: [{"key":"id","label":"ID"},{"key":"city","label":"╨У╨╛╤А╨╛╨┤"},{"key":"country","label":"╨б╤В╤А╨░╨╜╨░"},{"key":"note","label":"╨Я╤А╨╕╨╝╨╡╤З╨░╨╜╨╕╨╡"}],
+        closeAllPanels: closeAllPanels,
+        pageUrl: 'city.php',
+        preserveParams: ["sort","country_id"]      });
+
+      SortPanel.init({
+        btn: document.getElementById('sortBtn'),
+        columns: [{"key":"id","label":"ID"},{"key":"city","label":"╨У╨╛╤А╨╛╨┤"},{"key":"country","label":"╨б╤В╤А╨░╨╜╨░"},{"key":"note","label":"╨Я╤А╨╕╨╝╨╡╤З╨░╨╜╨╕╨╡"}],
+        pageUrl: 'city.php',
+        mode: 'modal',
+        directions: [
+          { key: 'asc',  label: '╨Я╨╛ ╨▓╨╛╨╖╤А╨░╤Б╤В╨░╨╜╨╕╤О' },
+          { key: 'desc', label: '╨Я╨╛ ╤Г╨▒╤Л╨▓╨░╨╜╨╕╤О' },
+        ]      });
+
+    ExportModal.init();
+    </script>
+    <script>
+    window.clearSelection = function () {
+      fetch(window.__marksUrl('clearSelection'), { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) location.reload(); });
+    };
+    window.invertSelection = function () {
+      fetch(window.__marksUrl('invertSelection'), { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) location.reload(); });
+    };
+    window.toggleShowOnly = function () {
+      fetch(window.__marksUrl('toggleShowOnly'), { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) location.reload(); });
+    };
+    </script>
+    <script>
+    ColumnFilter.init({"thSelector":".col-country"});
+    </script>
+        <script>
+    (function () {
+      var backdrop = document.getElementById('formModal');
+      var body     = document.getElementById('formModalBody');
+      if (!backdrop || !body) return;
+
+      var stashed = null;
+      var _fmDirty = false;
+
+      function autoInitFormBody(root) {
+        if (typeof root === 'undefined') root = body;
+        root.querySelectorAll('script:not([src])').forEach(function(s){
+          try{ eval(s.textContent); }catch(ex){ console.error('[FM] script error', ex); }
+        });
+        
+            root.querySelectorAll('[data-lookup]:not([data-lookup-bound])').forEach(function(el){
+                el.setAttribute('data-lookup-bound','1');
+                if(!el.__lookupBound){
+                    try{var _d=JSON.parse(el.getAttribute('data-countries')||'[]');
+                    var _ro=el.hasAttribute('data-readonly');
+                    window.bindLookup({root:el,data:_d,readonly:_ro});}catch(ex){}
+                }
+            });
+
+            var _tc=root.querySelector('.tab-container');
+            if(_tc&&!_tc.__fmTabs){
+                _tc.__fmTabs=true;
+                var _hds=_tc.querySelectorAll('.tab-header'),_pns=_tc.querySelectorAll('.tab-pane');
+                _hds.forEach(function(h){
+                    h.addEventListener('click',function(){
+                        var _i=parseInt(h.dataset.tabIndex,10);
+                        _hds.forEach(function(t){t.classList.remove('active');});
+                        _pns.forEach(function(p){p.classList.remove('active');});
+                        h.classList.add('active');
+                        var _p=_tc.querySelector('.tab-pane[data-tab-index="'+_i+'"]');
+                        if(_p)_p.classList.add('active');
+                    });
+                });
+            }        try {
+          if (typeof window.ColumnResize !== 'undefined') {
+            root.querySelectorAll('.data-table').forEach(function(t) {
+              if (t.querySelector('.col-resize-handle')) return;
+              var opts = { selector: '#' + t.id };
+              if (t.dataset.colResizeUrl) opts.saveUrl = t.dataset.colResizeUrl;
+              if (t.dataset.colResizeTbl) opts.tbl = t.dataset.colResizeTbl;
+              t.removeAttribute('data-col-resize-inited');
+              window.ColumnResize.init(opts);
+            });
+          }
+        } catch(ex) { console.error('[FM] ColumnResize re-init error', ex); }
+      }
+
+      function stashCurrentForm(onRestore, estSelectedId) {
+        var form = body.querySelector('form[data-form-modal]');
+        if (!form) { stashed = { html: body.innerHTML, onRestore: onRestore || function () {}, activeId: null, _tableSelections: estSelectedId ? {'__estFallback': estSelectedId} : {} }; return; }
+        var active = document.activeElement;
+        body.querySelectorAll('input, textarea, select').forEach(function (el) {
+          if (el.type === 'checkbox' || el.type === 'radio') {
+            if (el.checked) el.setAttribute('checked', ''); else el.removeAttribute('checked');
+          } else if (el.tagName === 'SELECT') {
+            Array.from(el.options).forEach(function (o) { o.removeAttribute('selected'); });
+            var sel = el.options[el.selectedIndex];
+            if (sel) sel.setAttribute('selected', '');
+          } else {
+            el.setAttribute('value', el.value);
+          }
+        });
+        var savedTableSelections = {};
+        Object.keys(window).forEach(function(k) {
+          if (k.indexOf('__') === 0 && k.indexOf('Table') === k.length - 5 && window[k] && typeof window[k].selectedId === 'number') {
+            savedTableSelections[k] = window[k].selectedId;
+          }
+        });
+        if (estSelectedId && !Object.keys(savedTableSelections).length) {
+          savedTableSelections['__estFallback'] = estSelectedId;
+        }
+        stashed = {
+          html: body.innerHTML,
+          onRestore: onRestore || function () {},
+          activeId: active && active.id ? active.id : null,
+          _tableSelections: savedTableSelections
+        };
+      }
+
+      function restoreStashedForm(data) {
+        if (!stashed) return false;
+        var savedTableSelections = stashed._tableSelections || {};
+        body.innerHTML = stashed.html;
+        var old = stashed;
+        stashed = null;
+        var form = body.querySelector('form[data-form-modal]');
+        bindForm(form);
+                body.querySelectorAll('[data-lookup="country"]').forEach(function (el) { bindLookup(el, "country"); });
+                    FormModalCore.bindFormTabTrap(form);
+                        try {  } catch(ex) { console.error('[FM] extraOpen error', ex); }
+        autoInitFormBody(body);
+        if (savedTableSelections && Object.keys(savedTableSelections).length) {
+          var restoreFn = function() {
+            console.log('[FM] restoreFn running, savedTableSelections=', JSON.stringify(savedTableSelections), 'window.__sgTable=', !!window.__sgTable);
+            Object.keys(savedTableSelections).forEach(function(k) {
+              if (k === '__estFallback') return;
+              var tbl = window[k];
+              if (tbl && typeof tbl.selectedId === 'number' && savedTableSelections[k]) {
+                var id = savedTableSelections[k];
+                var found = false;
+                if (tbl.data) { for (var i = 0; i < tbl.data.length; i++) { if (tbl.data[i].id == id) { found = true; break; } } }
+                if (found) {
+                  tbl.selectedId = id;
+                  tbl.render();
+                  if (tbl.tbody) {
+                    var row = tbl.tbody.querySelector('tr[data-id="' + id + '"]');
+                    if (row) row.scrollIntoView({ block: 'nearest' });
+                  }
+                }
+              }
+            });
+            if (savedTableSelections['__estFallback']) {
+              var fallbackId = savedTableSelections['__estFallback'];
+              Object.keys(window).forEach(function(k) {
+                if (k.indexOf('__') === 0 && k.indexOf('Table') === k.length - 5 && window[k] && typeof window[k].selectedId === 'number' && window[k].data) {
+                  var tbl = window[k];
+                  var found = false;
+                  for (var i = 0; i < tbl.data.length; i++) { if (tbl.data[i].id == fallbackId) { found = true; break; } }
+                  if (found) {
+                    tbl.selectedId = fallbackId;
+                    tbl.render();
+                    if (tbl.tbody) {
+                      var row = tbl.tbody.querySelector('tr[data-id="' + fallbackId + '"]');
+                      if (row) row.scrollIntoView({ block: 'nearest' });
+                    }
+                  }
+                }
+              });
+            }
+          };
+          setTimeout(restoreFn, 50);
+          setTimeout(restoreFn, 200);
+        }
+        if (data) { try { old.onRestore(data, body); } catch (e) { console.error('[FM] onRestore error', e); } }
+        if (old.activeId) {
+          var el = body.querySelector('[id="' + old.activeId.replace(/"/g, '\\"') + '"]');
+          if (el && !el.readOnly) { el.focus(); if (el.select) el.select(); }
+        } else {
+          FormModalCore.focusFirstField(body);
+        }
+        return true;
+      }
+
+      function openFormModal(url, stash) {
+        stashCurrentForm(stash && stash.onRestore, stash && stash._estSelectedId);
+        body.innerHTML = '<div style="padding:20px;color:var(--muted);">╨Ч╨░╨│╤А╤Г╨╖╨║╨░тАж</div>';
+        backdrop.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        fetch(FormModalCore.appendAjax(url), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(function (data) {
+            if (!data || typeof data.html !== 'string') throw new Error('bad response');
+            body.innerHTML = data.html;
+            var form = body.querySelector('form[data-form-modal]');
+            bindForm(form);
+                        body.querySelectorAll('[data-lookup="country"]').forEach(function (el) { bindLookup(el, "country"); });
+                        FormModalCore.bindFormTabTrap(form);
+            FormModalCore.focusFirstField(body);
+                        autoInitFormBody(body);
+          })
+          .catch(function (err) {
+            body.innerHTML = '<div class="flash flash--error">╨Ю╤И╨╕╨▒╨║╨░ ╨╖╨░╨│╤А╤Г╨╖╨║╨╕: ' + (err && err.message ? err.message : '╨╜╨╡╨╕╨╖╨▓╨╡╤Б╤В╨╜╨░╤П ╨╛╤И╨╕╨▒╨║╨░') + '</div>';
+            if (console && console.error) console.error('[form-modal]', err);
+          });
+      }
+
+      function closeFormModal() {
+        backdrop.classList.remove('open');
+        document.body.style.overflow = '';
+        body.innerHTML = '';
+        stashed = null;
+      }
+
+      function bindForm(form) {
+        if (!form) return;
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var fd = new FormData(form);
+          var submitBtn = e.submitter || form.querySelector('button[type="submit"]');
+          if (submitBtn && submitBtn.name) fd.set(submitBtn.name, submitBtn.value || '1');
+          fetch(form.getAttribute('action') || "city_form.php", {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+          })
+          .then(function (r) { return r.json(); })
+           .then(function (data) { if (data && data.ok) {
+              _fmDirty = true;
+              if (stashed) {
+                restoreStashedForm(data);
+              } else if (fd.get('action') === 'apply') {
+                body.innerHTML = data.html;
+                var f = body.querySelector('form[data-form-modal]');
+                bindForm(f);
+                                body.querySelectorAll('[data-lookup="country"]').forEach(function (el) { bindLookup(el, "country"); });
+                                FormModalCore.bindFormTabTrap(f);
+                                autoInitFormBody(body);
+                if (data && data.focusField) { var el = body.querySelector('[name="' + data.focusField + '"]'); if (el) { el.focus(); if (el.select) el.select(); } }
+                else { FormModalCore.focusFirstField(body); }
+              } else {
+                closeFormModal();
+                var params = new URLSearchParams(location.search);
+                                if (typeof window.__focusAfterSave === 'function') window.__focusAfterSave(params, form, data); else FormModalCore.setFocusAfterSave(params, form, data);
+                                location.href = "city.php" + '?' + params.toString();
+              }
+            } else {
+              body.innerHTML = (data && data.html) || '<div class="flash flash--error">╨Ю╤И╨╕╨▒╨║╨░ ╨┐╨╛╨┤╨║╨╗╤О╤З╨╡╨╜╨╕╤П ╨║ ╨С╨Ф</div>';
+              var f = body.querySelector('form[data-form-modal]');
+              bindForm(f);
+                            body.querySelectorAll('[data-lookup="country"]').forEach(function (el) { bindLookup(el, "country"); });
+                            FormModalCore.bindFormTabTrap(f);
+                            autoInitFormBody(body);
+              if (data && data.focusField) { var el = body.querySelector('[name="' + data.focusField + '"]'); if (el) { el.focus(); if (el.select) el.select(); } }
+              else { FormModalCore.focusFirstField(body); }
+            }
+          })
+          .catch(function (err) {
+            var flash = document.createElement('div');
+            flash.className = 'flash flash--error';
+            flash.textContent = '╨Ю╤И╨╕╨▒╨║╨░ ╨┐╨╛╨┤╨║╨╗╤О╤З╨╡╨╜╨╕╤П ╨║ ╨С╨Ф: ' + (err && err.message ? err.message : 'unknown');
+            form.insertBefore(flash, form.firstChild);
+          });
+        });
+      }
+
+      function bindLookup(root, tableName) {
+        if (!root) return;
+                var list = JSON.parse(root.getAttribute('data-countries') || '[]');
+                var isReadonly = root.hasAttribute('data-readonly');
+        window.bindLookup({
+          root: root,
+          data: list,
+          readonly: isReadonly
+        });
+      }
+
+      function closeOrReload() {
+        if (_fmDirty) {
+          _fmDirty = false;
+          var params = new URLSearchParams(location.search);
+          var idEl = body.querySelector('input[name="id"]');
+          var focusId = idEl ? parseInt(idEl.value, 10) : 0;
+          if (focusId > 0) params.set('focus', String(focusId));
+          closeFormModal();
+          location.href = "city.php" + '?' + params.toString();
+        } else {
+          closeFormModal();
+        }
+      }
+
+      document.addEventListener('click', function (e) {
+        if (backdrop.classList.contains('open')) {
+          var cancelA = e.target.closest('a.btn-secondary');
+          if (cancelA && cancelA.closest('.form-actions')) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            if (stashed) { restoreStashedForm(null); } else { closeOrReload(); }
+            return;
+          }
+        }
+        if (backdrop.classList.contains('open')) {
+          var addLink = e.target.closest('a[data-lookup-add]');
+          if (addLink) {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            var target = addLink.getAttribute('data-lookup-add');
+            if (!target) return;
+            openFormModal(addLink.getAttribute('href') || (target + '_form.php?mode=new'), {
+              onRestore: function (data, bodyEl) {
+                if (data && data.id && data.name) {
+                  var container = bodyEl.querySelector('[data-lookup="' + target + '"]');
+                  if (!container) return;
+                  var idEl   = container.querySelector('[data-lookup-id]');
+                  var nameEl = container.querySelector('.lookup-input');
+                  if (idEl)   idEl.value   = String(data.id);
+                  if (nameEl) nameEl.value = data.name;
+                  var items = [];
+                  try { items = JSON.parse(container.getAttribute('data-countries') || '[]'); } catch (e) {}
+                  if (!items.find(function (c) { return c.id === data.id; })) {
+                    items.push({ id: data.id, name: data.name });
+                    items.sort(function (a, b) { return a.name.localeCompare(b.name, 'ru'); });
+                    container.setAttribute('data-countries', JSON.stringify(items));
+                  }
+                }
+              }
+            });
+            return;
+          }
+        }
+        var a = e.target.closest('a[href*="city_form.php"]');
+        if (a) {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          openFormModal(a.getAttribute('href'));
+          return;
+        }
+        var b = e.target.closest('button[data-form-open], button[onclick*="city_form.php"]');
+        if (b) {
+          var url = b.getAttribute('data-form-open');
+          if (!url && b.getAttribute('onclick')) {
+            var m = b.getAttribute('onclick').match(/['"]([^'"]*city_form\.php[^'"]*)['"]/);
+            if (m) url = m[1];
+          }
+          if (url) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            openFormModal(url);
+          }
+        }
+      }, true);
+
+      backdrop.addEventListener('click', function (e) {
+        if (e.target.closest('[data-form-close]')) {
+          if (stashed) restoreStashedForm(null); else { closeOrReload(); }
+        }
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (!backdrop.classList.contains('open')) return;
+        var popOpen = body.querySelector('.lookup-pop.open');
+        if (popOpen) return;
+        e.preventDefault();
+        if (stashed) restoreStashedForm(null); else { closeOrReload(); }
+      });
+
+      window.__openFormModal = openFormModal;
+    })();
+    </script>
+    <script>
+    ColumnsPanel.init({
+      btn: document.getElementById('columnsBtn'),
+      saveUrl: 'city_columns_save.php',
+      tbl: 'city',
+      closeAllPanels: closeAllPanels,
+      initialColumns: [{"name":"id","label":"ID","visible":true},{"name":"city","label":"╨У╨╛╤А╨╛╨┤","visible":true},{"name":"country","label":"╨б╤В╤А╨░╨╜╨░","visible":true},{"name":"note","label":"╨Я╤А╨╕╨╝╨╡╤З╨░╨╜╨╕╨╡","visible":true}],
+      defaultColumns: [{"name":"id","label":"ID","visible":true},{"name":"city","label":"╨У╨╛╤А╨╛╨┤","visible":true},{"name":"country","label":"╨б╤В╤А╨░╨╜╨░","visible":true},{"name":"note","label":"╨Я╤А╨╕╨╝╨╡╤З╨░╨╜╨╕╨╡","visible":true}]    });
+
+    (function () {
+      const toolbar = document.querySelector('.toolbar');
+      if (!toolbar) return;
+      const tbody = document.querySelector('table tbody');
+      const currentPage  = parseInt(toolbar.dataset.page  || '1', 10);
+      const currentPages = parseInt(toolbar.dataset.pages || '1', 10);
+
+      const openBtn   = document.getElementById('rowOpenBtn');
+      const copyBtn   = document.getElementById('rowCopyBtn');
+      const deleteBtn = document.getElementById('rowDeleteBtn');
+      const tableWrapEl = document.querySelector('.table-wrap');
+
+      const rowSel = RowSelect.init({
+        tbody: tbody,
+        rowClass: 'selected',
+        onChange: function (id) {
+          const enabled = id > 0;
+          if (openBtn)   openBtn.disabled   = !enabled;
+          if (copyBtn)   copyBtn.disabled   = !enabled;
+          if (deleteBtn) deleteBtn.disabled = !enabled;
+        },
+        currentPage: currentPage,
+        totalPages: currentPages,
+        navigate: navigate
+      });
+      window.rowSel = rowSel;
+
+      (function applyInitialFocus() {
+        const rows = rowSel.getRows();
+        if (rows.length === 0) return;
+        const raw = (toolbar.dataset.focus || '').toString();
+        if (raw === 'first') { rowSel.selectByIndex(0); return; }
+        if (raw === 'last')  { rowSel.selectByIndex(rows.length - 1); return; }
+        const id = parseInt(raw, 10);
+        if (id > 0 && rowSel.selectById(id, false)) return;
+        rowSel.selectByIndex(0);
+      })();
+
+      if (tbody) {
+        tbody.addEventListener('dblclick', function (e) {
+          if (e.target.closest('input[type="checkbox"]')) return;
+          const tr = e.target.closest('tr[data-row-id]');
+          if (!tr) return;
+          const id = parseInt(tr.dataset.rowId, 10) || 0;
+          if (!id) return;
+          rowSel.selectById(id, true);
+          if (typeof window.__openFormModal === 'function') {
+            window.__openFormModal('city_form.php?mode=edit&id=' + id);
+          }
+        });
+      }
+
+      function openForm(mode) {
+        const id = rowSel.getSelectedId();
+        if (!id) return;
+        if (typeof window.__openFormModal === 'function') {
+          window.__openFormModal('city_form.php?mode=' + mode + '&id=' + id);
+        }
+      }
+      if (openBtn)   openBtn  .addEventListener('click', function (e) { e.stopPropagation(); openForm('edit'); });
+      if (copyBtn)   copyBtn  .addEventListener('click', function (e) { e.stopPropagation(); openForm('copy'); });
+      if (deleteBtn) deleteBtn.addEventListener('click', function (e) { e.stopPropagation(); openForm('delete'); });
+
+      function navigate(apply) {
+        const p = new URLSearchParams(location.search);
+        apply(p);
+        location.href = 'city.php?' + p.toString();
+      }
+
+      bindTableKeyboardShortcuts({
+        formPrefix: 'city_form',
+        rowSel: rowSel,
+        currentPage: currentPage,
+        currentPages: currentPages,
+        navigate: navigate,
+        tableWrapEl: tableWrapEl,
+        onOpenForm: window.__openFormModal
+      });
+    })();
+
+    (function () {
+      const tbody = document.querySelector('table tbody');
+      if (!tbody) return;
+
+            InlineEdit.init({
+        tbody: tbody,
+        saveUrl: 'city_field_save.php',
+        fields: {"city":{"dbField":"city","type":"text","label":"╨У╨╛╤А╨╛╨┤"},"country":{"dbField":"country_id","type":"lookup","label":"╨б╤В╤А╨░╨╜╨░"},"note":{"dbField":"note","type":"text","label":"╨Я╤А╨╕╨╝╨╡╤З╨░╨╜╨╕╨╡"}},
+        getLookupData: function (field) {
+          var map = {"country":[{"id":45,"name":"222222"},{"id":41,"name":"3333333333"},{"id":46,"name":"444444"},{"id":43,"name":"5555555"},{"id":47,"name":"55555555555"},{"id":42,"name":"666666666"},{"id":44,"name":"777777777"},{"id":48,"name":"7777777777"},{"id":49,"name":"9999"},{"id":40,"name":"iuygugiu"},{"id":2,"name":"╨Р╨╖╨╡╤А╨▒╨░╨╣╨┤╨╢╨░╨╜"},{"id":3,"name":"╨Р╨╜╨│╨╗╨╕╤П"},{"id":29,"name":"╨Р╤А╨╝╨╡╨╜╨╕╤П"},{"id":23,"name":"╨С╨╡╨╗╨░╤А╤Г╤Б╤М"},{"id":24,"name":"╨С╨╛╨╗╨│╨░╤А╨╕╤П"},{"id":13,"name":"╨У╨╡╤А╨╝╨░╨╜╨╕╤П"},{"id":14,"name":"╨У╤А╤Г╨╖╨╕╤П"},{"id":21,"name":"╨Ф╨░╨│╨╡╤Б╤В╨░╨╜"},{"id":30,"name":"╨Ш╤В╨░╨╗╨╕╤П"},{"id":10,"name":"╨Ъ╨░╨╖╨░╤Е╤Б╤В╨░╨╜"},{"id":22,"name":"╨Ъ╨░╨╗╨╝╤Л╨║╨╕╤П"},{"id":18,"name":"╨Ъ╨░╨╜╨░╨┤╨░"},{"id":16,"name":"╨Ъ╨╕╨┐╤А"},{"id":11,"name":"╨Ъ╨╕╤А╨│╨╕╨╖╨╕╤П"},{"id":6,"name":"╨Ы╨░╤В╨▓╨╕╤П"},{"id":7,"name":"╨Ы╨╕╤В╨▓╨░"},{"id":12,"name":"╨Ь╨╛╨╗╨┤╨╛╨▓╨░"},{"id":25,"name":"╨Ю╨Р╨Х"},{"id":20,"name":"╨Я╨╛╨┤╨╝╨╛╤Б╨║╨╛╨▓╤М╨╡"},{"id":9,"name":"╨Я╨╛╨╗╤М╤И╨░"},{"id":1,"name":"╨а╨╛╤Б╤Б╨╕╤П"},{"id":38,"name":"╨б╤В╤А╨░╨╜╨░2"},{"id":17,"name":"╨б╨и╨Р"},{"id":26,"name":"╨в╨░╨┤╨╢╨╕╨║╨╕╤Б╤В╨░╨╜"},{"id":19,"name":"╨в╤Г╤А╨║╨╝╨╡╨╜╨╕╤Б╤В╨░╨╜"},{"id":27,"name":"╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜"},{"id":8,"name":"╨г╨║╤А╨░╨╕╨╜╨░"},{"id":5,"name":"╨д╨╕╨╜╨╗╤П╨╜╨┤╨╕╤П"},{"id":28,"name":"╨д╤А╨░╨╜╤Ж╨╕╤П"},{"id":15,"name":"╨з╨╡╤Е╨╕╤П"},{"id":4,"name":"╨н╤Б╤В╨╛╨╜╨╕╤П"},{"id":31,"name":"╨п╨┐╨╛╨╜╨╕╤П"}]};
+          return map[field] || [];
+        },
+        validate: function (field, value) {
+          switch (field) {
+    case "country": if (parseInt(value,10)<=0) return '╨Т╤Л╨▒╨╡╤А╨╕╤В╨╡ ╨╖╨╜╨░╤З╨╡╨╜╨╕╨╡ ╨╕╨╖ ╤Б╨┐╨╕╤Б╨║╨░'; break;
+          }
+          return null;
+        },
+        onOpenForm: window.__openFormModal
+      });
+        })();
+
+    ColumnResize.init({ saveUrl: 'city_column_width_save.php', tbl: 'city', selector: 'table.data-table' });
+    </script>
+<script>
+(function(){
+  var kaTimer = null;
+  function ka() {
+    fetch('keepalive.php',{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},credentials:'same-origin'})
+      .then(function(r){return r.json()})
+      .then(function(d){if(d&&!d.ok)location.reload();})
+      .catch(function(){});
+  }
+  function rk() { if(kaTimer)clearTimeout(kaTimer); kaTimer=setTimeout(ka,120000); }
+  document.addEventListener('mousedown',rk); document.addEventListener('keydown',rk); rk();
+  var lb = document.getElementById('logout-btn');
+  if(lb) lb.addEventListener('click',function(e){e.preventDefault();fetch('logout_handler.php',{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},credentials:'same-origin'}).then(function(){location.reload();});});
+})();
+</script>
+</body>
+</html>
