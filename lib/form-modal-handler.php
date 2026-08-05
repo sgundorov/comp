@@ -411,6 +411,26 @@ function render_form_modal_script(array $config = []): void {
         if (stashed) restoreStashedForm(null); else { closeOrReload(); }
       });
 
+      // Enter в открытой модалке = нажать основную submit-кнопку формы
+      // (в т.ч. "Удалить"), даже если фокус не внутри формы (readonly-поля).
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+        if (!backdrop.classList.contains('open')) return;
+        if (e.defaultPrevented) return;
+        var t = e.target;
+        if (!t) return;
+        if (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return;
+        if (t.closest && t.closest('.lookup-pop, .col-filter-panel, .search-cond-panel, .columns-panel')) return;
+        if (t.closest && t.closest('table')) return;
+        if (t.closest && t.closest('[data-form-close], [data-lookup-add], [type="reset"], .lookup-tool, .col-filter-btn, .lookup-tool')) return;
+        var form = body.querySelector('form[data-form-modal]');
+        if (!form) return;
+        var submitBtn = form.querySelector('button[type="submit"]:not([disabled])');
+        if (!submitBtn) return;
+        e.preventDefault();
+        submitBtn.click();
+      });
+
       window.__openFormModal = openFormModal;
     })();
     </script>

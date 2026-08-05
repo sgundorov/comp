@@ -1,0 +1,17 @@
+# Local config with DB credentials
+config.local.php
+
+# Tooling / scratch
+graphify-out/
+.mimocode/
+_chk_*.php
+_tmp_*.php
+_test_*.php
+_inspect_*.php
+
+# Broken/obsolete copies
+city_form-.php
+
+# Uploads & user data
+uploads/
+img/accept-.png

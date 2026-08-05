@@ -8,7 +8,6 @@
       var col   = th.getAttribute('data-col');
       var param = config.param || th.getAttribute('data-param') || (col + '_id');
       var placeholder = config.placeholder || 'Искать';
-      var maxRows = config.maxRows || 8;
       var pageUrl = config.pageUrl || (th.closest('form') ? location.pathname : 'city.php');
 
       var initial = (th.getAttribute('data-values') || '')
@@ -71,12 +70,15 @@
       function onScrollOrResize() { if (panel.classList.contains('open')) positionPanel(); }
 
       function open() {
+        document.querySelectorAll('.col-filter-panel.open').forEach(function(p) {
+          if (p !== panel) { p.classList.remove('open'); p.style.display = ''; }
+        });
         panel.classList.add('open');
         panel.style.display = 'block';
         positionPanel();
         if (!loaded) loadOptions(); else renderList(searchInput.value);
       }
-      function close() { panel.classList.remove('open'); }
+      function close() { panel.classList.remove('open'); panel.style.display = ''; }
       function toggle() { panel.classList.contains('open') ? close() : open(); }
 
       function loadOptions() {
@@ -99,15 +101,14 @@
         var filtered = t ? allOptions.filter(function (o) {
           return String(o.name).toLowerCase().indexOf(t) !== -1;
         }) : allOptions;
-        var shown = filtered.slice(0, maxRows);
         listEl.innerHTML = '';
-        if (shown.length === 0) {
+        if (filtered.length === 0) {
           var empty = document.createElement('div');
           empty.className = 'col-filter-empty';
           empty.textContent = 'Нет совпадений';
           listEl.appendChild(empty);
         } else {
-          shown.forEach(function (o) {
+          filtered.forEach(function (o) {
             var row = document.createElement('label');
             row.className = 'col-filter-row';
             row.innerHTML =
@@ -116,12 +117,6 @@
               '<span class="col-filter-name">' + escapeHtml(o.name) + '</span>';
             listEl.appendChild(row);
           });
-        }
-        if (filtered.length > maxRows) {
-          var more = document.createElement('div');
-          more.className = 'col-filter-more';
-          more.textContent = 'Показано ' + maxRows + ' из ' + filtered.length + '. Уточните поиск.';
-          listEl.appendChild(more);
         }
       }
 
@@ -138,9 +133,9 @@
         e.stopPropagation();
         toggle();
       });
-      document.addEventListener('click', function (e) {
+      document.addEventListener('mousedown', function (e) {
         if (!th.contains(e.target) && !panel.contains(e.target)) close();
-      });
+      }, true);
       window.addEventListener('scroll', onScrollOrResize, true);
       window.addEventListener('resize', onScrollOrResize);
       searchInput.addEventListener('input', function () { renderList(searchInput.value); });

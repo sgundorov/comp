@@ -495,13 +495,11 @@ ob_start();
       <tr><td colspan="3"><?= render_input('text', 'jur_name', $values['jur_name'], ['id' => 'jur-name', 'class' => 'full', 'readonly' => $isReadonly]) ?></td></tr>
       <tr>
         <td class="form-label">Фамилия</td>
-        <td class="form-label">Имя</td>
-        <td class="form-label">Отчество</td>
+        <td class="form-label" colspan="2">Имя и отчество</td>
       </tr>
       <tr>
         <td><?= render_input('text', 'last_name', $values['last_name'], ['id' => 'last-name', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
-        <td><?= render_input('text', 'first_name', $values['first_name'], ['id' => 'first-name', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
-        <td><?= render_input('text', 'title', $values['title'], ['id' => 'title', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
+        <td colspan="2"><?= render_input('text', 'first_name', $values['first_name'], ['id' => 'first-name', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
       </tr>
       <tr>
         <td class="form-label">Категория</td>
@@ -515,13 +513,12 @@ ob_start();
       </tr>
       <tr>
         <td class="form-label">E-mail</td>
-        <td class="form-label">Сайт</td>
-        <td class="form-label">&nbsp;</td>
+        <td class="form-label">Виды деятельности</td>
+        <td>&nbsp;</td>
       </tr>
       <tr>
         <td><?= render_input('text', 'email', $values['email'], ['id' => 'email', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
-        <td><?= render_input('text', 'site', $values['site'], ['id' => 'site', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
-        <td>&nbsp;</td>
+        <td colspan="2"><div id="tag-picker-container" class="search-cond-control" data-values="<?= h(implode(',', $currentTagIds)) ?>" data-items='<?= h(json_encode($tagList, JSON_UNESCAPED_UNICODE)) ?>'></div></td>
       </tr>
       <tr><td class="form-label">Примечание</td></tr>
       <tr><td colspan="3"><?= render_textarea('note', $values['note'], ['id' => 'note', 'class' => 'full', 'readonly' => $isReadonly, 'rows' => '5', 'style' => 'resize:vertical']) ?></td></tr>
@@ -541,6 +538,8 @@ ob_start();
       <tr><td colspan="3"><?= render_input('text', 'address_jur', $values['address_jur'], ['id' => 'address-jur', 'class' => 'full', 'readonly' => $isReadonly]) ?></td></tr>
       <tr><td class="form-label">Фактический адрес</td></tr>
       <tr><td colspan="3"><?= render_input('text', 'address', $values['address'], ['id' => 'address', 'class' => 'full', 'readonly' => $isReadonly]) ?></td></tr>
+      <tr><td class="form-label">Сайт</td></tr>
+      <tr><td colspan="3"><?= render_input('text', 'site', $values['site'], ['id' => 'site', 'class' => 'full', 'readonly' => $isReadonly]) ?></td></tr>
     </table>
   </div>
 
@@ -572,10 +571,6 @@ ob_start();
       <tr><td class="form-label">Реклама</td></tr>
       <tr>
         <td><?= render_lookup('promo', 'promo_id', $values['promo_id'], $currentPromoName, h(json_encode($promoList, JSON_UNESCAPED_UNICODE)), 'promo_form.php?mode=new', $isReadonly, ['id' => 'promo-id', 'data-name-input' => 'promo-name']) ?></td>
-      </tr>
-      <tr><td class="form-label" colspan="3">Виды деятельности</td></tr>
-      <tr>
-        <td colspan="3"><div id="tag-picker-container" class="search-cond-control" data-values="<?= h(implode(',', $currentTagIds)) ?>" data-items='<?= h(json_encode($tagList, JSON_UNESCAPED_UNICODE)) ?>'></div></td>
       </tr>
     </table>
   </div>
@@ -857,7 +852,6 @@ initCdTable();
     var parts = val.split('/');
     return '<a href="' + val + '" target="_blank">' + parts[parts.length-1] + '</a>';
   };
-  tbl.render();
   tbl.onRowSelect = function(id){
     var item = null;
     for (var i=0;i<tbl.data.length;i++){if(tbl.data[i].id==id){item=tbl.data[i];break;}}
@@ -868,6 +862,7 @@ initCdTable();
     if(['jpg','jpeg','png','gif','webp','svg','bmp'].indexOf(ext)>=0){panel.innerHTML='<div style="padding:4px;text-align:center;"><a href="'+fn+'" target="_blank"><img src="'+fn+'" style="max-width:100%;max-height:70vh;border-radius:4px;" /></a></div>';}
     else{panel.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Предпросмотр недоступен</div>';}
   };
+  tbl.render();
   if (tbl.selectedId) tbl.onRowSelect(tbl.selectedId);
 })();
 </script>

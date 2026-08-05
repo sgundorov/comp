@@ -2,31 +2,6 @@
 if (!defined('TABLE_PAGE_SCRIPTS_LOADED')) {
 define('TABLE_PAGE_SCRIPTS_LOADED', true);
 
-/**
- * Генерирует весь JS-код инициализации таблицы: closeAllPanels, checkAll,
- * SearchPanel, SortPanel, ColumnsPanel, RowSelect, InlineEdit, ColumnResize.
- *
- * @param array $cfg Конфиг с ключами:
- *   pageUrl        — URL текущей страницы (group.php)
- *   formPrefix     — префикс формы (group_form)
- *   tableKey       — ключ таблицы в БД (group)
- *   fieldSaveUrl   — URL сохранения полей (group_field_save.php)
- *   columnsSaveUrl — URL сохранения столбцов (group_columns_save.php)
- *   columnResizeUrl — URL сохранения ширин (group_column_width_save.php)
- *   visibleColumns — массив видимых столбцов [['name'=>..,'label'=>..,'readonly'=>..,'param'=>..], ...]
- *   defaultColumns — массив столбцов по умолчанию [['name'=>..,'label'=>..], ...]
- *   searchColumns  — столбцы для поиска [['key'=>..,'label'=>..], ...] (по умолчанию = все столбцы)
- *   sortColumns    — столбцы для сортировки [['key'=>..,'label'=>..], ...] (по умолчанию = все столбцы)
- *   exportUrl      — URL экспорта (group_export.php)
- *   printUrl       — URL печати (group_print.php)
- *   preserveParams — параметры URL для сохранения в поиске ['sort']
- *   onOpenForm     — JS-выражение для открытия формы (по умолчанию window.__openFormModal)
- *   formModalConfig — доп. параметры для render_form_modal_script ['extra_open'=>..,'extra_restore'=>..]
- *   extraCode      — дополнительный JS-код после инициализации
- *   marksTbl       — имя таблицы для отметок. Если задано, генерирует clearSelection/invertSelection/toggleShowOnly
- *   searchPanelConfig — расширенные опции SearchPanel: {popupCheckboxes, emptyClass, labels, onApply, onToggle, onSubmit}
- *   colFilters     — массив конфигов для ColumnFilter.init(): [{thSelector, pageUrl, param}]
- */
 function render_table_page_scripts(array $cfg): void {
     $pageUrl        = $cfg['pageUrl'] ?? '';
     $urlSep         = strpos($pageUrl, '?') === false ? '?' : '&';
@@ -95,9 +70,20 @@ function render_table_page_scripts(array $cfg): void {
     if (window.__accessFlags && typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
     window.__focusAfterSave = function (params, form, data) {
       var mode = (form.querySelector('input[name="mode"]') || {}).value || '';
+      alert('__focusAfterSave: mode=' + mode + ', data=' + JSON.stringify(data));
       if (mode === 'new' || mode === 'copy') {
-        if (data.id) { params.set('focus', String(data.id)); if (data.page) params.set('page', String(data.page)); else params.delete('page'); }
-        else { params.delete('focus'); }
+        if (data.id) {
+          params.set('focus', String(data.id));
+          if ('page' in data) {
+            params.set('page', String(data.page));
+            alert('Устанавливаем page=' + data.page);
+          } else {
+            alert('page НЕ передан в data!');
+          }
+          alert('params после: ' + params.toString());
+        } else {
+          params.delete('focus');
+        }
       } else if (mode === 'edit') {
         var eid = parseInt((form.querySelector('input[name="id"]') || {}).value || '0', 10) || 0;
         if (eid > 0) params.set('focus', String(eid)); else params.delete('focus');

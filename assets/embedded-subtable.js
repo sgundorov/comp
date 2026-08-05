@@ -81,7 +81,7 @@
 
     var self = this;
     if (this.data.length > 0) {
-      setTimeout(function () { if (self.selectedId === 0) self.selectById(self.data[0].id); }, 0);
+      setTimeout(function () { if (self.selectedId === 0 && !self._refreshPending) self.selectById(self.data[0].id); }, 0);
     }
   }
 
@@ -430,6 +430,7 @@
    EmbeddedSubTable.prototype.refresh = function (opts) {
      var self = this;
      if (!this.saveUrl || !this.parentId) return;
+     self._refreshPending = true;
      var fd = new FormData();
      fd.set('field', '_list');
      fd.set(this.parentField, String(this.parentId));
@@ -479,8 +480,9 @@
                  self.selectedId = 0;
                }
              }
-           }
-           self.render();
+            }
+            self._refreshPending = false;
+            self.render();
            if (self.onDataChange) self.onDataChange(self.data);
            if (self.totalsCallback && typeof global[self.totalsCallback] === 'function') {
              var tf = new FormData();
@@ -606,7 +608,7 @@
                     tbl.selectedId = Number(data.id);
                   }
                   tbl.render();
-                } else if (data._deleted) {
+                } else if (data._deleted || data.mode === 'delete') {
                   var ddata = tbl.data || self.data;
                   var idx = -1;
                   for (var i = 0; i < ddata.length; i++) { if (ddata[i].id == data.id) { idx = i; break; } }

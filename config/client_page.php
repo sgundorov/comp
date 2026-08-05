@@ -35,7 +35,7 @@ $clientPageConfig = [
         'cli_categ_id' => ['c.cli_categ_id', 'cli_categ', 'cli_categ_id', 'categ'],
         'city_id'      => ['c.city_id', 'city', 'city_id', 'city'],
         'country_id'   => ['c.country_id', 'country', 'country_id', 'country'],
-        'tags'         => ['tag_id', 'tag', 'tag_id', 'tag'],
+        'tags'         => ['col' => 'tag_id', 'table' => 'tag', 'id' => 'tag_id', 'label' => 'tag', 'subquery' => true],
     ],
     'select_sql'   => "SELECT c.client_id,
         c.name,

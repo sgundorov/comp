@@ -62,6 +62,7 @@ $ALLOWED = [
     'disc_goods'    => ['col' => 'disc_goods',    'type' => 's', 'max' => 10],
     'dop1'          => ['col' => 'dop1',          'type' => 's', 'max' => 500],
     'note'          => ['col' => 'note',          'type' => 's', 'max' => 5000],
+    'tag_ids'       => ['col' => 'tag_ids',       'type' => 'tags', 'max' => 0],
 ];
 
 if (!isset($ALLOWED[$field])) {
@@ -83,6 +84,32 @@ if ($isCheckbox) {
     $stmt->execute();
     $stmt->close();
     echo json_encode(['ok' => true, 'field' => $field, 'value' => (string)$value, 'displayValue' => $displayValue]);
+} elseif ($field === 'tag_ids') {
+    $tagIds = array_values(array_filter(array_map('intval', explode(',', $rawValue)), fn($v) => $v > 0));
+    $stmt = $conn->prepare("DELETE FROM client_tag WHERE client_id = ?");
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $stmt->close();
+    foreach ($tagIds as $tid) {
+        $stmt = $conn->prepare("INSERT IGNORE INTO client_tag (client_id, tag_id) VALUES (?, ?)");
+        bind_auto($stmt, [$id, $tid]);
+        $stmt->execute();
+        $stmt->close();
+    }
+    $names = [];
+    if (count($tagIds) > 0) {
+        $ph = implode(',', array_fill(0, count($tagIds), '?'));
+        $nr = $conn->prepare("SELECT tag_id, tag AS name FROM tag WHERE tag_id IN ($ph)");
+        if ($nr) {
+            stmt_bind($nr, str_repeat('i', count($tagIds)), $tagIds);
+            $nr->execute();
+            $res = $nr->get_result();
+            if ($res) while ($r = $res->fetch_assoc()) $names[] = (string)$r['name'];
+            $nr->close();
+        }
+    }
+    $displayValue = implode(', ', $names);
+    echo json_encode(['ok' => true, 'field' => $field, 'value' => implode(',', $tagIds), 'displayValue' => $displayValue]);
 } elseif (in_array($field, ['cli_categ_id', 'city_id', 'country_id', 'promo_id'])) {
     $value = (int)$rawValue;
     $valueForZero = $value > 0 ? $value : null;

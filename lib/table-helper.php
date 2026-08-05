@@ -1,20 +1,7 @@
 <?php
 /**
  * Вычисляет номер страницы, на которой окажется новая запись
- * после применения сортировки. Используется для перехода к
- * выделенной записи после создания/копирования.
- *
- * @param mysqli $conn  Объект соединения с БД
- * @param string $table Имя таблицы (без обратных кавычек)
- * @param string $pkCol Имя первичного ключа (без кавычек)
- * @param string $sortCol Имя колонки сортировки
- * @param string $sortDir Направление: 'ASC' или 'DESC'
- * @param int|string $sortVal Значение колонки сортировки новой записи
- * @param int    $newPk  Значение первичного ключа новой записи
- * @param string $where  Доп. условие фильтрации (без WHERE)
- *                       Например: "doctype_id = 10" или ""
- *
- * @return int Номер страницы (1-based) или 1 если не удалось вычислить
+ * после применения сортировки.
  */
 function computePageOfNew(
     mysqli $conn,
@@ -28,42 +15,95 @@ function computePageOfNew(
 ): int {
     $pageSize = defined('PAGE_SIZE') && PAGE_SIZE > 0 ? PAGE_SIZE : 30;
 
+    $rawSortCol = trim($sortCol);
     $table = '`' . str_replace('`', '``', $table) . '`';
     $pkCol = '`' . str_replace('`', '``', $pkCol) . '`';
     $sortCol = '`' . str_replace('`', '``', $sortCol) . '`';
-    $sortDir = strtoupper($sortDir) === 'DESC' ? 'DESC' : 'ASC';
+    $sortDir = strtoupper($sortDir);
 
-    $cmpOp  = $sortDir === 'DESC' ? '>' : '<';
-    $pkCmp  = $sortDir === 'DESC' ? '>' : '<';
-
-    if (is_numeric($sortVal)) {
-        $sortValLit = (string)(int)$sortVal;
-        $condition = "$sortCol $cmpOp $sortValLit OR ($sortCol = $sortValLit AND $pkCol $pkCmp $newPk)";
-    } else {
-        $escaped = "'" . $conn->real_escape_string((string)$sortVal) . "'";
-        $condition = "$sortCol $cmpOp $escaped OR ($sortCol = $escaped AND $pkCol $pkCmp $newPk)";
-    }
-
+    // Получаем общее количество записей
     $whereClause = '';
     if ($where !== '') {
         $trimmed = trim($where);
         $upper = strtoupper(substr($trimmed, 0, 6));
         if ($upper === 'WHERE ') {
-            $whereClause = ' ' . $trimmed . ' AND (' . $condition . ')';
+            $whereClause = ' ' . $trimmed;
         } else {
-            $whereClause = ' WHERE ' . $trimmed . ' AND (' . $condition . ')';
+            $whereClause = ' WHERE ' . $trimmed;
         }
-    } else {
-        $whereClause = ' WHERE (' . $condition . ')';
+    }
+    
+    $totalSql = "SELECT COUNT(*) AS total FROM $table$whereClause";
+    $totalRes = $conn->query($totalSql);
+    if (!$totalRes || !($totalRow = $totalRes->fetch_assoc())) {
+        return 1;
+    }
+    $totalRecords = (int)$totalRow['total'];
+    $totalPages = ceil($totalRecords / $pageSize);
+
+    // Для сортировки по ID:
+    if ($rawSortCol === 'id' || $rawSortCol === $pkCol || $rawSortCol === str_replace('`', '', $pkCol)) {
+        if ($sortDir === 'ASC') {
+            // Новые записи с большим ID → в конце → последняя страница
+            return $totalPages;
+        } else {
+            // Новые записи с большим ID → в начале → первая страница
+            return 1;
+        }
     }
 
-    $sql = "SELECT COUNT(*) + 1 AS pos FROM $table$whereClause";
-    $res = @$conn->query($sql);
-    if ($res && ($row = $res->fetch_assoc())) {
-        $pos = (int)$row['pos'];
-        if ($pos > 0) {
-            return (int)ceil($pos / $pageSize);
+    // Для других полей считаем позицию
+    if (is_numeric($sortVal)) {
+        $sortValLit = (string)(int)$sortVal;
+        if ($sortDir === 'DESC') {
+            $condition = "$sortCol > $sortValLit OR ($sortCol = $sortValLit AND $pkCol < $newPk)";
+        } else {
+            $condition = "$sortCol < $sortValLit OR ($sortCol = $sortValLit AND $pkCol < $newPk)";
+        }
+    } else {
+        $escaped = "'" . $conn->real_escape_string((string)$sortVal) . "'";
+        if ($sortDir === 'DESC') {
+            $condition = "$sortCol > $escaped OR ($sortCol = $escaped AND $pkCol < $newPk)";
+        } else {
+            $condition = "$sortCol < $escaped OR ($sortCol = $escaped AND $pkCol < $newPk)";
         }
     }
+
+    $countSql = "SELECT COUNT(*) AS pos FROM $table$whereClause AND ($condition)";
+    $countRes = $conn->query($countSql);
+    if ($countRes && ($countRow = $countRes->fetch_assoc())) {
+        $pos = (int)$countRow['pos'];
+        return (int)ceil(($pos + 1) / $pageSize);
+    }
+
     return 1;
+}
+
+/**
+ * Получает текущую сортировку из URL-параметров.
+ */
+function get_current_sort(array $defaultSort): array {
+    $sortParam = $_GET['sort'] ?? '[]';
+    
+    // JSON формат
+    $sortLevels = json_decode($sortParam, true);
+    if (is_array($sortLevels) && count($sortLevels) > 0 && isset($sortLevels[0]['col'])) {
+        return [
+            'col' => (string)$sortLevels[0]['col'],
+            'dir' => strtoupper((string)($sortLevels[0]['dir'] ?? 'asc')),
+        ];
+    }
+    
+    // Простой формат col:dir
+    if (strpos($sortParam, ':') !== false) {
+        $parts = explode(':', $sortParam);
+        if (count($parts) === 2) {
+            return [
+                'col' => trim($parts[0]),
+                'dir' => strtoupper(trim($parts[1])),
+            ];
+        }
+    }
+    
+    return $defaultSort;
 }

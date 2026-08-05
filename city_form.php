@@ -107,7 +107,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newId = $stmt->insert_id;
             $stmt->close();
             if ($isAjax) {
-                $pageOfNew = computePageOfNew($conn, 'city', 'id', 'id', 'asc', $newId, $newId, '');
+                $sort = get_current_sort(['col' => 'id', 'dir' => 'asc']);
+                $sortCol = $sort['col'];
+                $sortDir = $sort['dir'];
+                $sortVal = $newId;
+                if ($sortCol === 'city') $sortVal = $values['city'];
+                if ($sortCol === 'note') $sortVal = $values['note'];
+                if ($sortCol === 'country') $sortVal = $values['country_name'] ?? '';
+                if ($sortCol === 'id') $sortCol = 'id';
+                $pageOfNew = computePageOfNew($conn, 'city', 'city_id', $sortCol, $sortDir, $sortVal, $newId, '');
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $newId, 'name' => $values['city'], 'page' => $pageOfNew]);
                 exit;

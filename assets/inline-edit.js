@@ -221,6 +221,21 @@
               '<button type="button" class="cell-edit-btn cell-edit-btn--primary cell-edit-save">' + IMG_SAVE + ' Сохранить</button>' +
               '<button type="button" class="cell-edit-btn cell-edit-cancel">' + IMG_CANCEL + ' Отменить</button>' +
             '</div>';
+        } else if (config.type === 'tags') {
+          var tagData = cfg.getLookupData(field) || [];
+          var currentIds = String(rawValue).split(',').map(function(s){return parseInt(s,10);}).filter(function(n){return !isNaN(n)&&n>0;});
+          var selectedSet = new Set(currentIds);
+          var tagsHtml = '<div class="cell-edit-tags-wrap">';
+          tagData.forEach(function(t){
+            tagsHtml += '<label class="cell-edit-tags-item"><input type="checkbox" value="' + t.id + '"' + (selectedSet.has(t.id)?' checked':'') + '/> ' + esc(t.name) + '</label>';
+          });
+          tagsHtml += '</div>';
+          panel.innerHTML = tagsHtml +
+            '<div class="cell-edit-error" style="display:none"></div>' +
+            '<div class="cell-edit-actions">' +
+              '<button type="button" class="cell-edit-btn cell-edit-btn--primary cell-edit-save">' + IMG_SAVE + ' Сохранить</button>' +
+              '<button type="button" class="cell-edit-btn cell-edit-cancel">' + IMG_CANCEL + ' Отменить</button>' +
+            '</div>';
         } else {
           return;
         }
@@ -278,6 +293,16 @@
             value = input.value;
             var selOpt = input.options[input.selectedIndex];
             displayAfter = selOpt ? selOpt.text : value;
+          } else if (config.type === 'tags') {
+            var checked = panel.querySelectorAll('input[type="checkbox"]:checked');
+            var ids = [];
+            var names = [];
+            checked.forEach(function(cb){
+              ids.push(cb.value);
+              names.push(cb.parentElement.textContent.trim());
+            });
+            value = ids.join(',');
+            displayAfter = names.join(', ');
           } else {
             value = panel._inputId.value;
             const dn = panel._input.getAttribute('data-display');

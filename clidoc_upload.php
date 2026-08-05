@@ -38,4 +38,6 @@ if (!move_uploaded_file($file['tmp_name'], $destPath)) {
     exit;
 }
 
+exec('icacls ' . escapeshellarg($destPath) . ' /grant "NT AUTHORITY\\IUSR:(RX)" "BUILTIN\\IIS_IUSRS:(RX)" 2>&1');
+
 echo json_encode(['ok' => true, 'filename' => 'uploads/client/' . $destName]);

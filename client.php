@@ -69,6 +69,10 @@ $promoLookup = [];
 $crs = $conn->query("SELECT promo_id, promo FROM promo ORDER BY promo");
 if ($crs) while ($cr = $crs->fetch_assoc()) $promoLookup[] = ['id' => (int)$cr['promo_id'], 'name' => (string)$cr['promo']];
 
+$tagLookup = [];
+$crs = $conn->query("SELECT tag_id, tag FROM tag WHERE client_flag = '1' ORDER BY tag");
+if ($crs) while ($cr = $crs->fetch_assoc()) $tagLookup[] = ['id' => (int)$cr['tag_id'], 'name' => (string)$cr['tag']];
+
 $tp->getTotalCount($conn);
 $rows = $tp->getRows($conn);
 
@@ -365,8 +369,9 @@ if (count($filters) > 0) {
             $raw = (string)($r['dop1'] ?? '');
             return [$raw, $doHilight ? hilight($raw, $search, $searchCond) : $raw];
         case 'tags':
-            $raw = (string)($r['tags_concat'] ?? '');
-            return [$raw, $doHilight ? hilight($raw, $search, $searchCond) : $raw];
+            $raw = (string)($r['tag_ids'] ?? '');
+            $display = (string)($r['tags_concat'] ?? '');
+            return [$raw, $doHilight ? hilight($display, $search, $searchCond) : $display];
         case 'note':
             $raw = (string)$r['note'];
             return [$raw, $doHilight ? hilight($raw, $search, $searchCond) : $raw];
@@ -404,8 +409,10 @@ $inlineFields = [];
 $valCases = '';
 foreach ($tp->visibleColumns as $vc) {
     $cn = $vc['name'];
-    if (!empty($vc['readonly']) || $cn === 'id' || $cn === 'name' || $cn === 'tags') continue;
-    if (in_array($cn, ['supplier_flag', 'problem_flag', 'juridical_flag', 'hide_flag'], true)) {
+    if (!empty($vc['readonly']) || $cn === 'id' || $cn === 'name') continue;
+    if ($cn === 'tags') {
+        $inlineFields[$cn] = ['dbField' => 'tag_ids', 'type' => 'tags', 'label' => $vc['label']];
+    } elseif (in_array($cn, ['supplier_flag', 'problem_flag', 'juridical_flag', 'hide_flag'], true)) {
         $inlineFields[$cn] = ['dbField' => $cn, 'type' => 'checkbox', 'label' => $vc['label']];
     } elseif (in_array($cn, ['cli_categ_id', 'city_id', 'country_id', 'promo_id'], true)) {
         $isLookup = !empty($vc['param']);
@@ -729,6 +736,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
                 case 'city_id': return window.__cityLookup || [];
                 case 'country_id': return window.__countryLookup || [];
                 case 'promo_id': return window.__promoLookup || [];
+                case 'tags': return window.__tagLookup || [];
             }
             return [];
         }
@@ -739,6 +747,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
     var __cityLookup = <?= $cityLookupJson ?>;
     var __countryLookup = <?= $countryLookupJson ?>;
     var __promoLookup = <?= $promoLookupJson ?>;
+    var __tagLookup = <?= json_encode($tagLookup, JSON_UNESCAPED_UNICODE) ?>;
 
     window.initFormTabs = function () {
       var container = document.querySelector('.tab-container');
@@ -912,6 +921,6 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
     ColumnFilter.init({"thSelector":".col-cli_categ_id","pageUrl":"client.php"});
     ColumnFilter.init({"thSelector":".col-city_id","pageUrl":"client.php"});
     ColumnFilter.init({"thSelector":".col-country_id","pageUrl":"client.php"});
-    ColumnFilter.init({"thSelector":".col-tags","pageUrl":"client.php"});
+    ColumnFilter.init({"thSelector":".col-tags","pageUrl":"client.php","param":"tag_id"});
   </script>
 <?php render_page_footer();

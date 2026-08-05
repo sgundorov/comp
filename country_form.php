@@ -75,7 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newId = $conn->insert_id;
             $stmt->close();
             if ($isAjax) {
-                $pageOfNew = computePageOfNew($conn, 'country', 'id', 'id', 'asc', $newId, $newId, '');
+                $sort = get_current_sort(['col' => 'id', 'dir' => 'asc']);
+                $pageOfNew = computePageOfNew($conn, 'country', 'country_id', $sort['col'], $sort['dir'], $newId, $newId, '');
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode(['ok' => true, 'mode' => $mode, 'id' => $newId, 'name' => $values['country'], 'page' => $pageOfNew]);
                 exit;

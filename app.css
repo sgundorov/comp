@@ -96,7 +96,6 @@ a { color: inherit; }
   box-shadow: 0 8px 18px rgba(0,0,0,.25);
 }
 .menu-item:hover > .submenu { display: block; }
-.menu-spacer { flex: 1; }
 .menu-user { margin-left: auto; }
 .menu-user .user-login { font-weight: bold; cursor: pointer; }
 .menu-user .user-login:hover { background: var(--btn); border-color: var(--line); }

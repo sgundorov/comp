@@ -25,6 +25,7 @@ class EmbeddedTable extends TableComponent {
     public $totalsCallback = '';
     public $onSaveSuccessExtra = '';
     public $columnLabels = [];
+    public $barcodeAdd = false;
 
     public function __construct(array $config) {
         $config['column_visibility_tbl'] = $config['column_visibility_tbl'] ?? '';
@@ -50,6 +51,7 @@ class EmbeddedTable extends TableComponent {
         $this->totalsCallback   = $config['totalsCallback'] ?? '';
         $this->onSaveSuccessExtra = $config['onSaveSuccessExtra'] ?? '';
         $this->columnLabels     = $config['columnLabels'] ?? [];
+        $this->barcodeAdd       = $config['barcodeAdd'] ?? false;
 
         if (empty($this->columnLabels)) {
             foreach ($this->columns as $col) {
@@ -107,6 +109,12 @@ $_actionsOk = !$_readonly && (!$af || true);
         <?php endif; ?>
         <?php if (!$_readonly): ?>
         <button type="button" class="icon-btn" title="Обновить" id="<?= h($p) ?>-refresh-btn"><img src="img/refresh.png" alt="" /></button>
+        <?php if ($this->barcodeAdd): ?>
+        <span class="barcode-add" style="display:inline-flex;align-items:center;gap:4px;margin-left:6px">
+          <input type="text" class="barcode-input" id="<?= h($p) ?>-barcode" maxlength="20" placeholder="Штрихкод" style="width:130px;height:24px;padding:0 6px;font-size:13px" />
+          <span style="color:var(--muted);font-size:12px">Enter</span>
+        </span>
+        <?php endif; ?>
         <?php if ($this->hasImport && $_addOk): ?>
         <button type="button" class="icon-btn" title="Импорт отмеченных" id="<?= h($p) ?>-import-btn"><img src="img/import.png" alt="" /></button>
         <?php endif; ?>
@@ -162,6 +170,7 @@ $_actionsOk = !$_readonly && (!$af || true);
     </div>
     <div class="table-wrap" style="overflow-x:auto">
     <table class="data-table docum2-table" style="table-layout:fixed;width:100%" id="<?= h($p) ?>-table"
+           data-readonly="<?= $_readonly ? '1' : '0' ?>"
            data-items='<?= h(json_encode($data, JSON_UNESCAPED_UNICODE)) ?>'>
       <?php $this->renderColgroup(true, $visibleCols) ?>
       <thead>
@@ -249,7 +258,7 @@ $_actionsOk = !$_readonly && (!$af || true);
         childFormUrl: '<?= $this->childFormUrl ?>',
         childFormName: '<?= $this->childFormName ?>',
         totalsCallback: <?= json_encode($totalsCallbackName, JSON_UNESCAPED_UNICODE) ?>,
-        readonly: <?= json_encode($this->readonly || ($this->accessFlags && (($this->accessFlags['change_flag'] ?? false) || ($this->accessFlags['save_flag'] ?? false)))) ?>,
+        readonly: <?= json_encode($this->readonly || ($this->accessFlags && (($this->accessFlags['change_flag'] ?? false) || ($this->accessFlags['save_flag'] ?? false)))) ?> || table.dataset.readonly === '1',
         onRowDoubleClick: <?= ($this->readonly || ($this->accessFlags && ($this->accessFlags['change_flag'] ?? false))) ? 'null' : 'function (id) { window[\'__' . $p . 'Table\'].openChildForm(\'edit\', id); }' ?>,
         filterBannerEl: '#<?= $p ?>-filter-banner',
         filterChipsEl: '#<?= $p ?>-filter-chips',
@@ -315,6 +324,36 @@ $_actionsOk = !$_readonly && (!$af || true);
       if (refreshBtn) refreshBtn.addEventListener('click', function () {
         window['__<?= $p ?>Table'].refresh();
       });
+
+      <?php if ($this->barcodeAdd): ?>
+      var bcEl = formBody.querySelector('#<?= $p ?>-barcode');
+      if (bcEl && !bcEl.__bcBound) {
+        bcEl.__bcBound = true;
+        bcEl.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' && e.key !== 'Tab') return;
+          e.preventDefault();
+          var code = bcEl.value.trim();
+          if (!code) return;
+          var tbl = window['__<?= $p ?>Table'];
+          if (!tbl || !tbl.parentId) return;
+          var fd = new FormData();
+          fd.set('field', '_barcode_add');
+          fd.set('<?= $this->parentField ?>', String(tbl.parentId));
+          fd.set('value', code);
+          fetch('<?= $this->saveUrl ?>', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              bcEl.value = '';
+              if (d && d.ok) {
+                if (typeof window.<?= $totalsCallbackName ?> === 'function') window.<?= $totalsCallbackName ?>(d);
+                if (tbl) tbl.refresh({ focusId: d.id });
+              } else {
+                alert((d && d.error) || 'Товар не найден');
+              }
+            });
+        });
+      }
+      <?php endif; ?>
 
       <?php if ($this->hasImport): ?>
       var importBtn = formBody.querySelector('#<?= $p ?>-import-btn');

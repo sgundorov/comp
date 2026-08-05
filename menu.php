@@ -25,6 +25,7 @@ $menuAccessMap = [
     'repmenu.php'   => 'RepMenu',
     'zat.php'       => 'Zat',
     'sale.php'      => 'Docum',
+    'ainv.php'      => 'Docum',
     'setup_form.php'=> 'Setup',
 ];
 $menuDisableCache = [];
@@ -82,6 +83,7 @@ $menuAttr = function(string $href) use ($activeMenu, $menuAccessMap, &$menuDisab
       <a href="invoice.php"<?= $menuAttr('invoice.php') ?>>Счета</a>
       <a href="invoice.php?kind=offer"<?= $menuAttr('invoice.php?kind=offer') ?>>Коммерческие предложения</a>
       <a href="plat.php"<?= $menuAttr('plat.php') ?>>Кассовая книга</a>
+      <a href="ainv.php"<?= $menuAttr('ainv.php') ?>>Инвентаризация</a>
     </div>
   </div>
   <div class="menu-item">
@@ -130,7 +132,6 @@ $menuAttr = function(string $href) use ($activeMenu, $menuAccessMap, &$menuDisab
       <a href="dostup.php"<?= $menuAttr('dostup.php') ?>>Права доступа</a>
     </div>
   </div>
-  <div class="menu-spacer"></div>
 <?php if (!empty($CurSotrID)): ?>
   <?php
   $stmt = $conn->prepare("SELECT login FROM sotr WHERE sotr_id = ?");

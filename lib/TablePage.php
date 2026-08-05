@@ -292,7 +292,7 @@ if (!defined('TABLEPAGE_LOADED')) {
                 if ($res) while ($r = $res->fetch_assoc()) $names[] = (string)$r[$lookupNameCol];
                 $stmt->close();
             }
-            $this->filters[] = ['kind' => 'col_filter', 'text' => "$label = " . (count($names) > 0 ? implode(', ', $names) : implode(',', $ids)), 'clear' => null];
+            $this->filters[] = ['kind' => 'col_filter', 'text' => "$label = " . (count($names) > 0 ? implode(', ', $names) : implode(',', $ids)), 'clear' => $getParam];
         }
 
         public function whereSql() {
@@ -357,10 +357,49 @@ if (!defined('TABLEPAGE_LOADED')) {
             return $rows;
         }
 
+        /**
+         * Вычисляет номер страницы, на которой окажется запись с заданным первичным ключом,
+         * с учётом текущей сортировки и активных фильтров/поиска.
+         */
+        public function computePageForNew(mysqli $conn, $newPk): int {
+            $pageSize = PAGE_SIZE;
+            $base = $this->idSelectSql ?: $this->selectSql;
+            $sql = str_placeholder($base, $this->whereSql()) . ' ORDER BY ' . $this->orderBy;
+            $stmt = @mysqli_prepare($conn, $sql);
+            if (!$stmt) return 1;
+            if ($this->types !== '') stmt_bind($stmt, $this->types, $this->params);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            $idx = 0;
+            $found = false;
+            if ($res) {
+                while ($r = $res->fetch_assoc()) {
+                    $keyVal = $r['id'] ?? $r[$this->key] ?? null;
+                    if ($keyVal !== null && (string)$keyVal === (string)$newPk) {
+                        $found = true;
+                        break;
+                    }
+                    $idx++;
+                }
+            }
+            $stmt->close();
+            if (!$found) return 1;
+            return (int)ceil(($idx + 1) / $pageSize);
+        }
+
         public function fetchPage(mysqli $conn): array {
             $onlyPage = ((string)($_GET['page'] ?? '0') !== '0');
             $pageNum = max(1, (int)($_GET['page'] ?? 1));
             $pageSize = PAGE_SIZE;
+            $focusRaw = (string)($_GET['focus'] ?? '0');
+            if ($focusRaw !== '' && $focusRaw !== '0' && $focusRaw !== 'first' && $focusRaw !== 'last' && is_numeric($focusRaw)) {
+                $focusId = (int)$focusRaw;
+                $computed = $this->computePageForNew($conn, $focusId);
+                if ($computed > 0) {
+                    $pageNum = $computed;
+                    $onlyPage = true;
+                }
+            }
             $pageOffset = ($pageNum - 1) * $pageSize;
             $pageTotal = 0;
             $pageCount = 0;
@@ -648,6 +687,14 @@ if (!defined('TABLEPAGE_LOADED')) {
         }
 
         public function getTotalCount(mysqli $conn) {
+            $focusRaw = (string)($_GET['focus'] ?? '0');
+            if ($focusRaw !== '' && $focusRaw !== '0' && $focusRaw !== 'first' && $focusRaw !== 'last' && is_numeric($focusRaw)) {
+                $computed = $this->computePageForNew($conn, (int)$focusRaw);
+                if ($computed > 0) {
+                    $this->page = $computed;
+                    $this->offset = ($this->page - 1) * PAGE_SIZE;
+                }
+            }
             $sql = $this->countSql ?? "SELECT COUNT(*) AS cnt FROM " . $this->table;
             $sql = str_placeholder($sql, $this->whereSql());
             $this->debugCountSql = $sql;
@@ -834,6 +881,7 @@ if (!defined('TABLEPAGE_LOADED')) {
             foreach ($this->colFilters as $col => $cfg) {
                 $cfg = $this->normalizeColFilterConfig($cfg);
                 if (empty($cfg)) continue;
+                if (!empty($cfg['subquery'])) continue;
                 $param = $cfg['param'] ?? ($this->colMeta[$col]['param'] ?? ($col . '_id'));
                 $raw = (string)($_GET[$param] ?? '');
                 if ($raw === '') continue;
@@ -2136,6 +2184,21 @@ if (!empty($cfInit)): ?>
 
       function bindForm(form) {
         if (!form) return;
+        // Enter в форме = нажать основную submit-кнопку (в т.ч. "Удалить"),
+        // даже если фокус на readonly-поле (tabindex=-1).
+        form.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+          var t = e.target;
+          if (!t || t.tagName === 'TEXTAREA') return;
+          if (t.tagName === 'SELECT') return;
+          if (t.closest && t.closest('.lookup-pop')) return;
+          if (t.closest && t.closest('.col-filter-panel, .search-cond-panel, .columns-panel')) return;
+          if (t.type === 'button' || t.type === 'submit' || t.type === 'reset') return;
+          var submitBtn = form.querySelector('button[type="submit"]:not([disabled])');
+          if (!submitBtn) return;
+          e.preventDefault();
+          submitBtn.click();
+        });
         form.addEventListener('submit', function (e) {
           e.preventDefault();
           var fd = new FormData(form);
@@ -2303,6 +2366,26 @@ if (!empty($cfInit)): ?>
         if (popOpen) return;
         e.preventDefault();
         if (stashed) restoreStashedForm(null); else { closeOrReload(); }
+      });
+
+      // Enter в открытой модалке = нажать основную submit-кнопку формы
+      // (в т.ч. "Удалить"), даже если фокус не внутри формы (readonly-поля).
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+        if (!backdrop.classList.contains('open')) return;
+        if (e.defaultPrevented) return;
+        var t = e.target;
+        if (!t) return;
+        if (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return;
+        if (t.closest && t.closest('.lookup-pop, .col-filter-panel, .search-cond-panel, .columns-panel')) return;
+        if (t.closest && t.closest('table')) return;
+        if (t.closest && t.closest('[data-form-close], [data-lookup-add], [type="reset"], .lookup-tool, .col-filter-btn, .lookup-tool')) return;
+        var form = body.querySelector('form[data-form-modal]');
+        if (!form) return;
+        var submitBtn = form.querySelector('button[type="submit"]:not([disabled])');
+        if (!submitBtn) return;
+        e.preventDefault();
+        submitBtn.click();
       });
 
       window.__openFormModal = openFormModal;
