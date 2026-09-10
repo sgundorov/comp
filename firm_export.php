@@ -15,6 +15,9 @@ $tp = new TablePage($conn, $firmPageConfig);
 
 $tp->applyFilterWithLabel($conn, 'city_id', 'f.city_id', 'Город', 'city', 'city_id', 'city');
 
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 $rows = $tp->fetchAll($conn);
 
 $baseName = 'Фирмы';

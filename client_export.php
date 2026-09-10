@@ -26,6 +26,9 @@ if ($tagFilter !== '') {
     }
 }
 
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 $rows = $tp->fetchAll($conn);
 
 $colValues = [

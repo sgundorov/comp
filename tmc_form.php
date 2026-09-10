@@ -80,8 +80,13 @@ $values = [
     'residue'       => 0,
     'price_in'      => 0,
     'price_out'     => 0,
+    'price_hour'    => 0,
+    'price_day'     => 0,
+    'price_month'   => 0,
+    'period_aren'   => '',
     'note'          => '',
     'noquant_flag'  => 0,
+    'nocalc_flag'   => 0,
     'hide_flag'     => 0,
     'service_flag'  => 0,
     'site'          => '',
@@ -104,9 +109,89 @@ if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
     }
 }
 
+// --- Флаги настроек «Аренда» ---
+$showHoursFlag  = (int)($appSettings['ShowHoursFlag'] ?? 0) === 1;
+$showDaysFlag   = (int)($appSettings['ShowDaysFlag'] ?? 0) === 1;
+$showMonthsFlag = (int)($appSettings['ShowMonthsFlag'] ?? 0) === 1;
+$anyArenFlag = $showHoursFlag || $showDaysFlag || $showMonthsFlag;
+$arenTabIdx = $isService ? '3' : '4';
+$initTariffs = $anyArenFlag && (
+    ((string)($_POST['after_save_open'] ?? '') === 'tariffs') ||
+    ((string)($_GET['tar'] ?? '') === '1')
+);
+$tmcApply = (string)($_POST['action'] ?? '') === 'apply';
+
+// --- Тарифы аренды (price) ---
+$prplanList = [];
+$prq = @$conn->query("SELECT prplan_id, prplan AS name FROM prplan ORDER BY prplan_id ASC");
+if ($prq) while ($prow = $prq->fetch_assoc()) $prplanList[] = ['id' => (int)$prow['prplan_id'], 'name' => (string)$prow['name']];
+$defaultPrplanId = !empty($prplanList) ? $prplanList[0]['id'] : 0;
+
+$priceColumnsAll = [
+    'bdays'      => 'Дней от',
+    'edays'      => 'Дней по',
+    'price'      => 'За день',
+    'btime'      => 'Время от',
+    'etime'      => 'Время по',
+    'hprice'     => 'За час',
+    'mprice'     => 'За месяц',
+];
+$priceColsVisible = [];
+foreach ($priceColumnsAll as $pcn => $pcl) {
+    $show = ($showDaysFlag && in_array($pcn, ['bdays', 'edays', 'price'], true))
+         || ($showHoursFlag && in_array($pcn, ['btime', 'etime', 'hprice'], true))
+         || ($showMonthsFlag && $pcn === 'mprice');
+    if ($show) $priceColsVisible[] = ['name' => $pcn, 'label' => $pcl, 'align' => 'right'];
+}
+$priceColsVisible[] = ['name' => 'fixed_flag', 'label' => 'Фиксированный', 'readonly' => true];
+$priceColsVisible[] = ['name' => 'name', 'label' => 'Название тарифа'];
+$priceWidthsMap = ['bdays'=>'70px','edays'=>'70px','price'=>'90px','btime'=>'80px','etime'=>'80px','hprice'=>'90px','mprice'=>'100px','fixed_flag'=>'110px','name'=>'200px'];
+$priceWidths = [];
+foreach ($priceColsVisible as $pc) { $priceWidths[$pc['name']] = $priceWidthsMap[$pc['name']]; }
+
+$priceData = [];
+if ($id > 0 && $defaultPrplanId > 0) {
+    $pStmt = @$conn->prepare("SELECT price_id AS id, name, bdays, edays, btime, etime, price, pricef, hprice, mprice, fixed_flag
+        FROM price WHERE product_id = ? AND prplan_id = ? ORDER BY price_id ASC");
+    if ($pStmt) {
+        $pStmt->bind_param('ii', $id, $defaultPrplanId);
+        $pStmt->execute();
+        $priceData = $pStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $pStmt->close();
+    }
+}
+
+$prTp = new TablePage($conn, [
+    'table'       => 'price',
+    'key'         => 'id',
+    'search_cols' => ['name'],
+    'column_visibility_tbl' => '',
+    'columns'     => $priceColsVisible,
+    'defaultColumnWidths' => $priceWidths,
+    'lookupData'  => [],
+]);
+$prEmbed = [
+    'prefix'       => 'pr',
+    'colWidths'    => $priceWidths,
+    'saveUrl'      => 'price_field_save.php' . ($defaultPrplanId > 0 ? '?prplan_id=' . $defaultPrplanId : ''),
+    'parentField'  => 'product_id',
+    'childFormUrl' => 'price_form.php?product_id=' . $id . '&prplan_id=' . $defaultPrplanId,
+    'childFormName'=> 'price',
+    'hasExport'    => true,
+    'hasPrint'     => true,
+    'exportUrl'    => 'price_export.php',
+    'printUrl'     => 'price_print.php',
+    'parentParam'  => 'product_id=',
+    'hasSearch'    => true,
+    'lookupData'   => [],
+    'columnResizeUrl' => 'price_column_width_save.php',
+    'columnResizeTbl' => 'price',
+    'readonly'     => $isReadonly,
+];
+
 $historyList = [];
 if ($values['product_id'] > 0) {
-    $hStmt = $conn->prepare("SELECT d2.quant, d2.price, d2.discount, d2.sum, d2.note, d2.accept_flag,
+    $hStmt = $conn->prepare("SELECT d2.quant, d2.price, d2.discount, d2.sum, d2.note, d2.accept_flag, d2.voz_flag,
         tp.typeop AS typeop_name, d.number, d.date, d.time, d.typeop, COALESCE(tp.prihod_flag, 0) AS prihod_flag
         FROM docum2 d2
         JOIN docum d ON d.docum_id = d2.docum_id
@@ -130,6 +215,7 @@ if ($values['product_id'] > 0) {
                 'sum'          => (string)$hr['sum'],
                 'note'         => (string)$hr['note'],
                 'accept_flag'  => (int)$hr['accept_flag'],
+                'voz_flag'     => (int)$hr['voz_flag'],
                 'prihod_flag'  => (int)$hr['prihod_flag'],
             ];
         }
@@ -150,8 +236,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['residue']      = (float)(str_replace(',', '.', (string)($_POST['residue'] ?? '0')));
     $values['price_in']     = (float)(str_replace(',', '.', (string)($_POST['price_in'] ?? '0')));
     $values['price_out']    = (float)(str_replace(',', '.', (string)($_POST['price_out'] ?? '0')));
+    $values['price_hour']   = (float)(str_replace(',', '.', (string)($_POST['price_hour'] ?? '0')));
+    $values['price_day']    = (float)(str_replace(',', '.', (string)($_POST['price_day'] ?? '0')));
+    $values['price_month']  = (float)(str_replace(',', '.', (string)($_POST['price_month'] ?? '0')));
+    $periodAren = strtolower(trim((string)($_POST['period_aren'] ?? '')));
+    $values['period_aren']  = in_array($periodAren, ['h', 'd', 'm'], true) ? $periodAren : '';
     $values['note']         = (string)($_POST['note'] ?? '');
     $values['noquant_flag'] = (int)(!empty($_POST['noquant_flag']));
+    $values['nocalc_flag']  = (int)(!empty($_POST['nocalc_flag']));
     $values['hide_flag']    = (int)(!empty($_POST['hide_flag']));
     $values['service_flag'] = $isService ? 1 : 0;
     $values['site']         = (string)($_POST['site'] ?? '');
@@ -232,7 +324,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $values['product_name'] = $baseInsertName;
         if ($values['code'] === '') $values['code'] = '0';
         $insertCounter = 1;
-        $stmt = $conn->prepare("INSERT INTO product (product_name, code, article, categ_id, group_id, sgroup_id, country_id, izgot_id, unit_id, residue, price_in, price_out, note, noquant_flag, hide_flag, service_flag, site, description, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $conn->prepare("INSERT INTO product (product_name, code, article, categ_id, group_id, sgroup_id, country_id, izgot_id, unit_id, residue, price_in, price_out, price_hour, price_day, price_month, period_aren, note, noquant_flag, nocalc_flag, hide_flag, service_flag, site, description, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         if ($stmt) {
             $saved = false;
             do {
@@ -240,8 +332,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $values['categ_id'], $values['group_id'], $values['sgroup_id'], $values['country_id'],
                     $values['izgot_id'], $values['unit_id'],
                     $values['residue'], $values['price_in'], $values['price_out'],
+                    $values['price_hour'], $values['price_day'], $values['price_month'], $values['period_aren'],
                     $values['note'],
-                    $values['noquant_flag'], $values['hide_flag'],
+                    $values['noquant_flag'], $values['nocalc_flag'], $values['hide_flag'],
                     $values['service_flag'],
                     $values['site'], $values['description'], $values['photo']]);
                 $ok = $stmt->execute();
@@ -261,13 +354,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $conn->query("UPDATE product SET code = $newId WHERE product_id = $newId");
                     $values['code'] = (string)$newId;
                 }
-                if ($ajax) {
+                if ($ajax && !$tmcApply) {
                     $pageOfNew = computePageOfNew($conn, 'product', 'id', 'id', 'asc', $newId, $newId, 'service_flag = ' . ($isService ? '1' : '0'));
                     ob_clean();
                     header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(['ok' => true, 'mode' => 'new', 'id' => $newId, 'page' => $pageOfNew, 'product_name' => $values['product_name']], JSON_UNESCAPED_UNICODE);
+                    echo json_encode(['ok' => true, 'mode' => 'new', 'id' => $newId, 'name' => $values['product_name'], 'page' => $pageOfNew, 'product_name' => $values['product_name']], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
+                if ($tmcApply) { $applySavedId = $newId; }
             } else {
                 $errors[] = 'Ошибка БД: ' . ($stmtErr ?: mysqli_error($conn) ?: 'неизвестная ошибка');
             }
@@ -279,7 +373,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $values['product_name'] = $baseEditName;
         if ($values['code'] === '') $values['code'] = (string)$id;
         $editCounter = 1;
-        $stmt = $conn->prepare("UPDATE product SET product_name=?, code=?, article=?, categ_id=?, group_id=?, sgroup_id=?, country_id=?, izgot_id=?, unit_id=?, residue=?, price_in=?, price_out=?, note=?, noquant_flag=?, hide_flag=?, site=?, description=?, photo=? WHERE product_id=?");
+        $stmt = $conn->prepare("UPDATE product SET product_name=?, code=?, article=?, categ_id=?, group_id=?, sgroup_id=?, country_id=?, izgot_id=?, unit_id=?, residue=?, price_in=?, price_out=?, price_hour=?, price_day=?, price_month=?, period_aren=?, note=?, noquant_flag=?, nocalc_flag=?, hide_flag=?, site=?, description=?, photo=? WHERE product_id=?");
         if ($stmt) {
             $saved = false;
             do {
@@ -287,8 +381,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $values['categ_id'], $values['group_id'], $values['sgroup_id'], $values['country_id'],
                     $values['izgot_id'], $values['unit_id'],
                     $values['residue'], $values['price_in'], $values['price_out'],
+                    $values['price_hour'], $values['price_day'], $values['price_month'], $values['period_aren'],
                     $values['note'],
-                    $values['noquant_flag'], $values['hide_flag'],
+                    $values['noquant_flag'], $values['nocalc_flag'], $values['hide_flag'],
                     $values['site'], $values['description'], $values['photo'],
                     $id]);
                 $ok = $stmt->execute();
@@ -303,12 +398,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtErr = $stmt->error;
             $stmt->close();
             if ($saved) {
-                if ($ajax) {
+                if ($ajax && !$tmcApply) {
                     ob_clean();
                     header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(['ok' => true, 'mode' => 'edit', 'id' => $id, 'product_name' => $values['product_name']], JSON_UNESCAPED_UNICODE);
+                    echo json_encode(['ok' => true, 'mode' => 'edit', 'id' => $id, 'name' => $values['product_name'], 'product_name' => $values['product_name']], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
+                if ($tmcApply) { $applySavedId = $id; }
             } else {
                 $errors[] = 'Ошибка БД: ' . ($stmtErr ?: mysqli_error($conn) ?: 'неизвестная ошибка');
             }
@@ -320,6 +416,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: tmc.php' . ($isService ? '?type=service' : ''));
         exit;
     }
+    }
+
+    // action=apply: сохранить и остаться в форме (режим редактирования)
+    $applySavedId = $applySavedId ?? 0;
+    if ($tmcApply && $applySavedId > 0 && empty($errors)) {
+        $mode = 'edit';
+        $id = (int)$applySavedId;
+        $stmt = @$conn->prepare("SELECT * FROM product WHERE product_id = ?");
+        if ($stmt) {
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            if ($res && $r = $res->fetch_assoc()) {
+                foreach ($values as $k => $v) { $values[$k] = $r[$k] ?? $v; }
+            }
+            $stmt->close();
+        }
+        $priceData = [];
+        if ($defaultPrplanId > 0) {
+            $pStmt = @$conn->prepare("SELECT price_id AS id, name, bdays, edays, btime, etime, price, pricef, hprice, mprice, fixed_flag
+                FROM price WHERE product_id = ? AND prplan_id = ? ORDER BY price_id ASC");
+            if ($pStmt) {
+                $pStmt->bind_param('ii', $id, $defaultPrplanId);
+                $pStmt->execute();
+                $priceData = $pStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                $pStmt->close();
+            }
+        }
+        $prEmbed['saveUrl'] = 'price_field_save.php' . ($defaultPrplanId > 0 ? '?prplan_id=' . $defaultPrplanId : '');
+        $prEmbed['childFormUrl'] = 'price_form.php?product_id=' . $id . '&prplan_id=' . $defaultPrplanId;
     }
 }
 
@@ -383,6 +509,9 @@ if (!$ajax):
     <div class="tab-header" data-tab-index="2">Остатки</div>
     <?php endif; ?>
     <div class="tab-header" data-tab-index="<?= $isService ? '2' : '3' ?>">История</div>
+    <?php if ($anyArenFlag): ?>
+    <div class="tab-header" data-tab-index="<?= $arenTabIdx ?>">Тарифы</div>
+    <?php endif; ?>
   </div>
 
   <div class="tab-pane active" data-tab-index="0">
@@ -427,16 +556,44 @@ if (!$ajax):
         <td><?= render_input('text', 'site', $values['site'], ['id' => 'tmc-site']) ?></td>
       </tr>
       <?php endif; ?>
+      <?php
+      $arenPriceFields = [];
+      if ($showHoursFlag)  $arenPriceFields[] = ['Цена за час аренды', 'price_hour', 'tmc-price_hour', $values['price_hour']];
+      if ($showDaysFlag)   $arenPriceFields[] = ['Цена за день', 'price_day', 'tmc-price_day', $values['price_day']];
+      if ($showMonthsFlag) $arenPriceFields[] = ['Цена за месяц', 'price_month', 'tmc-price_month', $values['price_month']];
+      $arenPeriodOptions = [];
+      if ($showHoursFlag)  $arenPeriodOptions[] = ['value' => 'h', 'label' => 'Час'];
+      if ($showDaysFlag)   $arenPeriodOptions[] = ['value' => 'd', 'label' => 'День'];
+      if ($showMonthsFlag) $arenPeriodOptions[] = ['value' => 'm', 'label' => 'Месяц'];
+      $allowedPeriodValues = array_map(fn($o) => $o['value'], $arenPeriodOptions);
+      if (!in_array($values['period_aren'], $allowedPeriodValues, true)) {
+          $values['period_aren'] = count($allowedPeriodValues) === 1 ? $allowedPeriodValues[0] : '';
+      }
+      ?>
       <tr>
         <td class="form-label">Закупочная цена</td>
         <td class="form-label">Розничная цена</td>
-        <td>&nbsp;</td>
+        <?php if ($anyArenFlag): ?><td class="form-label">Период аренды</td><?php else: ?><td>&nbsp;</td><?php endif; ?>
       </tr>
       <tr class="col-3">
         <td><?= render_input('text', 'price_in', $values['price_in'] == 0 ? '' : $values['price_in'], ['id' => 'tmc-price_in', 'class' => 'num']) ?></td>
         <td><?= render_input('text', 'price_out', $values['price_out'] == 0 ? '' : $values['price_out'], ['id' => 'tmc-price_out', 'class' => 'num']) ?></td>
-        <td>&nbsp;</td>
+        <?php if ($anyArenFlag): ?>
+        <td><?= render_select('period_aren', $arenPeriodOptions, $values['period_aren'], ['id' => 'tmc-period_aren']) ?></td>
+        <?php else: ?><td>&nbsp;</td><?php endif; ?>
       </tr>
+      <?php if ($anyArenFlag): ?>
+      <tr>
+        <?php for ($api = 0; $api < 3; $api++): ?>
+          <?php if (isset($arenPriceFields[$api])): ?><td class="form-label"><?= $arenPriceFields[$api][0] ?></td><?php else: ?><td>&nbsp;</td><?php endif; ?>
+        <?php endfor; ?>
+      </tr>
+      <tr class="col-3">
+        <?php for ($api = 0; $api < 3; $api++): ?>
+          <?php if (isset($arenPriceFields[$api])): ?><td><?= render_input('text', $arenPriceFields[$api][1], $arenPriceFields[$api][3] == 0 ? '' : $arenPriceFields[$api][3], ['id' => $arenPriceFields[$api][2], 'class' => 'num']) ?></td><?php else: ?><td>&nbsp;</td><?php endif; ?>
+        <?php endfor; ?>
+      </tr>
+      <?php endif; ?>
       <?php if (!$isService): ?>
       <tr>
         <td class="form-label">Количество</td>
@@ -445,10 +602,8 @@ if (!$ajax):
       </tr>
       <tr class="col-3">
         <td><?php $residueRaw = (float)($values['residue'] ?? 0); $residueDisp = $residueRaw == 0 ? '' : ($residueRaw == (int)$residueRaw ? (string)(int)$residueRaw : rtrim(rtrim(number_format($residueRaw, 3, '.', ''), '0'), '.')); ?><?= render_input('text', 'residue', $residueDisp, ['id' => 'tmc-residue', 'class' => 'num', 'readonly' => true]) ?></td>
-        <td><?= render_lookup('unit', 'unit_id', $values['unit_id'], $unitName, h(json_encode($unitList, JSON_UNESCAPED_UNICODE)), 'unit_form.php?mode=new', $isReadonly, ['id' => 'tmc-unit']) ?></td>
-        <td>
-          <label><input type="checkbox" name="noquant_flag" value="1"<?= $values['noquant_flag'] ? ' checked' : '' ?><?= $isReadonly ? ' disabled' : '' ?> /> Без количества</label>
-        </td>
+        <td><div style="display:flex;gap:10px;align-items:center"><?= render_lookup('unit', 'unit_id', $values['unit_id'], $unitName, h(json_encode($unitList, JSON_UNESCAPED_UNICODE)), '', $isReadonly, ['id' => 'tmc-unit', 'style' => 'max-width:120px']) ?><label><input type="checkbox" name="noquant_flag" value="1"<?= $values['noquant_flag'] ? ' checked' : '' ?><?= $isReadonly ? ' disabled' : '' ?> /> Без кол-ва</label></div></td>
+        <td><label><input type="checkbox" name="nocalc_flag" value="1"<?= $values['nocalc_flag'] ? ' checked' : '' ?><?= $isReadonly ? ' disabled' : '' ?> /> Не вычислять остаток</label></td>
       </tr>
       <?php endif; ?>
       <tr>
@@ -563,6 +718,14 @@ if (!$ajax):
       .history-filter-input { height:28px; padding:0 6px; border:1px solid var(--line); border-radius:4px; box-sizing:border-box; font-size:13px; font-family:inherit; color:var(--input-text); background:var(--input-bg); }
       .history-filter-input:focus { border-color:var(--accent); outline:none; box-shadow:0 0 0 2px rgba(230,126,34,.2); }
       .search-hl { background:#e67e22; color:#fff; border-radius:2px; padding:0 1px; }
+      #history-table tbody tr td:first-child { position: relative; text-align: center; }
+      #history-table tbody tr td:first-child img {
+        display: block;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+      }
     </style>
     <div id="history-wrap" style="max-height:300px;border:1px solid var(--line);border-radius:4px;overflow-y:auto;">
       <table class="data-table" id="history-table" style="min-width:auto;">
@@ -595,9 +758,15 @@ if (!$ajax):
         <tbody id="history-tbody">
           <?php if (empty($historyList)): ?>
           <tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px">Нет записей</td></tr>
-          <?php else: foreach ($historyList as $hl): ?>
-          <tr<?= $hl['accept_flag'] ? '' : ' style="color:#b59800"' ?>>
-            <td><?php if ($hl['accept_flag']): ?><img src="img/lock.png" alt="Утв." title="Утверждено" width="14" height="14" /><?php endif; ?></td>
+          <?php else: foreach ($historyList as $hl):
+            $isArenRem = in_array((int)$hl['typeop'], [90, 130], true);
+            $statusFlag = $isArenRem ? $hl['voz_flag'] : $hl['accept_flag'];
+          ?>
+          <tr data-typeop="<?= (int)$hl['typeop'] ?>"<?= $statusFlag ? '' : ' style="color:#ffe9a8"' ?>>
+            <td><?php if ($statusFlag):
+              if ($isArenRem): ?><img src="img/vozvr.png" alt="Возвр." title="Возвращено" width="27" height="27" /><?php
+              else: ?><img src="img/lock.png" alt="Утв." title="Утверждено" width="18" height="18" /><?php endif;
+            endif; ?></td>
             <td><?= h($hl['typeop_name']) ?></td>
             <td><?= (int)$hl['number'] ?></td>
             <td><?= h($hl['date']) ?></td>
@@ -619,6 +788,30 @@ if (!$ajax):
       </table>
     </div>
   </div>
+
+  <?php if ($anyArenFlag): ?>
+  <div class="tab-pane" data-tab-index="<?= $arenTabIdx ?>">
+    <?php if ($id <= 0): ?>
+    <div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;border:1px dashed var(--line);border-radius:4px;">
+      Сохраните товар, чтобы добавить тарифы
+    </div>
+    <?php else: ?>
+    <table class="form-table" style="margin-bottom:10px">
+      <tr><td class="form-label">Тарифный план</td></tr>
+      <tr>
+        <td>
+          <select id="prplan-select" class="field-input" style="max-width:320px">
+            <?php foreach ($prplanList as $pl): ?>
+            <option value="<?= (int)$pl['id'] ?>"<?= $pl['id'] === $defaultPrplanId ? ' selected' : '' ?>><?= h($pl['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </td>
+      </tr>
+    </table>
+    <?= $prTp->renderEmbedded($priceData, $prEmbed) ?>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
 </div>
 
 <?php
@@ -696,7 +889,10 @@ echo render_form_actions($actions);
     rows.forEach(function (tr) {
       var text = tr.textContent.toLowerCase();
       var matchSearch = (st === '' || text.indexOf(st) >= 0);
-      var matchApproved = !onlyApproved || tr.querySelector('img[alt]');
+      /* Аренда (90) и Ремонт (130) не фильтруются по «Только утверждённые» */
+      var typeop = parseInt(tr.getAttribute('data-typeop') || '0', 10);
+      var isArenRem = (typeop === 90 || typeop === 130);
+      var matchApproved = (!onlyApproved || isArenRem) || tr.querySelector('img[alt]');
       var matchDate = true;
       if (dFrom || dTo) {
         var dateCell = tr.children[3];
@@ -841,6 +1037,100 @@ document.querySelectorAll('[data-lookup]:not([data-lookup-bound])').forEach(func
 });
 </script>
 
+<script src="assets/embedded-subtable.js"></script>
+<script>
+<?php $prTp->renderEmbeddedScripts($prEmbed); ?>
+</script>
+<script>
+(function () {
+  var tc = document.querySelector('.tab-container');
+  var formEl = document.querySelector('form[data-form-modal]');
+  if (!tc || !formEl) return;
+  var tariffsIdx = <?= $anyArenFlag ? (int)$arenTabIdx : 'null' ?>;
+
+  function ensureHidden(name, val) {
+    var el = formEl.querySelector('input[name="' + name + '"]');
+    if (!el) { el = document.createElement('input'); el.type = 'hidden'; el.name = name; formEl.appendChild(el); }
+    el.value = val;
+    return el;
+  }
+
+  // Новый товар: переход на вкладку «Тарифы» => сохранить (action=apply) и остаться в форме
+  tc.addEventListener('click', function (e) {
+    if (tariffsIdx === null) return;
+    var h = e.target.closest('.tab-header');
+    if (!h) return;
+    if (parseInt(h.dataset.tabIndex, 10) !== parseInt(tariffsIdx, 10)) return;
+    var idInput = formEl.querySelector('input[name="id"]');
+    var curId = idInput ? parseInt(idInput.value, 10) : 0;
+    if (curId > 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    ensureHidden('action', 'apply');
+    ensureHidden('after_save_open', 'tariffs');
+    var sb = formEl.querySelector('button[type="submit"]');
+    if (sb) sb.click();
+  }, true);
+
+  // Активировать вкладку «Тарифы» после автосохранения / при открытии с tar=1
+  var initTab = <?= json_encode($initTariffs ? 'tariffs' : '') ?>;
+  if (initTab === 'tariffs' && tariffsIdx !== null) {
+    var th = tc.querySelector('.tab-header[data-tab-index="' + tariffsIdx + '"]');
+    if (th) th.click();
+  }
+
+  <?php if ($anyArenFlag && ($id > 0 || !empty($applySavedId))): ?>
+  var ptable = document.getElementById('pr-table');
+  if (ptable && typeof initPrTable === 'function') {
+    initPrTable();
+    var tbl = window.__prTable;
+    if (tbl) {
+      tbl.columns.forEach(function (c) {
+        if (c.key === 'fixed_flag') {
+          c.readonly = true;
+          c.render = function (v) {
+            return (v == 1 || v === '1')
+              ? '<svg class="check-icon" viewBox="0 0 24 24" width="16" height="16"><path fill="#27ae60" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+              : '';
+          };
+        }
+        if (c.key === 'btime' || c.key === 'etime') {
+          c.render = function (v) {
+            var s = String(v == null ? '' : v).substring(0, 5);
+            if (s === '' || s === '00:00') return '';
+            return (s.charAt(0) === '0' && s.charAt(1) !== ':') ? s.substring(1) : s;
+          };
+        }
+        if (['bdays', 'edays'].indexOf(c.key) >= 0) {
+          c.render = function (v) {
+            var n = parseInt(String(v == null ? '0' : v), 10);
+            return (isNaN(n) || n === 0) ? '' : String(n);
+          };
+        }
+        if (['price', 'pricef', 'hprice', 'mprice'].indexOf(c.key) >= 0) {
+          c.render = function (v) {
+            var n = parseFloat(String(v == null ? '0' : v).replace(',', '.'));
+            if (isNaN(n) || n === 0) return '';
+            var s = n.toFixed(2).replace(/\.?0+$/, '');
+            return s;
+          };
+        }
+      });
+      tbl.render();
+      var psel = document.getElementById('prplan-select');
+      if (psel) {
+        psel.addEventListener('change', function () {
+          var q = 'prplan_id=' + encodeURIComponent(this.value);
+          tbl.saveUrl = 'price_field_save.php?' + q;
+          tbl.childFormUrl = 'price_form.php?product_id=<?= (int)$id ?>&' + q;
+          tbl.refresh();
+        });
+      }
+    }
+  }
+  <?php endif; ?>
+})();
+</script>
 <?php if (!$ajax): ?>
 <script src="assets/lookup.js"></script>
 <script src="assets/inline-edit.js"></script>
@@ -871,6 +1161,8 @@ document.querySelectorAll('[data-lookup]:not([data-lookup-bound])').forEach(func
   }
 })();
 </script>
+
+
 </body>
 </html>
 <?php endif;
@@ -882,6 +1174,7 @@ if ($ajax) {
     header('Pragma: no-cache');
     header('Expires: 0');
     $resp = ['html' => $html];
+    if ($tmcApply && !empty($applySavedId)) { $resp['ok'] = true; $resp['mode'] = 'edit'; $resp['id'] = (int)$id; }
     if (!empty($focusField)) $resp['focusField'] = $focusField;
     echo json_encode($resp, JSON_UNESCAPED_UNICODE);
 } else {

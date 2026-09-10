@@ -11,7 +11,10 @@ if ($onlyPage) {
     $tp->page = max(1, $pageNum);
 }
 
-$rows = $tp->fetchAll($conn);
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
+[$rows, $pagination] = $tp->fetchPage($conn);
 
 $colValues = [
     'accept_flag' => function ($r) { return (int)$r['accept_flag'] ? 'Да' : ''; },

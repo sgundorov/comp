@@ -22,10 +22,12 @@ $menuAccessMap = [
     'sgroup.php'    => 'Group',
     'izgot.php'     => 'Izgot',
     'unit.php'      => 'Unit',
+    'prplan.php'    => 'Product',
     'repmenu.php'   => 'RepMenu',
     'zat.php'       => 'Zat',
     'sale.php'      => 'Docum',
     'ainv.php'      => 'Docum',
+    'arenda.php'    => 'Docum',
     'setup_form.php'=> 'Setup',
 ];
 $menuDisableCache = [];
@@ -84,6 +86,7 @@ $menuAttr = function(string $href) use ($activeMenu, $menuAccessMap, &$menuDisab
       <a href="invoice.php?kind=offer"<?= $menuAttr('invoice.php?kind=offer') ?>>Коммерческие предложения</a>
       <a href="plat.php"<?= $menuAttr('plat.php') ?>>Кассовая книга</a>
       <a href="ainv.php"<?= $menuAttr('ainv.php') ?>>Инвентаризация</a>
+      <a href="arenda.php"<?= $menuAttr('arenda.php') ?>>Аренда</a>
     </div>
   </div>
   <div class="menu-item">
@@ -120,6 +123,7 @@ $menuAttr = function(string $href) use ($activeMenu, $menuAccessMap, &$menuDisab
       <a href="group.php"<?= $menuAttr('group.php') ?>>Группы, подгруппы</a>
       <a href="izgot.php"<?= $menuAttr('izgot.php') ?>>Производители</a>
       <a href="unit.php"<?= $menuAttr('unit.php') ?>>Единицы измерения</a>
+      <a href="prplan.php"<?= $menuAttr('prplan.php') ?>>Тарифные планы</a>
     </div>
   </div>
   <div class="menu-item">

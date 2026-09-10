@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/controls.php';
 require_once __DIR__ . '/lib/table-helper.php';
+require_once __DIR__ . '/lib/table-template.php';
 
 $isAjax = (
     (string)($_GET['ajax'] ?? '') === '1' ||
@@ -28,6 +29,29 @@ $values = [
     'neg_ost_flag'     => '0',
     'firm_id'          => '0',
     'current_store_id' => '0',
+    'ShowHoursFlag'         => '0',
+    'ShowDaysFlag'          => '0',
+    'ShowMonthsFlag'        => '0',
+    'ManualTariffFlag'      => '0',
+    'FixedFlag'             => '0',
+    'KeepDaysOnEarlyReturn' => '0',
+    'NoRefundOnEarlyReturn' => '0',
+    'AddLateDayCharge'      => '0',
+    'TimeShift' => '00:00',
+    'TimeLate'  => '00:00',
+    'SezonFlag' => '0',
+];
+
+$rentalFlagKeys = [
+    'ShowHoursFlag',
+    'ShowDaysFlag',
+    'ShowMonthsFlag',
+    'ManualTariffFlag',
+    'FixedFlag',
+    'KeepDaysOnEarlyReturn',
+    'NoRefundOnEarlyReturn',
+    'AddLateDayCharge',
+    'SezonFlag',
 ];
 
 $appSettings = load_app_settings($conn);
@@ -41,6 +65,13 @@ $values['show_hidden']  = (string)((int)($appSettings['show_hidden'] ?? 0));
 $values['neg_ost_flag'] = (string)((int)($appSettings['neg_ost_flag'] ?? 0));
 $values['firm_id']          = (string)((int)($appSettings['firm_id'] ?? 0));
 $values['current_store_id'] = (string)((int)($appSettings['current_store_id'] ?? 0));
+foreach ($rentalFlagKeys as $flagKey) {
+    $values[$flagKey] = (string)((int)($appSettings[$flagKey] ?? 0));
+}
+foreach (['TimeShift', 'TimeLate'] as $timeKey) {
+    $t = trim((string)($appSettings[$timeKey] ?? '00:00'));
+    $values[$timeKey] = preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $t) ? $t : '00:00';
+}
 
 $firmOptions = [];
 $firmResult = @$conn->query("SELECT firm_id, name FROM firm ORDER BY firm_id LIMIT 100");
@@ -82,6 +113,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['neg_ost_flag'] = (string)(int)(!empty($_POST['neg_ost_flag']) ? 1 : 0);
     $values['firm_id']          = (string)(int)($_POST['firm_id'] ?? 0);
     $values['current_store_id'] = (string)(int)($_POST['current_store_id'] ?? 0);
+    foreach ($rentalFlagKeys as $flagKey) {
+        $values[$flagKey] = (string)(int)(!empty($_POST[$flagKey]) ? 1 : 0);
+    }
+    foreach (['TimeShift', 'TimeLate'] as $timeKey) {
+        $values[$timeKey] = trim((string)($_POST[$timeKey] ?? '00:00'));
+    }
 
     $pageSize  = (int)$values['page_size'];
     $pageWidth = (int)$values['page_width'];
@@ -98,6 +135,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($ndsRate < 0 || $ndsRate > 100) {
         $errors[] = 'Ставка НДС должна быть от 0 до 100.';
         $focusField = 'nds_rate';
+    }
+    foreach (['TimeShift' => 'Время задержки начала проката', 'TimeLate' => 'Допустимое время опоздания'] as $timeKey => $timeLabel) {
+        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $values[$timeKey])) {
+            $errors[] = 'Поле «' . $timeLabel . '» должно содержать время в формате чч:мм.';
+            $focusField = $timeKey;
+        }
     }
     if ($values['firm_id'] === '0') {
         $errors[] = 'Выберите фирму.';
@@ -133,6 +176,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             save_app_setting($conn, 'neg_ost_flag', $values['neg_ost_flag']);
             save_app_setting($conn, 'firm_id', $values['firm_id']);
             save_app_setting($conn, 'current_store_id', $values['current_store_id']);
+            foreach ($rentalFlagKeys as $flagKey) {
+                save_app_setting($conn, $flagKey, $values[$flagKey]);
+            }
+            save_app_setting($conn, 'TimeShift', $values['TimeShift']);
+            save_app_setting($conn, 'TimeLate', $values['TimeLate']);
 
             $localConfig = "<?php\nreturn [\n";
             $localConfig .= "    'DB_HOST' => " . var_export($values['db_host'], true) . ",\n";
@@ -193,6 +241,14 @@ ob_start();
   <div class="flash flash--success">Настройки сохранены</div>
 <?php endif; ?>
 
+<?php $rentalTabActive = in_array($focusField, ['TimeShift', 'TimeLate'], true); ?>
+<div class="tab-container">
+  <div class="tab-headers">
+    <div class="tab-header<?= $rentalTabActive ? '' : ' active' ?>" data-tab-index="0">Общие</div>
+    <div class="tab-header<?= $rentalTabActive ? ' active' : '' ?>" data-tab-index="1">Аренда</div>
+  </div>
+
+  <div class="tab-pane<?= $rentalTabActive ? '' : ' active' ?>" data-tab-index="0">
 <fieldset class="fieldset">
   <legend class="fieldset-legend">Основные</legend>
   <table class="setup-table">
@@ -228,10 +284,59 @@ ob_start();
     <div><?= render_field('Пароль', render_input('password', 'db_pass', $values['db_pass'], ['id' => 'db_pass', 'style' => 'width:220px']), false, ['for' => 'db_pass']) ?></div>
   </div>
 </fieldset>
+  </div>
+
+  <div class="tab-pane<?= $rentalTabActive ? ' active' : '' ?>" data-tab-index="1">
+<fieldset class="fieldset">
+  <legend class="fieldset-legend">Аренда</legend>
+  <table class="setup-table">
+    <tr>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="ShowHoursFlag" value="1"' . ($values['ShowHoursFlag'] === '1' ? ' checked' : '') . ' /> Показывать поле Часов</label>', false, ['for' => 'show-hours-flag']) ?></td>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="ShowDaysFlag" value="1"' . ($values['ShowDaysFlag'] === '1' ? ' checked' : '') . ' /> Показывать поле Дней</label>', false, ['for' => 'show-days-flag']) ?></td>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="ShowMonthsFlag" value="1"' . ($values['ShowMonthsFlag'] === '1' ? ' checked' : '') . ' /> Показывать поле Месяцев</label>', false, ['for' => 'show-months-flag']) ?></td>
+    </tr>
+    <tr>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="ManualTariffFlag" value="1"' . ($values['ManualTariffFlag'] === '1' ? ' checked' : '') . ' /> Тарифы вводятся вручную</label>', false, ['for' => 'manual-tariff-flag']) ?></td>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="FixedFlag" value="1"' . ($values['FixedFlag'] === '1' ? ' checked' : '') . ' /> Фиксированные тарифы за период времени</label>', false, ['for' => 'fixed-flag']) ?></td>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="AddLateDayCharge" value="1"' . ($values['AddLateDayCharge'] === '1' ? ' checked' : '') . ' /> Добавлять стоимость суток за опоздание</label>', false, ['for' => 'add-late-day-charge']) ?></td>
+    </tr>
+    <tr>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="KeepDaysOnEarlyReturn" value="1"' . ($values['KeepDaysOnEarlyReturn'] === '1' ? ' checked' : '') . ' /> Не изменять «Дней» при досрочном возврате</label>', false, ['for' => 'keep-days-on-early-return']) ?></td>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="NoRefundOnEarlyReturn" value="1"' . ($values['NoRefundOnEarlyReturn'] === '1' ? ' checked' : '') . ' /> Не возвращать деньги при досрочном возврате</label>', false, ['for' => 'no-refund-on-early-return']) ?></td>
+      <td><?= render_field('', '<label class="checkbox-label"><input type="checkbox" name="SezonFlag" value="1"' . ($values['SezonFlag'] === '1' ? ' checked' : '') . ' /> Использовать сезоны тарифных планов</label>', false, ['for' => 'sezon-flag']) ?></td>
+    </tr>
+    <tr>
+      <td><?= render_field('Время задержки начала проката', render_input('text', 'TimeShift', $values['TimeShift'], ['id' => 'time-shift', 'maxlength' => '5', 'placeholder' => 'чч:мм', 'style' => 'width:100px']), false, ['for' => 'time-shift']) ?></td>
+      <td><?= render_field('Допустимое время опоздания', render_input('text', 'TimeLate', $values['TimeLate'], ['id' => 'time-late', 'maxlength' => '5', 'placeholder' => 'чч:мм', 'style' => 'width:100px']), false, ['for' => 'time-late']) ?></td>
+      <td></td>
+    </tr>
+  </table>
+</fieldset>
+  </div>
+</div>
+
+<script>
+(function () {
+  var container = document.querySelector('.tab-container');
+  if (!container) return;
+  var headers = container.querySelectorAll('.tab-header');
+  var panes = container.querySelectorAll('.tab-pane');
+  headers.forEach(function (hdr) {
+    hdr.addEventListener('click', function () {
+      var idx = parseInt(hdr.dataset.tabIndex, 10);
+      headers.forEach(function (h) { h.classList.remove('active'); });
+      panes.forEach(function (p) { p.classList.remove('active'); });
+      hdr.classList.add('active');
+      var pane = container.querySelector('.tab-pane[data-tab-index="' + idx + '"]');
+      if (pane) pane.classList.add('active');
+    });
+  });
+})();
+</script>
 
 <div class="form-actions form-actions--bottom">
   <button type="submit" class="btn btn-primary"><img src="img/ok.png" alt="" /> Сохранить</button>
-  <button type="button" class="btn btn-secondary" data-form-close><img src="img/cancel.png" alt="" /> Отмена</button>
+  <button type="button" class="btn btn-secondary" data-form-close><img src="img/cancel.png" alt="" /> Отменить</button>
 </div>
 </form>
 <?php

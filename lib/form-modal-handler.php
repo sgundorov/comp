@@ -41,6 +41,9 @@ function render_form_modal_script(array $config = []): void {
 
     // Build auto-init JS snippet
     $autoInitChunks = [];
+    // Инициализация всех зарегистрированных вложенных таблиц (embedded-subtable)
+    // на каждом пути: открытие / восстановление после дочерней формы / apply.
+    $autoInitChunks[] = "try { if (window.EmbeddedSubTable && typeof EmbeddedSubTable.autoInitAll === 'function') EmbeddedSubTable.autoInitAll(); } catch(ex) {}";
     if ($autoBindLookups) {
         $autoInitChunks[] = "
             root.querySelectorAll('[data-lookup]:not([data-lookup-bound])').forEach(function(el){
@@ -193,7 +196,12 @@ function render_form_modal_script(array $config = []): void {
           setTimeout(restoreFn, 50);
           setTimeout(restoreFn, 200);
         }
-        if (data) { try { old.onRestore(data, body); } catch (e) { console.error('[FM] onRestore error', e); } }
+        if (data) {
+          try { old.onRestore(data, body); } catch (e) { console.error('[FM] onRestore error', e); }
+          /* Страховка обновления вложенных таблиц: независимо от того,
+           * сработал ли onRestore, каждая EmbeddedSubTable перечитает свой список. */
+          try { window.dispatchEvent(new CustomEvent('form-modal:child-saved', { detail: data })); } catch (e) {}
+        }
         if (old.activeId) {
           var el = body.querySelector('#' + old.activeId);
           if (el && !el.readOnly) { el.focus(); if (el.select) el.select(); }
@@ -256,6 +264,7 @@ function render_form_modal_script(array $config = []): void {
           .then(function (r) { return r.json(); })
            .then(function (data) { if (data && data.ok) {
               _fmDirty = true;
+              if (typeof window.__arenda2UpdateParentFlags === 'function') window.__arenda2UpdateParentFlags(data);
               if (stashed) {
                 restoreStashedForm(data);
               } else if (fd.get('action') === 'apply') {

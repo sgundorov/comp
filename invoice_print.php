@@ -24,7 +24,10 @@ if ($stateFilter !== '') {
     }
 }
 
-$rows = $tp->fetchAll($conn);
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
+[$rows, $pagination] = $tp->fetchPage($conn);
 
 $filterLabels = $tp->getFilterDescription();
 $now = date('d.m.Y H:i');

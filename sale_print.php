@@ -17,7 +17,10 @@ $tp->appendWhere("d.typeop = ?", [$typeop], 'i');
 $tp->applyFilterWithLabel($conn, 'client_id', 'd.client_id', 'Контрагент', 'client', 'client_id', 'name');
 $tp->applyFilterWithLabel($conn, 'store_id',  'd.store_id',  'Склад',      'store',  'store_id',  'name');
 
-$rows = $tp->fetchAll($conn);
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
+[$rows, $pagination] = $tp->fetchPage($conn);
 
 $docLabel = $DOC_LABELS[$typeop] ?? 'Документ';
 $filterLabels = $tp->getFilterDescription();

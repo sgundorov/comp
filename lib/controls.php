@@ -86,10 +86,77 @@ function render_input(string $type, string $name, $value = '', array $attrs = []
     if (empty($attrs['class']) && $type !== 'hidden' && $type !== 'checkbox' && $type !== 'radio') {
         $attrs['class'] = 'field-input';
     }
-    if ($type === 'checkbox' || $type === 'radio') {
-        $attrs['class'] = $attrs['class'] ?? '';
+    /* Поля даты/времени помечаются стандартным атрибутом data-norm —
+     * по нему серверные и клиентские обработчики распознают тип ввода. */
+    if ($type === 'date' || $type === 'time') {
+        $attrs['data-norm'] = $type;
+        if (empty($attrs['data-placeholder']) && !empty($attrs['placeholder'])) {
+            $attrs['data-placeholder'] = $attrs['placeholder'];
+        }
     }
     return '<input' . _render_btn_attrs($attrs) . ' />';
+}
+
+/* ================= Нормализация ввода дат и времени ================= */
+
+/**
+ * Умный разбор даты, результат — дд.мм.гггг:
+ *   5       -> 05.<текущий месяц>.<текущий год>
+ *   5.03    -> 05.03.<текущий год>      | 503  -> то же (без точек)
+ *   15.03   -> 15.03.<текущий год>      | 1503 -> то же
+ *   5.03.24 -> 05.03.2024               | 50324 -> d.mm.yy, 050324 -> ddmmyy
+ *   5.03.2024 -> 05.03.2024             | 05032024 -> полный вариант без точек
+ * Значения из нативных полей (ГГГГ-ММ-ДД) проходят без изменений.
+ */
+function norm_date_smart(string $v): string {
+    $v = trim($v);
+    if ($v === '') return '';
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) return $v;
+    $y = (int)date('Y');
+    $mo = (int)date('n');
+    $fromParts = function (int $d, int $m, int $y2): string {
+        if (!checkdate($m, $d, $y2)) return '';
+        return sprintf('%02d.%02d.%04d', $d, $m, $y2);
+    };
+    if (preg_match('/^\d+$/', $v)) {
+        $L = strlen($v);
+        if ($L <= 2)  return $fromParts((int)$v, $mo, $y);
+        if ($L === 3) return $fromParts((int)$v[0], (int)substr($v, 1), $y);
+        if ($L === 4) return $fromParts((int)substr($v, 0, 2), (int)substr($v, 2), $y);
+        if ($L === 5) { $r = $fromParts((int)$v[0], (int)substr($v, 1, 2), 2000 + (int)substr($v, 3)); if ($r !== '') return $r; }
+        if ($L === 6) { $r = $fromParts((int)substr($v, 0, 2), (int)substr($v, 2, 2), 2000 + (int)substr($v, 4)); if ($r !== '') return $r; }
+        if ($L >= 8)  return $fromParts((int)substr($v, 0, 2), (int)substr($v, 2, 2), (int)substr($v, 4));
+        return '';
+    }
+    if (!preg_match('/^(\d{1,2})(?:\.(\d{1,2}))?(?:\.(\d{2,4}))?$/', $v, $m)) return '';
+    $d   = (int)$m[1];
+    $mo2 = isset($m[2]) && $m[2] !== '' ? (int)$m[2] : $mo;
+    $yr  = (!isset($m[3]) || $m[3] === '') ? $y : ((strlen($m[3]) <= 2) ? 2000 + (int)$m[3] : (int)$m[3]);
+    return $fromParts($d, $mo2, $yr);
+}
+
+/**
+ * Умный разбор времени:
+ *   5    -> 05:00       | 930  -> 09:30 | 1230 -> 12:30
+ *   9:15 -> 09:15       | чч:мм / чч:мм:сс -> как есть
+ */
+function norm_time_smart(string $v, bool $seconds = true): string {
+    $v = trim($v);
+    if ($v === '') return '';
+    if (preg_match('/^(\d{1,2}):([0-5]\d)(:[0-5]\d)?$/', $v, $m)) {
+        if ((int)$m[1] > 23) return '';
+        $t = sprintf('%02d:%02d', $m[1], $m[2]);
+        return $seconds ? (isset($m[3]) ? $t . $m[3] : $t . ':00') : $t;
+    }
+    if (!preg_match('/^\d+$/', $v)) return '';
+    $h = 0; $mi = 0;
+    $L = strlen($v);
+    if ($L <= 2)      { $h = (int)$v; }
+    elseif ($L === 3) { $h = (int)$v[0]; $mi = (int)substr($v, 1); }
+    else              { $h = (int)substr($v, 0, 2); $mi = (int)substr($v, 2); }
+    if ($h > 23 || $mi > 59) return '';
+    $t = sprintf('%02d:%02d', $h, $mi);
+    return $seconds ? $t . ':00' : $t;
 }
 
 function render_textarea(string $name, $value = '', array $attrs = []): string {
@@ -155,7 +222,9 @@ function render_lookup(string $tableName, string $hiddenName, $hiddenValue, stri
     $html .= '<div class="lookup-tools"' . ($readonly ? ' style="display:none"' : '') . '>';
     $html .= '<button class="lookup-tool clear" type="button" title="Очистить" data-lookup-clear>×</button>';
     $html .= '<button class="lookup-tool" type="button" title="Открыть поиск" data-lookup-open>▾</button>';
-    $html .= '<a class="lookup-tool add" href="' . h($addUrl) . '" target="_blank" data-lookup-add="' . h($tableName) . '" title="Добавить">+</a>';
+    if ($addUrl !== '') {
+        $html .= '<a class="lookup-tool add" href="' . h($addUrl) . '" target="_blank" data-lookup-add="' . h($tableName) . '" title="Добавить">+</a>';
+    }
     $html .= '</div>';
     $html .= '<div class="lookup-pop" data-lookup-pop>';
     $html .= '<input class="lookup-pop-search" type="text" data-lookup-search placeholder="Поиск…" />';

@@ -17,19 +17,52 @@ if ($field === '_residue_recalc') {
         exit;
     }
     $conn->query("DELETE FROM residue WHERE product_id = $id");
+
+    /* Основные документы движения (кроме Аренды/Ремонта) — по store_id, со знаком
+       из typeop.prihod_flag. Только утверждённые (accept_flag != 0). */
     $ins = $conn->prepare("INSERT INTO residue (wh_id, product_id, quant)
         SELECT d.store_id, d2.product_id,
                COALESCE(SUM(d2.quant * IF(tp.prihod_flag = 1, 1, -1)), 0)
         FROM docum2 d2
         JOIN docum d ON d.docum_id = d2.docum_id
         LEFT JOIN typeop tp ON tp.typeop_id = d.typeop
-        WHERE d2.accept_flag != 0 AND d2.product_id = ?
+        WHERE d2.accept_flag != 0 AND d2.product_id = ? AND tp.typeop_id NOT IN (90, 130)
         GROUP BY d.store_id, d2.product_id");
     if ($ins) {
         $ins->bind_param('i', $id);
         $ins->execute();
         $ins->close();
     }
+
+    /* Аренда (90) и Ремонт (130): учитываются независимо от accept_flag.
+       Аренда уменьшает остаток, если товар не возвращён ИЛИ зарезервирован,
+       и дата расчёта (today) внутри [date_beg..date_voz].
+       Ремонт — то же, но без учёта rezerv_flag. */
+    $insA = $conn->prepare("INSERT INTO residue (wh_id, product_id, quant)
+        SELECT d.store_id, d2.product_id,
+               COALESCE(SUM(
+                   CASE
+                     WHEN tp.typeop_id = 90 THEN
+                       IF((d2.voz_flag = 0 OR d2.rezerv_flag = 1)
+                          AND d2.date_beg <= CURDATE() AND d2.date_voz >= CURDATE(), -d2.quant, 0)
+                     WHEN tp.typeop_id = 130 THEN
+                       IF(d2.voz_flag = 0
+                          AND d2.date_beg <= CURDATE() AND d2.date_voz >= CURDATE(), -d2.quant, 0)
+                     ELSE 0
+                   END
+                ), 0)
+        FROM docum2 d2
+        JOIN docum d ON d.docum_id = d2.docum_id
+        LEFT JOIN typeop tp ON tp.typeop_id = d.typeop
+        WHERE d2.product_id = ? AND tp.typeop_id IN (90, 130)
+        GROUP BY d.store_id, d2.product_id
+        ON DUPLICATE KEY UPDATE quant = quant + VALUES(quant)");
+    if ($insA) {
+        $insA->bind_param('i', $id);
+        $insA->execute();
+        $insA->close();
+    }
+
     $ins2 = $conn->prepare("INSERT INTO residue (wh_id, product_id, quant)
         SELECT d.store2_id, d2.product_id,
                COALESCE(SUM(d2.quant), 0)

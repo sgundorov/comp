@@ -298,11 +298,11 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         search: document.querySelector('.toolbar').getAttribute('data-search') || '',
         getExportUrl: function () {
           if (document.querySelectorAll('.row-check:checked').length === 0) return null;
-          return 'sotr_export.php?format=csv&all=1';
+          return 'sotr_export.php?format=csv&all=1&selected=1';
         },
         getPrintUrl: function () {
           if (document.querySelectorAll('.row-check:checked').length === 0) return null;
-          return 'sotr_print.php?all=1';
+          return 'sotr_print.php?all=1&selected=1';
         }
       });
 

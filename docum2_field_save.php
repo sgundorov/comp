@@ -1,7 +1,21 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/controls.php';
+require_once __DIR__ . '/lib/arenda2_totals.php';
+require_once __DIR__ . '/lib/arenda2_voz.php';
+require_once __DIR__ . '/lib/residue.php';
 
 if (!$isAjax) { header('HTTP/1.0 400 Bad Request'); exit; }
+
+/* Для товаров аренды (typeop=90) после операции пересчитываем документ */
+function docum2_is_arenda(mysqli $conn, int $documId): bool {
+    if ($documId <= 0) return false;
+    $q = $conn->query("SELECT typeop FROM docum WHERE docum_id = $documId");
+    return $q && (int)$q->fetch_row()[0] === 90;
+}
+function docum2_arenda_backfill(mysqli $conn, int $documId): array {
+    return arenda2_backfill_docum($conn, $documId);
+}
 
 $docum2Id = (int)($_POST['docum2_id'] ?? $_POST['id'] ?? 0);
 $field    = (string)($_POST['field'] ?? '');
@@ -64,6 +78,15 @@ if ($field === '_apply_discount') {
         exit;
     }
     check_docum_accepted($conn, $docId);
+    if (docum2_is_arenda($conn, $docId)) {
+        /* Сумма товара аренды считается по тарифам (не quant*price) —
+           применяем скидку через тарифный пересчёт. */
+        arenda2_recalc_discount($conn, $docId, $discount, $appSettings);
+        $totals = arenda2_backfill_docum($conn, $docId);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array_merge(['ok' => true], $totals));
+        exit;
+    }
     $ndsRate = (int)($appSettings['nds_rate'] ?? 22);
     $noNds   = ($appSettings['no_nds'] ?? '0') === '1';
     $stmt = $conn->prepare("UPDATE docum2 SET discount = ?, sum = quant * price * (1 - ? / 100), sum_discount = quant * price * (? / 100), sum_nds = (CASE WHEN ? = 1 THEN quant * price * (1 - ? / 100) * ? / (100 + ?) ELSE quant * price * (1 - ? / 100) * ? / 100 END) WHERE docum_id = ?");
@@ -97,6 +120,10 @@ if ($action === 'delete') {
     if ($docId > 0) check_docum_accepted($conn, $docId);
     $conn->query("DELETE FROM docum2 WHERE docum2_id IN ($in)");
     $totals = $docId > 0 ? recalc_docum_totals($conn, $docId) : [];
+    if ($docId > 0 && docum2_is_arenda($conn, $docId)) {
+        $totals = array_merge($totals, docum2_arenda_backfill($conn, $docId));
+        $totals = array_merge($totals, arenda2_sync_docum_flags($conn, $docId));
+    }
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array_merge(['ok' => true], $totals));
     exit;
@@ -116,6 +143,10 @@ if ($field === '_delete') {
     $stmt->execute();
     $stmt->close();
     $totals = $dId > 0 ? recalc_docum_totals($conn, $dId) : [];
+    if ($dId > 0 && docum2_is_arenda($conn, $dId)) {
+        $totals = array_merge($totals, docum2_arenda_backfill($conn, $dId));
+        $totals = array_merge($totals, arenda2_sync_docum_flags($conn, $dId));
+    }
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array_merge(['ok' => true], $totals));
     exit;
@@ -128,7 +159,7 @@ if ($field === '_list') {
         echo json_encode([]);
         exit;
     }
-    $stmt = $conn->prepare("SELECT docum2_id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note FROM docum2 WHERE docum_id = ? ORDER BY docum2_id ASC");
+    $stmt = $conn->prepare("SELECT d.docum2_id, d.product_id, d.code, CASE WHEN d.product_name != '' THEN d.product_name ELSE p.product_name END AS product_name, d.quant, d.price, d.discount, d.sum, d.sum_discount, d.sum_nds, d.note, d.hours, d.days, d.months, d.sum_zalog, d.rezerv_flag, d.voz_flag FROM docum2 d LEFT JOIN product p ON p.product_id = d.product_id WHERE d.docum_id = ? ORDER BY d.docum2_id ASC");
     $stmt->bind_param('i', $dId);
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -147,6 +178,12 @@ if ($field === '_list') {
             'sum_discount' => _fmt_d2($r['sum_discount'], 2),
             'sum_nds' => _fmt_d2($r['sum_nds'], 2),
             'note' => (string)$r['note'],
+            'hours' => trim((string)$r['hours']) === '' ? '' : substr((string)$r['hours'], 0, 5),
+            'days' => (int)$r['days'] > 0 ? (int)$r['days'] : '',
+            'months' => (int)$r['months'] > 0 ? (int)$r['months'] : '',
+            'sum_zalog' => (float)$r['sum_zalog'] == 0 ? '' : _fmt_d2($r['sum_zalog'], 2),
+            'rezerv_flag' => (int)$r['rezerv_flag'],
+            'voz_flag' => (int)$r['voz_flag'],
         ];
         foreach ($zeroFields as $f) {
             if (isset($item[$f]) && $item[$f] !== '' && ((float)str_replace(',', '.', $item[$f])) == 0) $item[$f] = '';
@@ -261,6 +298,12 @@ $ALLOWED = [
     'sum'          => ['type' => 'decimal', 'decimals' => 2],
     'sum_discount' => ['type' => 'decimal', 'decimals' => 2],
     'sum_nds'      => ['type' => 'decimal', 'decimals' => 2],
+    'sum_zalog'    => ['type' => 'decimal', 'decimals' => 2],
+    'hours'        => ['type' => 'time'],
+    'days'         => ['type' => 'int'],
+    'months'       => ['type' => 'int'],
+    'rezerv_flag'  => ['type' => 'int'],
+    'voz_flag'     => ['type' => 'int'],
     'note'         => ['type' => 'text'],
 ];
 
@@ -295,24 +338,36 @@ if ($docum2Id > 0) {
             $displayValue = $value > 0 ? (string)$value : '';
             break;
 
+        case 'time':
+            $value = norm_time_smart($value, false);
+            if ($value === '') { $displayValue = ''; }
+            else {
+                $stmt = $conn->prepare("UPDATE docum2 SET $field = ? WHERE docum2_id = ?");
+                bind_auto($stmt, [$value, $docum2Id]);
+                $stmt->execute();
+                $stmt->close();
+            }
+            $displayValue = $value;
+            break;
+
         case 'decimal':
             $value = str_replace(',', '.', $value);
             $valFloat = (float)$value;
+            $quantClampMsg = null;
             if ($field === 'quant' && !empty($appSettings['neg_ost_flag']) && $appSettings['neg_ost_flag'] === '1') {
                 $d2 = $conn->query("SELECT docum_id, product_id FROM docum2 WHERE docum2_id = $docum2Id")->fetch_assoc();
                 $dId = $d2 ? (int)$d2['docum_id'] : 0;
                 $pid = $d2 ? (int)$d2['product_id'] : 0;
                 if ($dId > 0 && $pid > 0) {
-                    $nq = $conn->query("SELECT noquant_flag FROM product WHERE product_id = $pid")->fetch_assoc();
-                    if (!$nq || !(int)$nq['noquant_flag']) {
+                    $nq = $conn->query("SELECT noquant_flag, nocalc_flag FROM product WHERE product_id = $pid")->fetch_assoc();
+                    if ($nq && !(int)$nq['noquant_flag'] && !(int)$nq['nocalc_flag']) {
                         $pf = $conn->query("SELECT COALESCE(tp.prihod_flag,0) AS pf, d.store_id FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = $dId")->fetch_assoc();
                         if ($pf && !(int)$pf['pf'] && (int)$pf['store_id'] > 0) {
-                            $rr = $conn->query("SELECT COALESCE(quant,0) AS q FROM residue WHERE wh_id = {$pf['store_id']} AND product_id = $pid")->fetch_assoc();
-                            $residueQ = $rr ? (float)$rr['q'] : 0;
-                            if ($valFloat > $residueQ) {
-                                header('Content-Type: application/json; charset=utf-8');
-                                echo json_encode(['ok' => false, 'error' => 'Недостаточно остатка товара на участке. Текущий остаток: ' . _fmt_qty($residueQ)]);
-                                exit;
+                            $available = residue_available_product($conn, $pid, (int)$pf['store_id']);
+                            if ($valFloat > $available) {
+                                $valFloat = $available;
+                                $value = (string)$available;
+                                $quantClampMsg = 'Недостаточно остатка товара на участке. Изменено на текущий остаток: ' . _fmt_qty($available);
                             }
                         }
                     }
@@ -344,7 +399,7 @@ if ($docum2Id > 0) {
             $ptRow = $pt ? $pt->fetch_assoc() : null;
             if ($ptRow) $priceCol = in_array((int)$ptRow['typeop'], [20, 110, 127], true) ? 'price_in' : 'price_out';
         }
-        $q = $conn->query("SELECT product_name, article AS code, $priceCol AS price FROM product WHERE product_id = " . (int)$value);
+        $q = $conn->query("SELECT product_name, code, $priceCol AS price FROM product WHERE product_id = " . (int)$value);
         if ($q && ($r = $q->fetch_assoc())) {
             $stmt = $conn->prepare("UPDATE docum2 SET product_name = ?, code = ?, price = ? WHERE docum2_id = ?");
             bind_auto($stmt, [$r['product_name'], $r['code'], $r['price'], $docum2Id]);
@@ -354,22 +409,47 @@ if ($docum2Id > 0) {
             $value = (int)$value;
         }
     }
-    $r = $conn->query("SELECT quant, price, discount FROM docum2 WHERE docum2_id = $docum2Id");
-    if ($r && ($row = $r->fetch_assoc())) {
-        $quant = (float)$row['quant'];
-        $price = (float)$row['price'];
-        $discount = (float)$row['discount'];
-        $sum = $quant * $price * (1 - $discount / 100);
-        $sum_discount = $quant * $price * ($discount / 100);
-        $ndsRate = (int)($appSettings['nds_rate'] ?? 22);
-        $noNds   = ($appSettings['no_nds'] ?? '0') === '1';
-        $sum_nds = $noNds ? ($sum * $ndsRate / (100 + $ndsRate)) : ($sum * $ndsRate / 100);
-        $uStmt = $conn->prepare("UPDATE docum2 SET sum = ?, sum_discount = ?, sum_nds = ? WHERE docum2_id = ?");
-        bind_auto($uStmt, [$sum, $sum_discount, $sum_nds, $docum2Id]);
-        $uStmt->execute();
-        $uStmt->close();
+    if ($actualDocumId > 0 && docum2_is_arenda($conn, $actualDocumId)) {
+        if ($field === 'product_id') {
+            /* Смена товара аренды — переподобрать тариф нового товара (по текущему
+               периоду) и пересчитать сумму; также пересчитать период по датам. */
+            arenda2_recalc_item_period($conn, $appSettings, $actualDocumId, $docum2Id);
+        } elseif ($field === 'voz_flag') {
+            /* Включение/выключение «Возвращено»: пересчёт days/hours/months/date_voz/
+               time_voz (правила 111.txt:644-683) + суммы. */
+            arenda2_apply_voz_to_item($conn, $appSettings, $actualDocumId, $docum2Id, (int)$value);
+        } else {
+            /* Остальные инлайн-правки: сумма считается по тарифам (дни/часы/месяцы/фикс),
+               а НЕ quant*price. Пересчитываем только что изменённую запись и пишем в docum. */
+            $it2 = $conn->query("SELECT docum2_id, product_id, quant, discount, days, hours, months, price_day, price_hour, price_we, price_month, price_fix, fixed_flag, date_beg, date_voz FROM docum2 WHERE docum2_id = $docum2Id")->fetch_assoc();
+            if ($it2) {
+                $pp = $conn->query("SELECT noquant_flag FROM product WHERE product_id = " . (int)$it2['product_id'])->fetch_assoc();
+                $it2['noquant_flag'] = $pp ? (int)$pp['noquant_flag'] : 0;
+                $cs = arenda2_calc_sum_for_item($it2, $appSettings);
+                $uStmt = $conn->prepare("UPDATE docum2 SET sum = ?, sum_discount = ?, sum_nds = 0 WHERE docum2_id = ?");
+                bind_auto($uStmt, [$cs['sum'], $cs['sum_discount'], $docum2Id]);
+                $uStmt->execute();
+                $uStmt->close();
+            }
+        }
+    } else {
+        $r = $conn->query("SELECT quant, price, discount FROM docum2 WHERE docum2_id = $docum2Id");
+        if ($r && ($row = $r->fetch_assoc())) {
+            $quant = (float)$row['quant'];
+            $price = (float)$row['price'];
+            $discount = (float)$row['discount'];
+            $sum = $quant * $price * (1 - $discount / 100);
+            $sum_discount = $quant * $price * ($discount / 100);
+            $ndsRate = (int)($appSettings['nds_rate'] ?? 22);
+            $noNds   = ($appSettings['no_nds'] ?? '0') === '1';
+            $sum_nds = $noNds ? ($sum * $ndsRate / (100 + $ndsRate)) : ($sum * $ndsRate / 100);
+            $uStmt = $conn->prepare("UPDATE docum2 SET sum = ?, sum_discount = ?, sum_nds = ? WHERE docum2_id = ?");
+            bind_auto($uStmt, [$sum, $sum_discount, $sum_nds, $docum2Id]);
+            $uStmt->execute();
+            $uStmt->close();
+        }
     }
-    $q2 = $conn->query("SELECT docum2_id AS id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note FROM docum2 WHERE docum2_id = $docum2Id");
+    $q2 = $conn->query("SELECT docum2_id AS id, product_id, code, product_name, quant, price, discount, sum, sum_discount, sum_nds, note, hours, days, months, sum_zalog, rezerv_flag, voz_flag FROM docum2 WHERE docum2_id = $docum2Id");
     $itemData = $q2 ? $q2->fetch_assoc() : null;
 } else {
     if ($documId > 0) check_docum_accepted($conn, $documId);
@@ -392,6 +472,13 @@ if ($docum2Id > 0) {
 }
 
 $totals = $actualDocumId > 0 ? recalc_docum_totals($conn, $actualDocumId) : [];
+if ($actualDocumId > 0 && docum2_is_arenda($conn, $actualDocumId)) {
+    $totals = array_merge($totals, docum2_arenda_backfill($conn, $actualDocumId));
+    $totals = array_merge($totals, arenda2_sync_docum_flags($conn, $actualDocumId));
+}
 
 header('Content-Type: application/json; charset=utf-8');
-echo json_encode(array_merge(['ok' => true, 'field' => $field, 'value' => $value, 'displayValue' => $displayValue, 'id' => $newId, 'item' => $itemData], $totals));
+$resp = ['ok' => true, 'field' => $field, 'value' => $value, 'displayValue' => $displayValue, 'id' => $newId, 'item' => $itemData];
+if (!empty($quantClampMsg)) $resp['message'] = $quantClampMsg;
+$totals = array_merge($resp, $totals);
+echo json_encode($totals);

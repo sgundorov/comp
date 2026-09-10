@@ -145,10 +145,34 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_GET['action'] ?? '') ===
                     WHERE d2.accept_flag != 0
                       AND d2.product_id = ?
                       AND d.store_id = ?
+                      AND tp.typeop_id NOT IN (90, 130)
                 ");
                 $upsertStmt = $conn->prepare("
                     INSERT INTO residue (wh_id, product_id, quant) VALUES (?, ?, ?)
                     ON DUPLICATE KEY UPDATE quant = VALUES(quant)
+                ");
+                /* Аренда (90) / Ремонт (130): уменьшают остаток на участке независимо
+                   от accept_flag. Аренда — если не возвращён ИЛИ зарезервирован, и дата
+                   расчёта (today) внутри [date_beg..date_voz]. Ремонт — без rezerv_flag. */
+                $calcArStmt = $conn->prepare("
+                    SELECT COALESCE(SUM(
+                        CASE
+                          WHEN d.typeop = 90 THEN
+                            IF((d2.voz_flag = 0 OR d2.rezerv_flag = 1)
+                               AND d2.date_beg <= CURDATE() AND d2.date_voz >= CURDATE(), d2.quant, 0)
+                          WHEN d.typeop = 130 THEN
+                            IF(d2.voz_flag = 0
+                               AND d2.date_beg <= CURDATE() AND d2.date_voz >= CURDATE(), d2.quant, 0)
+                          ELSE 0
+                        END
+                    ), 0) AS total
+                    FROM docum2 d2
+                    JOIN docum d ON d.docum_id = d2.docum_id
+                    WHERE d2.product_id = ? AND d.store_id = ? AND d.typeop IN (90, 130)
+                ");
+                $upsertAddStmt = $conn->prepare("
+                    INSERT INTO residue (wh_id, product_id, quant) VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE quant = quant + VALUES(quant)
                 ");
                 foreach ($productIds as $pid) {
                     $calcStmt->bind_param('ii', $pid, $storeId);
@@ -158,9 +182,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_GET['action'] ?? '') ===
                     $calcRes->close();
                     $upsertStmt->bind_param('iid', $storeId, $pid, $total);
                     $upsertStmt->execute();
+                    /* Уменьшаем остаток на активные Аренды/Ремонт этого товара на участке */
+                    $calcArStmt->bind_param('ii', $pid, $storeId);
+                    $calcArStmt->execute();
+                    $calcArRes = $calcArStmt->get_result();
+                    $arTotal = (float)$calcArRes->fetch_row()[0];
+                    $calcArRes->close();
+                    if ($arTotal != 0) {
+                        $upsertAddStmt->bind_param('iid', $storeId, $pid, -$arTotal);
+                        $upsertAddStmt->execute();
+                    }
                 }
                 $calcStmt->close();
                 $upsertStmt->close();
+                if ($calcArStmt) $calcArStmt->close();
+                if ($upsertAddStmt) $upsertAddStmt->close();
 
                 if ($docTypeop === 100 && $store2Id > 0) {
                     $calcStmt2 = $conn->prepare("
@@ -309,9 +345,10 @@ $_pcols = [
     ['key' => 'zat_name',    'label' => 'Вид операции', 'readonly' => true],
     ['key' => 'sum',         'label' => 'Сумма', 'align' => 'right'],
     ['key' => 'plat_type',   'label' => 'Вид платежа'],
-    ['key' => 'note',        'label' => 'Примечание'],
+    ['key' => 'sotr_name',   'label' => 'Сотрудник', 'readonly' => true],
+    ['key' => 'note',        'label' => 'Примечание', 'align' => 'left'],
 ];
-$_pw = ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'plat_type' => '100px', 'note' => 'auto'];
+$_pw = ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '140px', 'sum' => '100px', 'plat_type' => '110px', 'sotr_name' => '140px', 'note' => '300px'];
 
 $platTable = new EmbeddedTable([
     'prefix'       => 'plat',
@@ -1022,12 +1059,37 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
           if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); } return;
         }
       }
+      if (e.target.closest('[data-lookup-add]')) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        var addLink = e.target.closest('a[data-lookup-add]');
+        var target = addLink.getAttribute('data-lookup-add');
+        if (target) {
+          var href = addLink.getAttribute('href') || (target + '_form.php?mode=new');
+          syncFormValues();
+          openFormModal(href, { onRestore: function(data, bodyEl) {
+            if (!data || !data.id || !data.name) return;
+            var container = bodyEl.querySelector('[data-lookup="' + target + '"]');
+            if (!container) return;
+            var idEl = container.querySelector('[data-lookup-id]');
+            var nameEl = container.querySelector('.lookup-input');
+            if (idEl) idEl.value = String(data.id);
+            if (nameEl) nameEl.value = data.name;
+            var items = [];
+            try { items = JSON.parse(container.getAttribute('data-countries') || '[]'); } catch(e) {}
+            if (!items.find(function(c) { return c.id === data.id; })) {
+              items.push({ id: data.id, name: data.name });
+              items.sort(function(a, b) { return a.name.localeCompare(b.name, 'ru'); });
+              container.setAttribute('data-countries', JSON.stringify(items));
+            }
+          }});
+        }
+        return;
+      }
       let a = e.target.closest('a[href*="sale_form.php"]');
       if (a) { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return; e.preventDefault(); e.stopImmediatePropagation(); openFormModal(a.getAttribute('href')); return; }
       const trig = e.target.closest('[data-form-open]');
       if (trig) { e.preventDefault(); openFormModal(trig.getAttribute('data-form-open')); return; }
       if (e.target.closest('[data-form-close]')) { e.preventDefault(); if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); } return; }
-      if (e.target.closest('[data-lookup-add]')) { e.preventDefault(); syncFormValues(); var openFn = openFormModal; FormModalCore.handleLookupAdd(e.target.closest('[data-lookup-add]'), function (fn) { stashed = { html: formBody.innerHTML, onRestore: fn, activeId: document.activeElement ? document.activeElement.id : null }; }, openFn); return; }
     });
 
     function initSaleFormTabSwitch() {

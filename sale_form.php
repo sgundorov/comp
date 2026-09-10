@@ -161,7 +161,7 @@ if (!$zatIdForPlat) {
     if ($zr2 && ($zrow2 = $zr2->fetch_assoc())) $zatIdForPlat = (int)$zrow2['zat_id'];
 }
 if ($id > 0 && $mode !== 'new') {
-    $stmtP = $conn->prepare("SELECT p.plat_id, p.datetime, p.sum_in, p.sum_out, p.sum, p.out_flag, p.plat_type, p.doc_id, p.note, c.name AS client_name, z.name AS zat_name FROM plat p LEFT JOIN client c ON c.client_id = p.client_id LEFT JOIN zat z ON z.zat_id = p.zat_id WHERE p.doc_id = ? AND p.doc_type = ? ORDER BY p.plat_id DESC");
+    $stmtP = $conn->prepare("SELECT p.plat_id, p.datetime, p.sum_in, p.sum_out, p.sum, p.out_flag, p.plat_type, p.doc_id, p.note, c.name AS client_name, z.name AS zat_name, s.last_name AS sotr_name, s.doc_name AS sotr_doc_name FROM plat p LEFT JOIN client c ON c.client_id = p.client_id LEFT JOIN zat z ON z.zat_id = p.zat_id LEFT JOIN sotr s ON s.sotr_id = p.sotr_id WHERE p.doc_id = ? AND p.doc_type = ? ORDER BY p.plat_id DESC");
     if ($stmtP) {
         bind_auto($stmtP, [$id, $typeop]);
         $stmtP->execute();
@@ -248,10 +248,11 @@ $platColumns = [
     ['key' => 'zat_name',    'label' => 'Вид операции', 'readonly' => true],
     ['key' => 'sum',         'label' => 'Сумма', 'align' => 'right'],
     ['key' => 'plat_type',   'label' => 'Вид платежа'],
-    ['key' => 'note',        'label' => 'Примечание'],
+    ['key' => 'sotr_name',   'label' => 'Сотрудник', 'readonly' => true],
+    ['key' => 'note',        'label' => 'Примечание', 'align' => 'left'],
 ];
 
-$platColWidths = ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'plat_type' => '100px', 'note' => 'auto'];
+$platColWidths = ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '140px', 'sum' => '100px', 'plat_type' => '110px', 'sotr_name' => '140px', 'note' => '300px'];
 
 $platTable = new EmbeddedTable([
     'prefix'           => 'plat',
@@ -280,6 +281,7 @@ $platListData = array_map(function($p) {
         'sum' => (float)$p['sum'],
         'plat_type' => (string)$p['plat_type'],
         'out_flag' => (int)$p['out_flag'],
+        'sotr_name' => (string)(($p['sotr_doc_name'] ?? '') !== '' ? $p['sotr_doc_name'] : ($p['sotr_name'] ?? '-')),
         'note' => (string)$p['note'],
     ];
 }, $platList);
@@ -518,10 +520,10 @@ ob_start();
       <tr>
         <td><?= render_lookup('store', 'store_id', $values['store_id'], $currentStoreName,
                 h(json_encode($storeList, JSON_UNESCAPED_UNICODE)),
-                'store_form.php?mode=new', $ro, ['id' => 'store-id', 'data-name-input' => 'store-name']) ?></td>
+                '', $ro, ['id' => 'store-id', 'data-name-input' => 'store-name']) ?></td>
         <td><?= render_lookup('store', 'store2_id', $values['store2_id'], $currentStore2Name,
                 h(json_encode($storeList, JSON_UNESCAPED_UNICODE)),
-                'store_form.php?mode=new', $ro, ['id' => 'store2-id', 'data-name-input' => 'store2-name']) ?></td>
+                '', $ro, ['id' => 'store2-id', 'data-name-input' => 'store2-name']) ?></td>
         <td>&nbsp;</td>
       </tr>
       <?php elseif ($typeop !== 127): ?>
@@ -536,7 +538,7 @@ ob_start();
                 'client_form.php?mode=new', $ro, ['id' => 'client-id', 'data-name-input' => 'cli-name']) ?></td>
         <td><?= render_lookup('store', 'store_id', $values['store_id'], $currentStoreName,
                 h(json_encode($storeList, JSON_UNESCAPED_UNICODE)),
-                'store_form.php?mode=new', $ro, ['id' => 'store-id', 'data-name-input' => 'store-name']) ?></td>
+                '', $ro, ['id' => 'store-id', 'data-name-input' => 'store-name']) ?></td>
         <td>&nbsp;</td>
       </tr>
       <?php else: ?>
@@ -548,7 +550,7 @@ ob_start();
       <tr>
         <td><?= render_lookup('store', 'store_id', $values['store_id'], $currentStoreName,
                 h(json_encode($storeList, JSON_UNESCAPED_UNICODE)),
-                'store_form.php?mode=new', $ro, ['id' => 'store-id', 'data-name-input' => 'store-name']) ?></td>
+                '', $ro, ['id' => 'store-id', 'data-name-input' => 'store-name']) ?></td>
         <td>&nbsp;</td>
         <td>&nbsp;</td>
       </tr>
@@ -694,10 +696,10 @@ ob_start();
       <tr>
         <td><?= render_lookup('sotr', 'sotr_id', $values['sotr_id'], $currentSotrName,
                 h(json_encode($sotrList, JSON_UNESCAPED_UNICODE)),
-                'sotr_form.php?mode=new', $ro, ['id' => 'sotr-id', 'data-name-input' => 'sotr-name']) ?></td>
+                '', $ro, ['id' => 'sotr-id', 'data-name-input' => 'sotr-name']) ?></td>
         <td><?= render_lookup('sotr', 'sotr2_id', $values['sotr2_id'], $currentSotr2Name,
                 h(json_encode($sotrList, JSON_UNESCAPED_UNICODE)),
-                'sotr_form.php?mode=new', $ro, ['id' => 'sotr2-id', 'data-name-input' => 'sotr2-name']) ?></td>
+                '', $ro, ['id' => 'sotr2-id', 'data-name-input' => 'sotr2-name']) ?></td>
         <td>&nbsp;</td>
       </tr>
       <tr>
@@ -744,6 +746,15 @@ ob_start();
 <input type="hidden" name="auto_save_ready" value="1" />
 <?php endif; ?>
 </form>
+<script src="assets/inline-edit.js"></script>
+<script>
+<?php $d2Table->renderScripts(); ?>
+<?php $platTable->renderScripts(); ?>
+if (typeof window.__openFormModal === 'undefined') {
+    initD2Table();
+    initPlatTable();
+}
+</script>
 <script>if(typeof FormModalCore!=='undefined'&&FormModalCore.initTabAutoSave)FormModalCore.initTabAutoSave([1,2]);</script>
 <style>
     .form-note { margin: 1.5px 0; }
@@ -787,8 +798,6 @@ if ($isAjax) {
   <script src="assets/lookup.js"></script>
   <script src="assets/embedded-subtable.js"></script>
   <script>
-  <?php $d2Table->renderScripts(); ?>
-  <?php $platTable->renderScripts(); ?>
   if (typeof window.__openFormModal === 'undefined') {
     initD2Table();
     initPlatTable();

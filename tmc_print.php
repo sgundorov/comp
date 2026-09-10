@@ -14,9 +14,12 @@ $tp->applyFilterWithLabel($conn, 'group_id',   'p.group_id',   'Группа',  
 $tp->applyFilterWithLabel($conn, 'sgroup_id',  'p.sgroup_id',  'Подгруппа',   'sgroup',  'sgroup_id', 'name');
 $tp->applyFilterWithLabel($conn, 'country_id', 'p.country_id', 'Страна',      'country', 'country_id','country');
 
-$rows = $tp->fetchAll($conn);
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
+[$rows, $pagination] = $tp->fetchPage($conn);
 $printTitle = $printServiceMode === 'service' ? 'Услуги' : 'Товары';
-$tp->renderPrintPage($rows, ['totalCount' => count($rows)], [
+$tp->renderPrintPage($rows, $pagination, [
     'title' => $printTitle,
     'colValues' => [
         'id'        => fn($r) => (int)$r['product_id'],

@@ -278,10 +278,14 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/color-pi
         return 'status.php?action=invertSelection&' + other.toString();
       },
       getExportUrl: function () {
-        return null;
+        var sp = new URLSearchParams(location.search);
+        ['action', 'page'].forEach(function (k) { sp.delete(k); });
+        return 'status_export.php?format=csv&selected=1&' + sp.toString();
       },
       getPrintUrl: function () {
-        return null;
+        var sp = new URLSearchParams(location.search);
+        ['action', 'page'].forEach(function (k) { sp.delete(k); });
+        return 'status_print.php?selected=1&' + sp.toString();
       }
     });
 

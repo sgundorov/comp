@@ -300,8 +300,16 @@ render_toolbar_wrapper_close(); ?>
     SelectionToolbar.init({
         pageUrl: 'contact.php',
         getInvertUrl: function () { var o = new URLSearchParams(location.search); o.delete('ids'); return 'contact.php?action=invertSelection&' + o.toString(); },
-        getExportUrl: function () { return null; },
-        getPrintUrl: function () { return null; }
+        getExportUrl: function () {
+          var sp = new URLSearchParams(location.search);
+          ['action', 'page'].forEach(function (k) { sp.delete(k); });
+          return 'contact_export.php?format=csv&selected=1&' + sp.toString();
+        },
+        getPrintUrl: function () {
+          var sp = new URLSearchParams(location.search);
+          ['action', 'page'].forEach(function (k) { sp.delete(k); });
+          return 'contact_print.php?selected=1&' + sp.toString();
+        }
     });
 
     document.querySelectorAll('.row-check').forEach(function (cb) {

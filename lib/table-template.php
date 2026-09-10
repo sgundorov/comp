@@ -294,6 +294,46 @@ function apply_search_highlight(string $display, string $search): string {
     return preg_replace('/' . preg_quote($search, '/') . '/iu', '<span class="hl">$0</span>', $display);
 }
 
+/**
+ * Стандартное «красивое» представление чисел в таблицах:
+ * убирает хвостовые нули десятичной части (250.00 -> 250, 100.50 -> 100.5).
+ * Не-числа возвращаются как есть.
+ */
+function table_pretty_num(string $s): string {
+    $s = trim($s);
+    if ($s === '' || !preg_match('/^-?\d{1,3}(?: \d{3})*(?:[.,]\d+)?$|^-?\d+(?:[.,]\d+)?$/', $s)) return $s;
+    $s = str_replace(' ', '', $s);
+    if (strpos($s, ',') !== false) $s = str_replace(',', '.', $s);
+    if (strpos($s, '.') !== false) $s = rtrim(rtrim($s, '0'), '.');
+    return $s;
+}
+
+/**
+ * Автоопределение числовых колонок: колонка считается числовой, если все её
+ * непустые значения — числа. Такие колонки выравниваются вправо и форматируются
+ * стандартно (table_pretty_num).
+ */
+function table_detect_numeric_cols(array $visibleColumns, array $rows, callable $cellValue): array {
+    $numeric = [];
+    if (empty($rows)) return $numeric;
+    foreach ($visibleColumns as $vc) {
+        $cn = $vc['name'];
+        if ($cn === 'id') continue;
+        $any = false; $all = true;
+        foreach ($rows as $r) {
+            [$rv, $dv] = $cellValue($r, $cn, $vc);
+            // смотрим на отображаемый текст (без HTML-тегов): колонки-лукапы
+            // с числовыми id, но текстовыми названиями числовыми не считаются
+            $disp = trim(strip_tags((string)$dv));
+            if ($disp === '') continue;
+            $any = true;
+            if (!preg_match('/^-?\d{1,3}(?: \d{3})*(?:[.,]\d+)?$|^-?\d+(?:[.,]\d+)?$/', $disp)) { $all = false; break; }
+        }
+        if ($any && $all) $numeric[$cn] = true;
+    }
+    return $numeric;
+}
+
 function render_table_tbody(array $visibleColumns, array $rows, array $marks, string $search, string $key, callable $cellValue, array $extra = []): void {
     $hasCheckbox = $extra['hasCheckbox'] ?? true;
     $rowIdAttr   = $extra['rowIdAttr'] ?? 'data-row-id';
@@ -308,6 +348,7 @@ function render_table_tbody(array $visibleColumns, array $rows, array $marks, st
     <?php if (empty($rows)): ?>
       <tr><td colspan="<?= ($hasCheckbox ? 1 : 0) + count($visibleColumns) ?>" style="text-align:center; padding:20px; color:var(--muted);"><?= $noDataMessage ?></td></tr>
     <?php else: ?>
+      <?php $numericCols = table_detect_numeric_cols($visibleColumns, $rows, $cellValue); ?>
       <?php foreach ($rows as $r):
           $rid = (int)$r[$key];
       ?>
@@ -320,13 +361,17 @@ function render_table_tbody(array $visibleColumns, array $rows, array $marks, st
         <?php foreach ($visibleColumns as $i => $vc):
             $cn = $vc['name'];
             [$rawValue, $displayValue] = $cellValue($r, $cn, $vc);
+            $isNumCol = !empty($numericCols[$cn]);
+            if ($isNumCol && strpos($displayValue, '<') === false && $displayValue !== '') {
+                $displayValue = table_pretty_num($displayValue);
+            }
             if ($search !== '' && strpos($displayValue, '<span class="hl"') === false) {
                 $shouldHighlight = !$searchActive || count($searchCols) === 0 || in_array($cn, $searchCols);
                 if ($shouldHighlight) $displayValue = apply_search_highlight($displayValue, $search);
             }
             $readonly = !empty($vc['readonly']) || $cn === 'id' || ($rowReadonly && $rowReadonly($r, $cn));
             $editable = !$readonly;
-            $tdAttrs = 'class="col-' . h($cn) . ($editable ? ' cell-editable' : '') . '"';
+            $tdAttrs = 'class="col-' . h($cn) . ($editable ? ' cell-editable' : '') . ($isNumCol ? ' num-col' : '') . '"';
             if ($editable) $tdAttrs .= ' data-field="' . h($cn) . '"';
             $tdAttrs .= ' data-value="' . h((string)$rawValue) . '"';
             if ($tdExtraAttrs) $tdAttrs .= $tdExtraAttrs($cn, $vc, $r, $i);

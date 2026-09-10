@@ -1,0 +1,6 @@
+OpencodeKey: sk-0qiEJEGkGZ5QoQh1PcaxM99JhxTkwrsgpaomvqp3lq8O6Khi
+
+Base URL: https://api.tokenrouter.com/v1
+
+
+https://www.tokenrouter.com/

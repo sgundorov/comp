@@ -192,7 +192,7 @@ render_form_modal(); ?>
 
     <div class="table-wrap">
       <table class="data-table">
-        <?php render_table_colgroup($visibleColumns, $columnWidths, array_merge(['accept_flag' => '90px', 'number' => '70px', 'date' => '90px', 'time' => '70px', 'mesto_id' => '150px', 'pos' => '70px', 'sum' => '110px', 'first_card' => '130px', 'last_card' => '150px', 'firm_id' => '150px', 'sotr_id' => '150px', 'note' => '400px'], count($firmLookupOptions) === 1 ? ['firm_id' => '0px'] : [])); ?>
+        <?php render_table_colgroup($visibleColumns, $columnWidths, array_merge(['accept_flag' => '90px', 'number' => '70px', 'date' => '90px', 'time' => '70px', 'mesto_id' => '150px', 'pos' => '70px', 'sum' => '110px', 'first_card' => '130px', 'last_card' => '150px', 'firm_id' => '150px', 'sotr_id' => '150px', 'note' => '1600px'], count($firmLookupOptions) === 1 ? ['firm_id' => '0px'] : [])); ?>
         <?php render_table_thead($visibleColumns, $COL_META, $sortLevels, $allRowsMarked, $rowsTotalCount === 0, [
             'thAttrsCallback' => function($cn, $cm) use ($mestoIds, $firmIds, $sotrIds) {
                 if ($cm && !empty($cm['filter']) && $cn === 'mesto_id') {

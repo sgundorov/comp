@@ -364,6 +364,10 @@ function ensure_clidoc_table(mysqli $conn): void {
         UNIQUE KEY type_client_number (type, client_id, number),
         KEY idx_client (client_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $r = @$conn->query("SHOW COLUMNS FROM clidoc LIKE 'note'");
+    if ($r && $r->num_rows === 0) {
+        @$conn->query("ALTER TABLE clidoc ADD COLUMN note TEXT DEFAULT NULL AFTER filename");
+    }
 }
 
 function save_column_width(mysqli $conn, string $tbl, string $column_name, ?int $width): bool {

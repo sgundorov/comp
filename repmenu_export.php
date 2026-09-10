@@ -14,6 +14,9 @@ $tp = new TablePage($conn, $repmenuPageConfig);
 
 $tp->applyFilterWithLabel($conn, 'gr_id', 'm.gr_id', 'Группа', 'repgroup', 'gr_id', 'name');
 
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 $rows = $tp->fetchAll($conn);
 
 $tp->renderExport($format, $rows, [

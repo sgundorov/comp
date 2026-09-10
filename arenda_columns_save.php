@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/config/invo_columns.php';
+require_once __DIR__ . '/config/arenda_columns.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -17,7 +17,7 @@ if (!$isAjax) {
 }
 
 $allowedCols = [];
-foreach (invo_columns_defaults() as $c) $allowedCols[$c['name']] = $c['label'];
+foreach (arenda_columns_defaults() as $c) $allowedCols[$c['name']] = $c['label'];
 
 $raw = $_POST['columns'] ?? [];
 if (!is_array($raw)) {
@@ -39,15 +39,15 @@ foreach ($raw as $i => $row) {
         'order'   => (int)($row['order'] ?? $i),
     ];
 }
-foreach (invo_columns_defaults() as $i => $c) {
+foreach (arenda_columns_defaults() as $i => $c) {
     if (!isset($seen[$c['name']])) {
-        $clean[] = ['name' => $c['name'], 'visible' => !empty($c['visible']) ? 1 : 0, 'order' => count($clean) + $i];
+        $clean[] = ['name' => $c['name'], 'visible' => 1, 'order' => count($clean) + $i];
     }
 }
 
 usort($clean, function ($a, $b) { return $a['order'] - $b['order']; });
 
-$ok = save_columns_config($conn, 'invoice', $clean);
+$ok = save_columns_config($conn, 'arenda', $clean);
 if (!$ok) {
     echo json_encode(['ok' => false, 'error' => 'save failed']);
     exit;

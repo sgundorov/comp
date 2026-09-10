@@ -187,8 +187,8 @@ function render_embedded_subtable_scripts(array $cfg): void {
       if (typeof InlineEdit !== 'undefined') {
         var ieFields = {};
         <?php foreach ($columns as $col):
-            $colType = $col['type'] ?? 'text';
-            $dbField = $col['dbField'] ?? $col['key'];
+            $colType = (!empty($col['param']) || (($col['type'] ?? '') === 'lookup')) ? 'lookup' : ($col['type'] ?? 'text');
+            $dbField = $col['dbField'] ?? $col['param'] ?? $col['key'];
         ?>
         ieFields['<?= $col['key'] ?>'] = { dbField: '<?= $dbField ?>', type: '<?= $colType ?>', label: <?= json_encode($col['label'], JSON_UNESCAPED_UNICODE) ?> };
         <?php endforeach; ?>

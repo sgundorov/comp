@@ -5,6 +5,9 @@ require_once __DIR__ . '/config/sotr_page.php';
 
 $tp = new TablePage($conn, $sotrPageConfig);
 
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 [$rows, $pagination] = $tp->fetchPage($conn);
 
 $tp->renderPrintPage($rows, $pagination, [

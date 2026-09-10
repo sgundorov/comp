@@ -12,6 +12,9 @@ if ($groupId > 0) {
     $tp->appendWhere('sg.group_id = ?', [$groupId], 'i');
 }
 
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 [$rows, $pagination] = $tp->fetchPage($conn);
 
 $printTitle = $sgroupIsService ? 'Услуги' : 'Подгруппы товаров';

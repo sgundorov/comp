@@ -32,6 +32,7 @@ $values = [
     'problem_flag'   => '0',
     'juridical_flag' => '0',
     'hide_flag'      => '0',
+    'nozalog_flag'   => '0',
     'phone'          => '',
     'cphone'         => '',
     'email'          => '',
@@ -69,7 +70,7 @@ try {
 
 if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
     $stmt = $conn->prepare("SELECT c.last_name, c.first_name, c.name, c.title,
-        c.cli_categ_id, c.supplier_flag, c.problem_flag, c.juridical_flag, c.hide_flag,
+        c.cli_categ_id, c.supplier_flag, c.problem_flag, c.juridical_flag, c.hide_flag, c.nozalog_flag,
         c.phone, c.cphone, c.email, c.site,
         c.city_id, c.country_id, c.postindex, c.address_jur, c.address,
         c.pasport, c.pasp_date, c.pasp_vydan, c.birthday,
@@ -95,6 +96,7 @@ if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
         $values['problem_flag'] = (string)$r['problem_flag'];
         $values['juridical_flag'] = (string)$r['juridical_flag'];
         $values['hide_flag'] = (string)$r['hide_flag'];
+        $values['nozalog_flag'] = (string)$r['nozalog_flag'];
         $values['phone'] = (string)$r['phone'];
         $values['cphone'] = (string)$r['cphone'];
         $values['email'] = (string)$r['email'];
@@ -136,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values['supplier_flag'] = (string)($_POST['supplier_flag'] ?? '0');
     $values['problem_flag'] = (string)($_POST['problem_flag'] ?? '0');
     $values['hide_flag'] = (string)($_POST['hide_flag'] ?? '0');
+    $values['nozalog_flag'] = (string)($_POST['nozalog_flag'] ?? '0');
     $values['phone'] = (string)($_POST['phone'] ?? '');
     $values['cphone'] = (string)($_POST['cphone'] ?? '');
     $values['email'] = (string)($_POST['email'] ?? '');
@@ -196,9 +199,9 @@ $values['disc_goods'] = ($discGoods === '') ? '0' : $discGoods;
             exit;
         }
         if ($mode === 'new' || $mode === 'copy') {
-            $stmt = $conn->prepare("INSERT INTO client (last_name, first_name, title, name, cli_categ_id, supplier_flag, problem_flag, juridical_flag, hide_flag, phone, cphone, email, site, city_id, country_id, postindex, address_jur, address, pasport, pasp_date, pasp_vydan, birthday, promo_id, inn, kpp, ogrn, jur_name, director, glavbuh, bank, bik, schet, kschet, okonh, okpo, disc_goods, dop1, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $conn->prepare("INSERT INTO client (last_name, first_name, title, name, cli_categ_id, supplier_flag, problem_flag, juridical_flag, hide_flag, nozalog_flag, phone, cphone, email, site, city_id, country_id, postindex, address_jur, address, pasport, pasp_date, pasp_vydan, birthday, promo_id, inn, kpp, ogrn, jur_name, director, glavbuh, bank, bik, schet, kschet, okonh, okpo, disc_goods, dop1, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             bind_auto($stmt, [$values['last_name'], $values['first_name'], $values['title'], $values['name'],
-                $values['cli_categ_id'], $values['supplier_flag'], $values['problem_flag'], $values['juridical_flag'], $values['hide_flag'],
+                $values['cli_categ_id'], $values['supplier_flag'], $values['problem_flag'], $values['juridical_flag'], $values['hide_flag'], $values['nozalog_flag'],
                 $values['phone'], $values['cphone'], $values['email'], $values['site'], $values['city_id'], $values['country_id'], $values['postindex'],
                 $values['address_jur'], $values['address'], $values['pasport'], $values['pasp_date'], $values['pasp_vydan'], $values['birthday'],
                 $values['promo_id'], $values['inn'], $values['kpp'], $values['ogrn'], $values['jur_name'], $values['director'], $values['glavbuh'],
@@ -214,13 +217,14 @@ $values['disc_goods'] = ($discGoods === '') ? '0' : $discGoods;
         if ($mode === 'edit') {
             $stmt = $conn->prepare("UPDATE client SET last_name = ?, first_name = ?, title = ?, name = ?,
                 cli_categ_id = ?, supplier_flag = ?, problem_flag = ?, juridical_flag = ?, hide_flag = ?,
+                nozalog_flag = ?,
                 phone = ?, cphone = ?, email = ?, site = ?, city_id = ?, country_id = ?, postindex = ?,
                 address_jur = ?, address = ?, pasport = ?, pasp_date = ?, pasp_vydan = ?, birthday = ?,
                 promo_id = ?, inn = ?, kpp = ?, ogrn = ?, jur_name = ?, director = ?, glavbuh = ?,
                 bank = ?, bik = ?, schet = ?, kschet = ?, okonh = ?, okpo = ?,
                 disc_goods = ?, dop1 = ?, note = ? WHERE client_id = ?");
             bind_auto($stmt, [$values['last_name'], $values['first_name'], $values['title'], $values['name'],
-                $values['cli_categ_id'], $values['supplier_flag'], $values['problem_flag'], $values['juridical_flag'], $values['hide_flag'],
+                $values['cli_categ_id'], $values['supplier_flag'], $values['problem_flag'], $values['juridical_flag'], $values['hide_flag'], $values['nozalog_flag'],
                 $values['phone'], $values['cphone'], $values['email'], $values['site'], $values['city_id'], $values['country_id'], $values['postindex'],
                 $values['address_jur'], $values['address'], $values['pasport'], $values['pasp_date'], $values['pasp_vydan'], $values['birthday'],
                 $values['promo_id'], $values['inn'], $values['kpp'], $values['ogrn'], $values['jur_name'], $values['director'], $values['glavbuh'],
@@ -250,8 +254,8 @@ $values['disc_goods'] = ($discGoods === '') ? '0' : $discGoods;
 
         if (empty($errors) && $isAjax) {
             header('Content-Type: application/json; charset=utf-8');
-            $resp = ['ok' => true, 'mode' => $mode, 'id' => ($mode === 'new' || $mode === 'copy') ? $newId : $id];
-            if ($mode === 'new' || $mode === 'copy') $resp['page'] = $pageOfNew;
+    $resp = ['ok' => true, 'mode' => $mode, 'id' => ($mode === 'new' || $mode === 'copy') ? $newId : $id, 'name' => $values['name']];
+    if ($mode === 'new' || $mode === 'copy') $resp['page'] = $pageOfNew;
             echo json_encode($resp);
             exit;
         }
@@ -568,9 +572,13 @@ ob_start();
         <td><?= render_input('text', 'glavbuh', $values['glavbuh'], ['id' => 'glavbuh', 'class' => 'full', 'readonly' => $isReadonly]) ?></td>
         <td>&nbsp;</td>
       </tr>
-      <tr><td class="form-label">Реклама</td></tr>
+      <tr><td class="form-label">Реклама</td><td>&nbsp;</td></tr>
       <tr>
         <td><?= render_lookup('promo', 'promo_id', $values['promo_id'], $currentPromoName, h(json_encode($promoList, JSON_UNESCAPED_UNICODE)), 'promo_form.php?mode=new', $isReadonly, ['id' => 'promo-id', 'data-name-input' => 'promo-name']) ?></td>
+        <td><div style="display:flex;align-items:center;gap:6px;<?= $isReadonly ? 'opacity:0.6;' : '' ?>">
+          <?= render_checkbox('nozalog_flag', '1', $values['nozalog_flag'] === '1', ['id' => 'client-nozalog', 'disabled' => $isReadonly]) ?>
+          <label class="field-label" for="client-nozalog" style="margin:0;">Без залога</label>
+        </div></td>
       </tr>
     </table>
   </div>
@@ -757,8 +765,8 @@ input.full, textarea.full { width: 100%; box-sizing: border-box; }
   var cityList = cityRoot ? JSON.parse(cityRoot.getAttribute('data-countries') || '[]') : [];
   var countryList = countryRoot ? JSON.parse(countryRoot.getAttribute('data-countries') || '[]') : [];
 
-  var cityReadonly = cityRoot && cityRoot.querySelector('.lookup-input') && cityRoot.querySelector('.lookup-input').hasAttribute('readonly');
-  var countryReadonly = countryRoot && countryRoot.querySelector('.lookup-input') && countryRoot.querySelector('.lookup-input').hasAttribute('readonly');
+  var cityReadonly = cityRoot && cityRoot.hasAttribute('data-readonly');
+  var countryReadonly = countryRoot && countryRoot.hasAttribute('data-readonly');
 
   function onCitySelect(id, name) {
     var city = cityList.find(function (c) { return String(c.id) === String(id); });
@@ -782,13 +790,13 @@ input.full, textarea.full { width: 100%; box-sizing: border-box; }
 
   var cliCategRoot = document.querySelector('[data-lookup="cli_categ"]');
   var cliCategList = cliCategRoot ? JSON.parse(cliCategRoot.getAttribute('data-countries') || '[]') : [];
-  if (cliCategRoot && !cliCategRoot.querySelector('.lookup-input')?.readOnly) {
+  if (cliCategRoot && !cliCategRoot.hasAttribute('data-readonly')) {
     bindLookup({ root: cliCategRoot, data: cliCategList, readonly: false });
   }
 
   var promoRoot = document.querySelector('[data-lookup="promo"]');
   var promoList = promoRoot ? JSON.parse(promoRoot.getAttribute('data-countries') || '[]') : [];
-  if (promoRoot && !promoRoot.querySelector('.lookup-input')?.readOnly) {
+  if (promoRoot && !promoRoot.hasAttribute('data-readonly')) {
     bindLookup({ root: promoRoot, data: promoList, readonly: false });
   }
 

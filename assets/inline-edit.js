@@ -339,6 +339,7 @@
             })
             .then(function (data) {
               if (data.ok) {
+                if (data.message) { try { alert(data.message); } catch(e) {} }
                 const newDisplay = data.displayValue != null ? String(data.displayValue) : (displayAfter || (data.value != null ? String(data.value) : value));
                 if (valSpan) {
                   if (config.type === 'checkbox') { valSpan.innerHTML = newDisplay; }

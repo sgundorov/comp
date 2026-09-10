@@ -12,6 +12,9 @@ if (!in_array($format, $validFormats, true)) {
 }
 
 $tp = new TablePage($conn, $cityPageConfig);
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 $rows = $tp->fetchAll($conn);
 
 $baseName = 'Города';

@@ -54,7 +54,7 @@ if ($mode === 'new') {
     $values['doc_number'] = (string)($_GET['number'] ?? '');
     $docIdVal = (int)$values['doc_id'];
     $docTypeVal = (int)$values['doc_type'];
-    if ($docIdVal > 0 && $values['client_id'] <= 0 && in_array($docTypeVal, [5, 10, 20, 40, 110, 120, 127], true)) {
+    if ($docIdVal > 0 && $values['client_id'] <= 0 && in_array($docTypeVal, [5, 10, 20, 40, 90, 110, 120, 127], true)) {
         if ($docTypeVal === 10) {
             $pStmt = $conn->prepare("SELECT client_id FROM invoice WHERE invoice_id = ?");
             $pStmt->bind_param('i', $docIdVal);
@@ -94,7 +94,7 @@ if ($mode === 'new') {
                 if ($rem > 0) $values['sum_in'] = (string)$rem;
             }
         }
-        if ((float)$values['sum_in'] <= 0 && (float)$values['sum_out'] <= 0 && in_array($docTypeVal, [10, 20, 40, 100, 110, 120, 127], true)) {
+        if ((float)$values['sum_in'] <= 0 && (float)$values['sum_out'] <= 0 && in_array($docTypeVal, [10, 20, 40, 90, 100, 110, 120, 127], true)) {
             $dr = $conn->prepare("SELECT COALESCE((SELECT SUM(d2.sum) FROM docum2 d2 WHERE d2.docum_id = d.docum_id), 0) AS sum, COALESCE(d.sum_plat,0) AS sum_plat, COALESCE(tp.prihod_flag,0) AS prihod_flag FROM docum d LEFT JOIN typeop tp ON tp.typeop_id = d.typeop WHERE d.docum_id = ?");
             $dr->bind_param('i', $docIdVal);
             $dr->execute();
@@ -119,7 +119,7 @@ if ($mode === 'new') {
             $nRow = $nStmt->get_result()->fetch_assoc();
             $nStmt->close();
             if ($nRow) $values['doc_number'] = (string)(int)$nRow['number'];
-        } elseif (in_array($docTypeVal, [10, 20, 40, 100, 110, 120, 127], true)) {
+        } elseif (in_array($docTypeVal, [10, 20, 40, 90, 100, 110, 120, 127], true)) {
             $nStmt = $conn->prepare("SELECT number FROM docum WHERE docum_id = ?");
             $nStmt->bind_param('i', $docIdVal);
             $nStmt->execute();
@@ -221,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $delDocId = (int)$values['doc_id'];
             $delSumPlat = 0;
             $delDocType = (int)$values['doc_type'];
-            if ($delDocId > 0 && in_array($delDocType, [10, 20, 40, 110, 120, 127], true)) {
+            if ($delDocId > 0 && in_array($delDocType, [10, 20, 40, 90, 110, 120, 127], true)) {
                 $parentTable = $delDocType === 10 ? 'invoice' : 'docum';
                 $parentKey = $delDocType === 10 ? 'invoice_id' : 'docum_id';
                 $sp = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
@@ -280,7 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $saveSumPlat = 0;
         $saveDocType = (int)$values['doc_type'];
-        if ($docIdVal > 0 && in_array($saveDocType, [5, 10, 20, 40, 110, 120, 127], true)) {
+        if ($docIdVal > 0 && in_array($saveDocType, [5, 10, 20, 40, 90, 110, 120, 127], true)) {
             $parentTable = in_array($saveDocType, [5, 10], true) ? 'invoice' : 'docum';
             $parentKey = in_array($saveDocType, [5, 10], true) ? 'invoice_id' : 'docum_id';
             $sp = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
@@ -554,9 +554,9 @@ ob_start();
   var zatList = zatRoot ? JSON.parse(zatRoot.getAttribute('data-countries') || '[]') : [];
   var sotrList = sotrRoot ? JSON.parse(sotrRoot.getAttribute('data-countries') || '[]') : [];
 
-  var clientReadonly = clientRoot && clientRoot.querySelector('.lookup-input') && clientRoot.querySelector('.lookup-input').hasAttribute('readonly');
-  var zatReadonly = zatRoot && zatRoot.querySelector('.lookup-input') && zatRoot.querySelector('.lookup-input').hasAttribute('readonly');
-  var sotrReadonly = sotrRoot && sotrRoot.querySelector('.lookup-input') && sotrRoot.querySelector('.lookup-input').hasAttribute('readonly');
+  var clientReadonly = clientRoot ? clientRoot.hasAttribute('data-readonly') : false;
+  var zatReadonly = zatRoot ? zatRoot.hasAttribute('data-readonly') : false;
+  var sotrReadonly = sotrRoot ? sotrRoot.hasAttribute('data-readonly') : false;
 
   function setOutFlagFromZat(id) {
     var z = zatList.find(function (z) { return z.id === id; });

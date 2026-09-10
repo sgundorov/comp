@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/controls.php';
+require_once __DIR__ . '/lib/residue.php';
 
 $mode      = (string)($_GET['mode'] ?? 'new');
 $docum2Id  = (int)($_GET['id'] ?? 0);
@@ -158,10 +159,9 @@ if ($isAjax && isset($_POST['action'])) {
                 $ds = $conn->query("SELECT store_id FROM docum WHERE docum_id = $documId")->fetch_assoc();
                 if ($ds) $storeId = (int)$ds['store_id'];
                 if ($storeId > 0) {
-                    $nq = $conn->query("SELECT noquant_flag FROM product WHERE product_id = $productId")->fetch_assoc();
-                    if (!$nq || !(int)$nq['noquant_flag']) {
-                        $rr = $conn->query("SELECT COALESCE(quant,0) AS q FROM residue WHERE wh_id = $storeId AND product_id = $productId")->fetch_assoc();
-                        $residueQ = $rr ? (float)$rr['q'] : 0;
+                    $nq = $conn->query("SELECT noquant_flag, nocalc_flag FROM product WHERE product_id = $productId")->fetch_assoc();
+                    if ($nq && !(int)$nq['noquant_flag'] && !(int)$nq['nocalc_flag']) {
+                        $residueQ = residue_available_product($conn, $productId, $storeId);
                         if ($quant > $residueQ) $errors[] = 'Недостаточно остатка товара на участке. Текущий остаток: ' . _fmt_qty($residueQ);
                     }
                 }

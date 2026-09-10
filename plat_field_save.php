@@ -26,7 +26,7 @@ if ($field === '_list') {
         echo json_encode([]);
         exit;
     }
-    $stmt = $conn->prepare("SELECT p.plat_id, p.datetime, p.client_id, p.zat_id, p.sum, p.plat_type, p.out_flag, p.note, c.name AS client_name, z.name AS zat_name FROM plat p LEFT JOIN client c ON p.client_id = c.client_id LEFT JOIN zat z ON p.zat_id = z.zat_id WHERE p.doc_id = ? AND p.doc_type = ? ORDER BY p.plat_id DESC");
+    $stmt = $conn->prepare("SELECT p.plat_id, p.datetime, p.client_id, p.zat_id, p.sum, p.plat_type, p.out_flag, p.note, c.name AS client_name, z.name AS zat_name, s.last_name AS sotr_name, s.doc_name AS sotr_doc_name FROM plat p LEFT JOIN client c ON p.client_id = c.client_id LEFT JOIN zat z ON p.zat_id = z.zat_id LEFT JOIN sotr s ON p.sotr_id = s.sotr_id WHERE p.doc_id = ? AND p.doc_type = ? ORDER BY p.plat_id DESC");
     bind_auto($stmt, [$docId, $listDocType]);
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -43,7 +43,9 @@ if ($field === '_list') {
             'sum' => (string)(float)$r['sum'],
             'plat_type' => (string)$r['plat_type'],
             'out_flag' => (int)$r['out_flag'] ? 'Расход' : 'Приход',
+            'out_flag' => (int)$r['out_flag'] ? 'Расход' : 'Приход',
             'note' => (string)$r['note'],
+            'sotr_name' => (string)(($r['sotr_doc_name'] ?? '') !== '' ? $r['sotr_doc_name'] : ($r['sotr_name'] ?? '-')),
         ];
     }, $rows);
     header('Content-Type: application/json; charset=utf-8');
@@ -67,23 +69,32 @@ if ($field === '_delete') {
     $stmt->execute();
     $stmt->close();
     $conn->query("DELETE FROM marks WHERE tbl = 'plat' AND row_id = $delId");
-    $sumPlat = 0;
-    if ($docId > 0 && in_array($docType, [5, 10, 20, 110, 120, 127], true)) {
-        $parentTable = in_array($docType, [5, 10], true) ? 'invoice' : 'docum';
-        $parentKey = in_array($docType, [5, 10], true) ? 'invoice_id' : 'docum_id';
-        $sp = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
-        $sp->bind_param('ii', $docId, $docType);
-        $sp->execute();
-        $sumPlat = (float)$sp->get_result()->fetch_row()[0];
-        $sp->close();
-        $upd = $conn->prepare("UPDATE $parentTable SET sum_plat = ? WHERE $parentKey = ?");
-        bind_auto($upd, [$sumPlat, $docId]);
-        $upd->execute();
-        $upd->close();
-    }
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['ok' => true, 'mode' => 'delete', 'id' => $delId, 'sum_plat' => number_format($sumPlat, 2, '.', '')]);
-    exit;
+        $sumPlat = 0;
+        $sumBalans = null;
+        if ($docId > 0 && in_array($docType, [5, 10, 20, 90, 110, 120, 127], true)) {
+            $parentTable = in_array($docType, [5, 10], true) ? 'invoice' : 'docum';
+            $parentKey = in_array($docType, [5, 10], true) ? 'invoice_id' : 'docum_id';
+            $sp = $conn->prepare("SELECT COALESCE(SUM(sum),0) FROM plat WHERE doc_id = ? AND doc_type = ?");
+            $sp->bind_param('ii', $docId, $docType);
+            $sp->execute();
+            $sumPlat = (float)$sp->get_result()->fetch_row()[0];
+            $sp->close();
+            if (in_array($docType, [5, 10], true)) {
+                $upd = $conn->prepare("UPDATE $parentTable SET sum_plat = ? WHERE $parentKey = ?");
+                bind_auto($upd, [$sumPlat, $docId]);
+            } else {
+                $sumRow = $conn->query("SELECT COALESCE(`sum`,0) FROM docum WHERE docum_id = $docId")->fetch_row();
+                $docSum = (float)($sumRow[0] ?? 0);
+                $sumBalans = $docSum - $sumPlat;
+                $upd = $conn->prepare("UPDATE docum SET sum_plat = ?, sum_balans = ? WHERE docum_id = ?");
+                bind_auto($upd, [$sumPlat, $sumBalans, $docId]);
+            }
+            $upd->execute();
+            $upd->close();
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => true, 'mode' => 'delete', 'id' => $delId, 'sum_plat' => number_format($sumPlat, 2, '.', ''), 'sum_balans' => $sumBalans === null ? null : number_format($sumBalans, 2, '.', '')]);
+        exit;
 }
 
 if ($id <= 0 || $field === '') {
@@ -190,7 +201,7 @@ switch ($ALLOWED[$field]['type']) {
 
 $sumPlat = 0;
 $docQ = $conn->query("SELECT doc_id, doc_type FROM plat WHERE plat_id = $id");
-if ($docQ && ($docR = $docQ->fetch_assoc()) && in_array((int)$docR['doc_type'], [5, 10, 20, 40, 110, 120, 127], true) && (int)$docR['doc_id'] > 0) {
+if ($docQ && ($docR = $docQ->fetch_assoc()) && in_array((int)$docR['doc_type'], [5, 10, 20, 40, 90, 110, 120, 127], true) && (int)$docR['doc_id'] > 0) {
     $docType = (int)$docR['doc_type'];
     $parentTable = in_array($docType, [5, 10], true) ? 'invoice' : 'docum';
     $parentKey = in_array($docType, [5, 10], true) ? 'invoice_id' : 'docum_id';

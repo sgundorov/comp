@@ -25,6 +25,9 @@ $tp->appendWhere("d.typeop = ?", [$typeop], 'i');
 $tp->applyFilterWithLabel($conn, 'client_id', 'd.client_id', 'Контрагент', 'client', 'client_id', 'name');
 $tp->applyFilterWithLabel($conn, 'store_id',  'd.store_id',  'Склад',      'store',  'store_id',  'name');
 
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 $rows = $tp->fetchAll($conn);
 
 $colValues = [

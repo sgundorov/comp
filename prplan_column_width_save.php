@@ -15,21 +15,23 @@ if (!$isAjax) {
     exit;
 }
 
-$name  = (string)($_POST['name'] ?? '');
-$width = isset($_POST['width']) && $_POST['width'] !== '' ? (int)$_POST['width'] : null;
-
-if ($name === '') {
-    echo json_encode(['ok' => false, 'error' => 'bad name']);
+$tbl = (string)($_POST['tbl'] ?? '');
+if ($tbl !== 'prplan') {
+    echo json_encode(['ok' => false, 'error' => 'unknown table']);
     exit;
 }
 
+require_once __DIR__ . '/config/prplan_columns.php';
 $allowed = [];
-require_once __DIR__ . '/config/invo_columns.php';
-foreach (invo_columns_defaults() as $c) $allowed[$c['name']] = true;
+foreach (prplan_columns_defaults() as $c) $allowed[$c['name']] = true;
+
+$name  = (string)($_POST['name'] ?? '');
+$width = isset($_POST['width']) && $_POST['width'] !== '' ? (int)$_POST['width'] : null;
+
 if (!isset($allowed[$name])) {
     echo json_encode(['ok' => false, 'error' => 'unknown column']);
     exit;
 }
 
-$ok = save_column_width($conn, 'invoice', $name, $width);
-echo json_encode(['ok' => (bool)$ok]);
+$ok = save_column_width($conn, $tbl, $name, $width);
+echo json_encode(['ok' => $ok]);

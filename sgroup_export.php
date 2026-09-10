@@ -19,6 +19,9 @@ if ($groupId > 0) {
     $tp->appendWhere('sg.group_id = ?', [$groupId], 'i');
 }
 
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 $rows = $tp->fetchAll($conn);
 
 $baseName = $sgroupIsService ? 'Услуги' : 'Подгруппы товаров';

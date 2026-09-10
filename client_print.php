@@ -18,7 +18,10 @@ if ($tagFilter !== '') {
     }
 }
 
-$rows = $tp->fetchAll($conn);
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
+[$rows, $pagination] = $tp->fetchPage($conn);
 
 $skipCols = ['last_name', 'first_name'];
 $tp->visibleColumns = array_values(array_filter($tp->visibleColumns, fn($c) => !in_array($c['name'], $skipCols, true)));
@@ -77,8 +80,9 @@ $printWidths = [
     'bank' => '80px', 'bik' => '50px', 'dop1' => '60px', 'tags' => '80px',
 ];
 
-$tp->renderPrintPage($rows, ['totalCount' => count($rows)], [
+$tp->renderPrintPage($rows, $pagination, [
     'title' => 'Контрагенты',
+    'orientation' => 'landscape',
     'colValues' => $colValues,
     'printWidths' => $printWidths,
 ]);

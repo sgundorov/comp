@@ -328,10 +328,10 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         pageUrl: 'object.php',
         search: document.querySelector('.toolbar').getAttribute('data-search') || '',
         getExportUrl: function () {
-          return 'object_export.php?format=csv&all=1';
+          return 'object_export.php?format=csv&all=1&selected=1';
         },
         getPrintUrl: function () {
-          return 'object_print.php?all=1';
+          return 'object_print.php?all=1&selected=1';
         }
       });
 

@@ -1,0 +1,4 @@
+FreeKey: sk-0cf594eccc417857-w5tcqy-1a25083e
+
+http://localhost:20128/v1
+

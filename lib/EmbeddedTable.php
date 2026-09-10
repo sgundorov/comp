@@ -26,6 +26,7 @@ class EmbeddedTable extends TableComponent {
     public $onSaveSuccessExtra = '';
     public $columnLabels = [];
     public $barcodeAdd = false;
+    public $toolbarExtraAfterRefresh = '';
 
     public function __construct(array $config) {
         $config['column_visibility_tbl'] = $config['column_visibility_tbl'] ?? '';
@@ -52,6 +53,7 @@ class EmbeddedTable extends TableComponent {
         $this->onSaveSuccessExtra = $config['onSaveSuccessExtra'] ?? '';
         $this->columnLabels     = $config['columnLabels'] ?? [];
         $this->barcodeAdd       = $config['barcodeAdd'] ?? false;
+        $this->toolbarExtraAfterRefresh = $config['toolbarExtraAfterRefresh'] ?? '';
 
         if (empty($this->columnLabels)) {
             foreach ($this->columns as $col) {
@@ -109,6 +111,7 @@ $_actionsOk = !$_readonly && (!$af || true);
         <?php endif; ?>
         <?php if (!$_readonly): ?>
         <button type="button" class="icon-btn" title="Обновить" id="<?= h($p) ?>-refresh-btn"><img src="img/refresh.png" alt="" /></button>
+        <?= $this->toolbarExtraAfterRefresh ?>
         <?php if ($this->barcodeAdd): ?>
         <span class="barcode-add" style="display:inline-flex;align-items:center;gap:4px;margin-left:6px">
           <input type="text" class="barcode-input" id="<?= h($p) ?>-barcode" maxlength="20" placeholder="Штрихкод" style="width:130px;height:24px;padding:0 6px;font-size:13px" />
@@ -270,8 +273,8 @@ $_actionsOk = !$_readonly && (!$af || true);
         var ieFields = {};
         <?php foreach ($visibleCols as $col):
             $cn = $col['name'] ?? $col['key'] ?? '';
-            $colType = !empty($col['param']) ? 'lookup' : ($col['type'] ?? 'text');
-            $dbField = $col['param'] ?? $cn;
+            $colType = (!empty($col['param']) || (($col['type'] ?? '') === 'lookup')) ? 'lookup' : ($col['type'] ?? 'text');
+            $dbField = $col['dbField'] ?? $col['param'] ?? $cn;
         ?>
         ieFields['<?= $cn ?>'] = { dbField: '<?= $dbField ?>', type: '<?= $colType ?>', label: <?= json_encode($col['label'] ?? $cn, JSON_UNESCAPED_UNICODE) ?> };
         <?php endforeach; ?>

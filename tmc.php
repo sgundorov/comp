@@ -353,7 +353,7 @@ render_form_modal(); ?>
   </div>
 
 <?php
-render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'assets/export-modal.js', 'assets/column-filter.js']]);
+render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'assets/export-modal.js', 'assets/column-filter.js', 'assets/embedded-subtable.js']]);
 ?>
   <script>
     window.__serviceMode = <?= json_encode($serviceMode) ?>;
@@ -378,10 +378,14 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
         pageUrl: 'tmc.php',
         search: document.querySelector('.toolbar').getAttribute('data-search') || '',
         getExportUrl: function () {
-          return null;
+          var sp = new URLSearchParams(location.search);
+          ['action', 'page'].forEach(function (k) { sp.delete(k); });
+          return 'tmc_export.php?format=csv&selected=1&' + sp.toString();
         },
         getPrintUrl: function () {
-          return null;
+          var sp = new URLSearchParams(location.search);
+          ['action', 'page'].forEach(function (k) { sp.delete(k); });
+          return 'tmc_print.php?selected=1&' + sp.toString();
         }
       });
 
@@ -461,6 +465,7 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
     'form_prefix' => $FORM_PREFIX,
     'base_url' => $PAGE_URL,
     'lookup_tables' => ['categ', 'group', 'sgroup', 'country', 'izgot', 'unit'],
+    'autoInitTables' => ['pr'],
     'extra_open' => '(function(){
       var groupRoot = document.querySelector(\'[data-lookup="group"]\');
       var sgroupRoot = document.querySelector(\'[data-lookup="sgroup"]\');

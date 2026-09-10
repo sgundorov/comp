@@ -130,7 +130,7 @@ $zr = $conn->query("SELECT zat_id FROM zat WHERE name = 'Оплата счета
 if ($zr && ($zrow = $zr->fetch_assoc())) $zatIdForPlat = (int)$zrow['zat_id'];
 if (($mode === 'edit' || $mode === 'copy' || $mode === 'delete') && $id > 0) {
     $docType = $invoiceDoctypeId;
-    $stmtP = $conn->prepare("SELECT p.plat_id, p.datetime, p.sum_in, p.sum_out, p.sum, p.out_flag, p.plat_type, p.doc_id, p.note, c.name AS client_name, z.name AS zat_name FROM plat p LEFT JOIN client c ON c.client_id = p.client_id LEFT JOIN zat z ON z.zat_id = p.zat_id WHERE p.doc_id = ? AND p.doc_type = ? ORDER BY p.plat_id DESC");
+    $stmtP = $conn->prepare("SELECT p.plat_id, p.datetime, p.sum_in, p.sum_out, p.sum, p.out_flag, p.plat_type, p.doc_id, p.note, c.name AS client_name, z.name AS zat_name, s.last_name AS sotr_name, s.doc_name AS sotr_doc_name FROM plat p LEFT JOIN client c ON c.client_id = p.client_id LEFT JOIN zat z ON z.zat_id = p.zat_id LEFT JOIN sotr s ON s.sotr_id = p.sotr_id WHERE p.doc_id = ? AND p.doc_type = ? ORDER BY p.plat_id DESC");
     bind_auto($stmtP, [$id, $docType]);
     $stmtP->execute();
     $platList = $stmtP->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -397,7 +397,7 @@ $platTable = new EmbeddedTable([
     'parentField' => 'doc_id',
     'childFormUrl' => 'plat_form.php?doc_type=' . $invoiceDoctypeId . '&client_id=' . $values['client_id'] . '&sotr_id=' . $CurSotrID . '&zat_id=' . $zatIdForPlat . '&sum_in=' . urlencode(max(0, (float)$values['sum'] - (float)$values['sum_plat'])),
     'childFormName' => 'PlatForm',
-    'colWidths' => ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'out_flag' => '80px', 'note' => 'auto'],
+    'colWidths' => ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'out_flag' => '80px', 'sotr_name' => '140px', 'note' => '300px'],
     'columnResizeUrl' => 'plat_column_width_save.php',
     'columnResizeTbl' => 'plat',
     'pageSize' => 15,
@@ -412,7 +412,8 @@ $platTable = new EmbeddedTable([
         ['name' => 'zat_name', 'label' => 'Вид операции'],
         ['name' => 'sum', 'label' => 'Сумма'],
         ['name' => 'out_flag', 'label' => 'Тип'],
-        ['name' => 'note', 'label' => 'Примечание', 'type' => 'textarea'],
+        ['name' => 'sotr_name', 'label' => 'Сотрудник', 'readonly' => true],
+        ['name' => 'note', 'label' => 'Примечание', 'type' => 'textarea', 'align' => 'left'],
     ],
     'columnLabels' => [
         'datetime' => 'Дата/Время',
@@ -420,6 +421,7 @@ $platTable = new EmbeddedTable([
         'zat_name' => 'Вид операции',
         'sum' => 'Сумма',
         'out_flag' => 'Тип',
+        'sotr_name' => 'Сотрудник',
         'note' => 'Примечание',
     ],
     'accessFlags' => $accessFlags,
@@ -566,10 +568,10 @@ ob_start();
       <tr>
         <td><?= render_lookup('store', 'store_id', $values['store_id'], $currentStoreName,
                 h(json_encode($storeList, JSON_UNESCAPED_UNICODE)),
-                'store_form.php?mode=new', $isReadonly, ['id' => 'store-id', 'data-name-input' => 'store-name']) ?></td>
+                '', $isReadonly, ['id' => 'store-id', 'data-name-input' => 'store-name']) ?></td>
         <td><?= render_lookup('sotr', 'sotr_id', $values['sotr_id'], $currentSotrName,
                 h(json_encode($sotrList, JSON_UNESCAPED_UNICODE)),
-                'sotr_form.php?mode=new', $isReadonly, ['id' => 'sotr-id', 'data-name-input' => 'sotr-name']) ?></td>
+                '', $isReadonly, ['id' => 'sotr-id', 'data-name-input' => 'sotr-name']) ?></td>
         <td>&nbsp;</td>
       </tr>
       <tr>
@@ -634,6 +636,7 @@ $platData = array_map(function($p) {
         'zat_name' => (string)($p['zat_name'] ?? '-'),
         'sum' => (float)$p['sum'],
         'out_flag' => (int)$p['out_flag'] ? 'Расход' : 'Приход',
+        'sotr_name' => (string)(($p['sotr_doc_name'] ?? '') !== '' ? $p['sotr_doc_name'] : ($p['sotr_name'] ?? '-')),
         'note' => (string)$p['note'],
     ];
 }, $platList);

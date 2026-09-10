@@ -13,7 +13,10 @@ if ($onlyPage) {
     $tp->page = $pageNum;
 }
 
-$rows = $tp->fetchAll($conn);
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
+[$rows, $pagination] = $tp->fetchPage($conn);
 
 $colValues = [
     'id'    => fn($r) => (int)$r['number'],

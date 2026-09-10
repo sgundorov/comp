@@ -11,5 +11,8 @@ if (!in_array($format, ['csv', 'xls'], true)) {
 }
 
 $tp = new TablePage($conn, $contypePageConfig);
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 $rows = $tp->fetchAll($conn);
 $tp->renderExport($format, $rows, ['baseName' => 'Виды контактов', 'colValues' => ['id' => fn($r) => (string)(int)$r['contype_id']]]);

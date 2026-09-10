@@ -273,6 +273,24 @@ if (!defined('TABLEPAGE_LOADED')) {
             $this->where = $this->where === '' ? $extra : $this->where . ' AND ' . $extra;
         }
 
+        /**
+         * Строгий фильтр «только выбранные» для экспорта/печати из меню «Выбрано»:
+         * если в marks есть записи — ограничивает выборку отмеченными id,
+         * иначе делает выборку пустой (пункты меню при отсутствии отметок недоступны).
+         * Возвращает количество отмеченных записей.
+         */
+        public function applySelectedFilter(mysqli $conn): int {
+            $ids = array_keys(load_marks_set($conn, $this->marksTbl));
+            $colExpr = $this->keyExpr ?? $this->key;
+            if (count($ids) === 0) {
+                $this->appendWhereRaw('1 = 0');
+                return 0;
+            }
+            $place = implode(',', array_fill(0, count($ids), '?'));
+            $this->appendWhere("$colExpr IN ($place)", $ids, str_repeat('i', count($ids)));
+            return count($ids);
+        }
+
         public function applyFilterWithLabel(mysqli $conn, string $getParam, string $colExpr, string $label, string $lookupTable, string $lookupIdCol, string $lookupNameCol): void {
             $raw = (string)($_GET[$getParam] ?? '');
             if ($raw === '') return;
@@ -472,6 +490,9 @@ if (!defined('TABLEPAGE_LOADED')) {
             $totalCount = $pagination['totalCount'] ?? count($rows);
             $rangeFrom = $pagination['rangeFrom'] ?? (count($rows) > 0 ? 1 : 0);
             $rangeTo = $pagination['rangeTo'] ?? count($rows);
+            $pageCss = strtolower((string)($options['orientation'] ?? '')) === 'landscape'
+                ? "\n    /* landscape */\n    @media screen { .print-page, .print-toolbar { max-width: 1400px; } }\n    @media print { @page { size: A4 landscape; margin: 8mm; } }"
+                : '';
 
             ?><!DOCTYPE html>
 <html lang="ru">
@@ -511,7 +532,7 @@ if (!defined('TABLEPAGE_LOADED')) {
         .print-page { box-shadow:none; padding:0; margin:0; max-width:100%; }
         .print-toolbar { display:none; }
         body { background:#fff; padding:0; }
-    }
+    }<?= $pageCss ?>
 </style>
 </head>
 <body>
@@ -1486,6 +1507,7 @@ if (!defined('TABLEPAGE_LOADED')) {
           });
         };
         <?php endif; ?>
+        if (window.EmbeddedSubTable && EmbeddedSubTable.registerInit) EmbeddedSubTable.registerInit('<?= $p ?>', function () { if (typeof window.init<?= ucfirst($p) ?>Table === 'function') window.init<?= ucfirst($p) ?>Table(); });
         window.init<?= ucfirst($p) ?>Table = function () {
           var table = document.getElementById('<?= $p ?>-table');
           if (!table) return;
@@ -1533,8 +1555,8 @@ if (!defined('TABLEPAGE_LOADED')) {
             var ieFields = {};
             <?php foreach ($visibleCols as $col):
                 $cn = $col['name'] ?? $col['key'] ?? '';
-                $colType = !empty($col['param']) ? 'lookup' : ($col['type'] ?? 'text');
-                $dbField = $col['param'] ?? $cn;
+                $colType = (!empty($col['param']) || (($col['type'] ?? '') === 'lookup')) ? 'lookup' : ($col['type'] ?? 'text');
+                $dbField = $col['dbField'] ?? $col['param'] ?? $cn;
             ?>
             ieFields['<?= $cn ?>'] = { dbField: '<?= $dbField ?>', type: '<?= $colType ?>', label: <?= json_encode($col['label'] ?? $cn, JSON_UNESCAPED_UNICODE) ?> };
             <?php endforeach; ?>

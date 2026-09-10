@@ -11,5 +11,8 @@ if (!in_array($format, ['csv', 'xls'], true)) {
 }
 
 $tp = new TablePage($conn, $tagPageConfig);
+if ((string)($_GET['selected'] ?? '') === '1') {
+    $tp->applySelectedFilter($conn);
+}
 $rows = $tp->fetchAll($conn);
 $tp->renderExport($format, $rows, ['baseName' => 'Виды деятельности', 'colValues' => ['id' => fn($r) => (string)(int)$r['tag_id']]]);

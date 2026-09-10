@@ -1,0 +1,13 @@
+kiosapi.com
+
+OpencodeKey: sk-4YX5AoB3rMZkMWmZ8s0kpYTZAO6ymmvVKOKXogVMsXMAFg4T
+
+Base URL: https://router.kiosapi.com/v1/
+
+deepseek-ai/deepseek-v4-pro-0813
+
+deepseek-ai/deepseek-v4-flash-0731
+
+nvidia/nemotron-3-super-120b-a12b
+
+moonshotai/kimi-k3

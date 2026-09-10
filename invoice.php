@@ -690,6 +690,19 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
         try { eval(s.textContent); } catch(ex) { console.error('[form] script error', ex); }
       });
     }
+    function syncFormValues(root) {
+      (root || formBody).querySelectorAll('input, textarea, select').forEach(function(el) {
+        if (el.type === 'checkbox' || el.type === 'radio') {
+          if (el.checked) el.setAttribute('checked', ''); else el.removeAttribute('checked');
+        } else if (el.tagName === 'SELECT') {
+          Array.from(el.options).forEach(function(o) { o.removeAttribute('selected'); });
+          var sel = el.options[el.selectedIndex];
+          if (sel) sel.setAttribute('selected', '');
+        } else {
+          el.setAttribute('value', el.value);
+        }
+      });
+    }
 
     function restoreStashedForm(data) {
       if (!stashed) return;
@@ -912,12 +925,37 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/lookup.js', 'a
           if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); } return;
         }
       }
+      if (e.target.closest('[data-lookup-add]')) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        var addLink = e.target.closest('a[data-lookup-add]');
+        var target = addLink.getAttribute('data-lookup-add');
+        if (target) {
+          var href = addLink.getAttribute('href') || (target + '_form.php?mode=new');
+          syncFormValues();
+          openFormModal(href, { onRestore: function(data, bodyEl) {
+            if (!data || !data.id || !data.name) return;
+            var container = bodyEl.querySelector('[data-lookup="' + target + '"]');
+            if (!container) return;
+            var idEl = container.querySelector('[data-lookup-id]');
+            var nameEl = container.querySelector('.lookup-input');
+            if (idEl) idEl.value = String(data.id);
+            if (nameEl) nameEl.value = data.name;
+            var items = [];
+            try { items = JSON.parse(container.getAttribute('data-countries') || '[]'); } catch(e) {}
+            if (!items.find(function(c) { return c.id === data.id; })) {
+              items.push({ id: data.id, name: data.name });
+              items.sort(function(a, b) { return a.name.localeCompare(b.name, 'ru'); });
+              container.setAttribute('data-countries', JSON.stringify(items));
+            }
+          }});
+        }
+        return;
+      }
       let a = e.target.closest('a[href*="invoice_form.php"]');
       if (a) { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return; e.preventDefault(); e.stopImmediatePropagation(); openFormModal(a.getAttribute('href')); return; }
       const trig = e.target.closest('[data-form-open]');
       if (trig) { e.preventDefault(); openFormModal(trig.getAttribute('data-form-open')); return; }
       if (e.target.closest('[data-form-close]')) { e.preventDefault(); window.invoice2Dirty = false; if (stashed) { restoreStashedForm(null); } else { closeFormModal(); var p = new URLSearchParams(location.search); var st = document.querySelector('table.data-table tbody tr.selected'); if (st) p.set('focus', st.getAttribute('data-row-id')); location.href = location.pathname + '?' + p.toString(); } return; }
-      if (e.target.closest('[data-lookup-add]')) { e.preventDefault(); var openFn = openFormModal; FormModalCore.handleLookupAdd(e.target.closest('[data-lookup-add]'), function (fn) { stashed = { html: formBody.innerHTML, onRestore: fn, activeId: document.activeElement ? document.activeElement.id : null, invoice2Dirty: window.invoice2Dirty }; }, openFn); return; }
     });
 
     document.querySelectorAll('tbody tr').forEach(function (tr) {
@@ -1065,7 +1103,7 @@ $platTable = new EmbeddedTable([
     'parentField' => 'doc_id',
     'childFormUrl' => 'plat_form.php?doc_type=' . $invoiceDoctypeId,
     'childFormName' => 'PlatForm',
-    'colWidths' => ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'out_flag' => '80px', 'note' => 'auto'],
+    'colWidths' => ['datetime' => '140px', 'client_name' => 'auto', 'zat_name' => '150px', 'sum' => '100px', 'out_flag' => '80px', 'sotr_name' => '140px', 'note' => '300px'],
     'columnResizeUrl' => 'plat_column_width_save.php',
     'columnResizeTbl' => 'plat',
     'pageSize' => 15,
@@ -1080,7 +1118,8 @@ $platTable = new EmbeddedTable([
         ['name' => 'zat_name', 'label' => 'Вид операции'],
         ['name' => 'sum', 'label' => 'Сумма'],
         ['name' => 'out_flag', 'label' => 'Тип'],
-        ['name' => 'note', 'label' => 'Примечание', 'type' => 'textarea'],
+        ['name' => 'sotr_name', 'label' => 'Сотрудник', 'readonly' => true],
+        ['name' => 'note', 'label' => 'Примечание', 'type' => 'textarea', 'align' => 'left'],
     ],
     'columnLabels' => [
         'datetime' => 'Дата/Время',
@@ -1088,6 +1127,7 @@ $platTable = new EmbeddedTable([
         'zat_name' => 'Вид операции',
         'sum' => 'Сумма',
         'out_flag' => 'Тип',
+        'sotr_name' => 'Сотрудник',
         'note' => 'Примечание',
     ],
     'accessFlags' => $accessFlags,

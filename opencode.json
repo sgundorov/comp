@@ -1,4 +1,72 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": ["USER.md"]
+  "provider": {
+    "omniroute": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "OmniRoute",
+      "options": {
+        "baseURL": "http://localhost:20128/v1",
+        "apiKey": "sk-24cbffdd8e01b35f-31a55d-1a273243"
+      },
+      "models": {
+        "oc/big-pickle": {
+          "name": "oc/big-pickle"
+        },
+        "oc/deepseek-v4-flash-free": {
+          "name": "oc/deepseek-v4-flash-free"
+        },
+      }
+    },
+    "kiro": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Kiro",
+      "options": {
+        "baseURL": "http://localhost:20128/v1",
+        "apiKey": "sk-24cbffdd8e01b35f-cc52dc-9e128b02"
+      },
+      "models": {
+        "kr/minimax-m2.5": {
+          "name": "kr/minimax-m2.5"
+        },
+        "kr/deepseek-3.2": {
+          "name": "kr/deepseek-3.2"
+        },
+      }
+    },
+    "Tokenrouter": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Tokenrouter",
+      "options": {
+        "baseURL": "https://api.tokenrouter.com/v1",
+        "apiKey": "sk-0qiEJEGkGZ5QoQh1PcaxM99JhxTkwrsgpaomvqp3lq8O6Khi"
+      },
+      "models": {
+        "z-ai/glm-5.3-free": {
+          "name": "kz-ai/glm-5.3-free"
+        },
+      }
+    },
+    "Kiosapi": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Kiosapi",
+      "options": {
+        "baseURL": "https://router.kiosapi.com/v1/",
+        "apiKey": "sk-4YX5AoB3rMZkMWmZ8s0kpYTZAO6ymmvVKOKXogVMsXMAFg4T"
+      },
+      "models": {
+        "deepseek-ai/deepseek-v4-pro-0813": {
+          "name": "deepseek-ai/deepseek-v4-pro-0813"
+        },
+        "deepseek-ai/deepseek-v4-flash-0731": {
+          "name": "deepseek-ai/deepseek-v4-flash-0731"
+        },
+        "nvidia/nemotron-3-super-120b-a12b": {
+          "name": "nvidia/nemotron-3-super-120b-a12b"
+        },
+        "moonshotai/kimi-k3": {
+          "name": "moonshotai/kimi-k3"
+        },
+      }
+    },
+  }
 }

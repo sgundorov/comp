@@ -1,4 +1,4 @@
-:root{
+﻿:root{
   --bg: #2f3e4e;
   --panel: #3a4a5b;
   --panel-2: #405162;
@@ -351,7 +351,7 @@ textarea[readonly] {
   font-style: italic;
 }
 
-/* ---------- Form actions (Сохранить / Отменить) ---------- */
+/* ---------- Form actions (РЎРѕС…СЂР°РЅРёС‚СЊ / РћС‚РјРµРЅРёС‚СЊ) ---------- */
 .form {
   width: 100%;
   max-width: 760px;
@@ -435,6 +435,8 @@ textarea[readonly] {
 .data-table th { position: relative; }
 .data-table th,
 .data-table td { overflow: hidden; }
+.data-table td.num-col { text-align: right; }
+.data-table td.num-col .cell-value { font-variant-numeric: tabular-nums; }
 .col-resize-handle {
   position: absolute;
   right: 0;

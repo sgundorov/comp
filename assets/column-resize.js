@@ -10,7 +10,13 @@
     function initResize() {
       var table = document.querySelector(selector);
       if (!table) return;
-      if (table.dataset.colResizeInited) return;
+      /* Форма в модалке при открытии дочернего окна сериализуется в innerHTML
+       * (stash), а затем возвращается (restore). В HTML попадают и сам атрибут
+       * data-col-resize-inited, и ручки .col-resize-handle, но слушатели событий
+       * при сериализации не сохраняются — ручки остаются «видимыми», но мёртвыми.
+       * Поэтому инициализация должна быть идемпотентной: всегда убирать старые
+       * ручки и флаг и привязывать заново. */
+      table.querySelectorAll('.col-resize-handle').forEach(function (h) { h.remove(); });
       table.dataset.colResizeInited = '1';
       if (SAVE_URL) table.dataset.colResizeUrl = SAVE_URL;
       if (tbl) table.dataset.colResizeTbl = tbl;

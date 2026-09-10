@@ -13,6 +13,14 @@
     return isNaN(n) ? '-' : n.toFixed(dec);
   }
 
+  function prettyNumStr(s) {
+    s = String(s == null ? '' : s).trim();
+    if (s === '' || !/^-?\d+(?:[.,]\d+)?$/.test(s)) return s;
+    if (s.indexOf(',') >= 0) s = s.replace(',', '.');
+    if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s;
+  }
+
   function EmbeddedSubTable(config) {
     if (!config || !config.tableEl) throw new Error('EmbeddedSubTable: tableEl required');
 
@@ -80,6 +88,16 @@
     this._updateButtons();
 
     var self = this;
+    /* Страховка: после сохранения дочерней формы (восстановления родительской
+     * модалки) перечитываем список, даже если шаблонный onRestore не сработал. */
+    if (typeof window.addEventListener === 'function') {
+      window.addEventListener('form-modal:child-saved', function (e) {
+        if (!self.saveUrl || !self.parentId) return;
+        if (!self.tableEl || !self.tableEl.isConnected) return;
+        var detail = e && e.detail ? e.detail : {};
+        self.refresh({ focusId: detail.id || 0 });
+      });
+    }
     if (this.data.length > 0) {
       setTimeout(function () { if (self.selectedId === 0 && !self._refreshPending) self.selectById(self.data[0].id); }, 0);
     }
@@ -145,6 +163,21 @@
     } else {
       var html = '';
       var st = this.searchActive && this.searchText ? this.searchText.toLowerCase() : '';
+      /* Автоопределение числовых колонок: все непустые значения — числа.
+       * Такие колонки выравниваются вправо и форматируются (без хвостовых нулей). */
+      var autoNum = {};
+      for (var c = 0; c < this.columns.length; c++) {
+        var acol = this.columns[c];
+        if (acol.key === 'id' || acol.render || acol.align) continue;
+        var anyV = false, allNum = true;
+        for (var q = 0; q < items.length; q++) {
+          var av = items[q][acol.key];
+          if (av == null || av === '') continue;
+          anyV = true;
+          if (!/^-?\d+(?:[.,]\d+)?$/.test(String(av))) { allNum = false; break; }
+        }
+        if (anyV && allNum) autoNum[acol.key] = true;
+      }
       for (var i = 0; i < items.length; i++) {
         var item = items[i];
         var sel = (item.id == this.selectedId) ? ' selected' : '';
@@ -156,11 +189,15 @@
           var val = item[col.key] != null ? item[col.key] : '';
           var cellVal = (col.dbField && col.dbField !== col.key) ? (item[col.dbField] != null ? item[col.dbField] : '') : val;
           var display = col.render ? col.render(val, item) : (col.hideZero && (val === 0 || val === '0') ? '' : esc(val));
+          var isAutoNum = !!autoNum[col.key];
+          if (isAutoNum && String(display).indexOf('<') === -1 && display !== '') {
+            display = esc(prettyNumStr(display));
+          }
           if (st && this.searchCols.indexOf(col.key) >= 0) {
             display = this._highlight(display, st);
           }
-          var align = col.align || 'left';
-          var editable = (this.readonly || col.readonly) ? '' : ' class="cell-editable"';
+          var align = col.align || (isAutoNum ? 'right' : 'left');
+          var editable = (this.readonly || col.readonly || (col.lockedField && item[col.lockedField])) ? '' : ' class="cell-editable"';
           html += '<td' + editable + ' data-field="' + col.key + '" data-value="' + esc(String(cellVal)) + '" style="text-align:' + align + '"><span class="cell-value">' + display + '</span></td>';
         }
         html += '</tr>';
@@ -595,8 +632,21 @@
               var tbl = window['__' + self.prefix + 'Table'] || self;
               if (self.totalsCallback && typeof global[self.totalsCallback] === 'function') global[self.totalsCallback](data);
               if (tbl) {
-                if (data.sgroup_list) {
-                  tbl.data = data.sgroup_list;
+                /* Универсальный контракт: дочерняя форма возвращает свежий список
+                 * в любом ключе вида *_list (sgroup_list, price_list, ...).
+                 * Раньше жёстко ожидался только sgroup_list, из-за чего новые
+                 * вложенные таблицы не обновлялись после сохранения. */
+                var freshList = null;
+                for (var fk in data) {
+                  if (Object.prototype.hasOwnProperty.call(data, fk) &&
+                      fk.length > 5 && fk.slice(-5) === '_list' &&
+                      Object.prototype.toString.call(data[fk]) === '[object Array]') {
+                    freshList = data[fk];
+                    break;
+                  }
+                }
+                if (freshList) {
+                  tbl.data = freshList;
                   if (data._deleted) {
                     if (tbl.data.length > 0) {
                       var idx = Math.min(tbl.data.length - 1, 0);
@@ -647,5 +697,20 @@
     }
   };
 
-  global.EmbeddedSubTable = { create: function (config) { return new EmbeddedSubTable(config); } };
+  /* Реестр инициализации вложенных таблиц: renderEmbeddedScripts регистрирует
+   * свой init здесь, а form-modal-handler вызывает autoInitAll() после каждой
+   * инъекции/восстановления HTML формы (open/restore/apply). Новым таблицам
+   * не нужно ничего добавлять в конфиг лист-страницы. */
+  global.EmbeddedSubTable = {
+    create: function (config) { return new EmbeddedSubTable(config); },
+    _initFns: {},
+    registerInit: function (prefix, fn) { this._initFns[prefix] = fn; },
+    autoInitAll: function () {
+      var fns = this._initFns || {};
+      Object.keys(fns).forEach(function (p) {
+        try { if (typeof fns[p] === 'function') fns[p](); }
+        catch (e) { if (global.console) console.error('[EST] init ' + p, e); }
+      });
+    }
+  };
 })(window);

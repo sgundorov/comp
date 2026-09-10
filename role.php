@@ -187,10 +187,14 @@ render_script_includes(['scripts' => ['assets/export-modal.js', 'assets/access.j
         pageUrl: 'role.php',
         search: document.querySelector('.toolbar').getAttribute('data-search') || '',
         getExportUrl: function () {
-          return null;
+          var sp = new URLSearchParams(location.search);
+          ['action', 'page'].forEach(function (k) { sp.delete(k); });
+          return 'role_export.php?format=csv&selected=1&' + sp.toString();
         },
         getPrintUrl: function () {
-          return null;
+          var sp = new URLSearchParams(location.search);
+          ['action', 'page'].forEach(function (k) { sp.delete(k); });
+          return 'role_print.php?selected=1&' + sp.toString();
         }
       });
 

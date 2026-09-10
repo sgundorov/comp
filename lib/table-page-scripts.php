@@ -70,17 +70,14 @@ function render_table_page_scripts(array $cfg): void {
     if (window.__accessFlags && typeof applyAccessFlags === 'function') applyAccessFlags(window.__accessFlags);
     window.__focusAfterSave = function (params, form, data) {
       var mode = (form.querySelector('input[name="mode"]') || {}).value || '';
-      alert('__focusAfterSave: mode=' + mode + ', data=' + JSON.stringify(data));
       if (mode === 'new' || mode === 'copy') {
         if (data.id) {
           params.set('focus', String(data.id));
           if ('page' in data) {
             params.set('page', String(data.page));
-            alert('Устанавливаем page=' + data.page);
           } else {
-            alert('page НЕ передан в data!');
+            params.delete('focus');
           }
-          alert('params после: ' + params.toString());
         } else {
           params.delete('focus');
         }
@@ -171,11 +168,11 @@ function render_table_page_scripts(array $cfg): void {
         search: search,
         getExportUrl: function () {
           if (markedSet.size === 0) return null;
-          return '<?= h($exportUrl) ?>?format=csv&all=1';
+          return '<?= h($exportUrl) ?>?format=csv&all=1&selected=1';
         },
         getPrintUrl: function () {
           if (markedSet.size === 0) return null;
-          return '<?= h($printUrl) ?>?all=1';
+          return '<?= h($printUrl) ?>?all=1&selected=1';
         },
 <?php if ($marksTbl): ?>
         getInvertUrl: function () {

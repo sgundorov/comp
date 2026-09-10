@@ -504,10 +504,14 @@ render_script_includes(['scripts' => ['assets/access.js', 'assets/export-modal.j
         return 'client.php?action=invertSelection&' + other.toString();
       },
       getExportUrl: function () {
-        return null;
+        var sp = new URLSearchParams(location.search);
+        ['action', 'page'].forEach(function (k) { sp.delete(k); });
+        return 'client_export.php?format=csv&selected=1&' + sp.toString();
       },
       getPrintUrl: function () {
-        return null;
+        var sp = new URLSearchParams(location.search);
+        ['action', 'page'].forEach(function (k) { sp.delete(k); });
+        return 'client_print.php?selected=1&' + sp.toString();
       }
     });
 
