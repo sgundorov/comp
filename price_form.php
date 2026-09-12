@@ -210,7 +210,7 @@ ob_start();
   <!-- Тарифный план | Фиксированный тариф -->
   <tr>
     <td class="form-label">Тарифный план</td>
-    <td class="form-label">Фиксированный тариф</td>
+    <td>&nbsp;</td>
     <td>&nbsp;</td>
   </tr>
   <tr>

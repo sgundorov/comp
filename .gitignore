@@ -15,3 +15,8 @@ city_form-.php
 # Uploads & user data
 uploads/
 img/accept-.png
+
+# Secrets & scratch (never commit)
+KEYS/polinations.txt
+out.txt
+opencode-.json

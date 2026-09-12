@@ -494,12 +494,13 @@ function dv2($v) { return $v; }
     var z = sumZalogBase;
     if (!p || !p.noquant_flag) z *= quant;
     setVal('arenda2-sum-zalog', fmtNum(z));
+    cleanSumFields();
   }
 
   function getVal(id) { var el = document.getElementById(id); return el ? el.value : ''; }
   function setVal(id, v) { var el = document.getElementById(id); if (el) el.value = v; }
   function parseNum(s) { s = String(s == null ? '' : s).trim().replace(',', '.'); var n = parseFloat(s); return isNaN(n) ? 0 : n; }
-  function fmtNum(v) { v = parseFloat(v) || 0; var s = v.toFixed(2).replace(/\.?0+$/, ''); return s === '' ? '0' : s; }
+  function fmtNum(v) { v = parseFloat(v) || 0; var s = v.toFixed(2).replace(/\.?0+$/, ''); return s; }
   function normHhmm(s) { s = String(s == null ? '' : s).trim(); var m = s.match(/^(\d{1,2}):(\d{2})/); return m ? m[1] + ':' + m[2] : ''; }
   function hhmmToNum(s) { var m = normHhmm(s); if (!m) return 0; var p = m.split(':'); return (+p[0]) * 60 + (+p[1]); }
   function weekendCount(b, v) {
@@ -654,6 +655,7 @@ function dv2($v) { return $v; }
     if (NDS_RATE > 0 && NO_NDS !== 1) { sum *= (1 + NDS_RATE / 100); }
     setVal('arenda2-sum', fmtNum(sum));
     setVal('arenda2-sum-discount', fmtNum(sd));
+    cleanSumFields();
     if (callback) callback({ ok: true, sum: sum, sum_discount: sd });
   }
 
@@ -1142,6 +1144,12 @@ function dv2($v) { return $v; }
   }
   syncTariffVisibility();
   syncFixedPeriodLock();
+  function cleanSumFields() {
+    ['arenda2-sum', 'arenda2-sum-discount', 'arenda2-sum-zalog'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && (el.value === '0' || el.value === '0.00' || el.value === '0,00')) el.value = '';
+    });
+  }
 })();
 /* Кнопки +/- (спин) для Количество/Часов/Дней/Месяцев — глобальное делегирование.
    Обработчик вешается на document ОДИН раз. Форма пере-выполняется через eval при

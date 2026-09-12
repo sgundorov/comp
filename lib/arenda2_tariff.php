@@ -29,7 +29,7 @@ function arenda2_select_tariff(mysqli $conn, array $appSettings, int $productId,
     }
     if ($clientId > 0) {
         $cl = $conn->query("SELECT nozalog_flag FROM client WHERE client_id = $clientId")->fetch_assoc();
-        if ($cl && (int)$cl['nozalog_flag'] === 1) $sumZalog = 0;
+        if ($cl && (int)$cl['nozalog_flag'] === 1) $sumZalog = 0.0;
     }
 
     /* Базовая цена по периоду аренды товара */
